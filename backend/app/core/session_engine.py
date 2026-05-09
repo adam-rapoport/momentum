@@ -23,6 +23,11 @@ from app.core.documents import router as docs_router
 from app.core.groq_client import StreamChunk, StreamResult
 from app.core.llm import stream_message
 from app.core.model_router import select_model
+from app.core.pending_actions import (
+    clear_pending_action,
+    execute_pending_action,
+    get_pending_action,
+)
 from app.core.skills import CLEAR_SENTINEL, detect_skill, get_skill
 from app.core.system_prompt import build_prompt
 from app.core.tools import (
@@ -151,18 +156,46 @@ class DoneEvent:
 
 @dataclass
 class AwaitingReviewEvent:
-    """Emitted when the agent called `AwaitReview` successfully in this turn.
-    The frontend swaps the chat input for an approval bar until the next
-    user message resumes the session.
+    """Emitted when the session pauses for user approval. Two cases:
+
+    1. **Skill deliverable** (kind='deliverable'): the agent called
+       `AwaitReview` after producing a document/PRD/etc. The other
+       fields (deliverable_kind, document_id, summary_for_user, url)
+       describe the deliverable.
+
+    2. **Pending action** (kind='send_email' / 'create_event'): a
+       send-side tool staged a payload via `pending_actions`. The
+       `pending_action` payload carries the preview so the ApprovalBar
+       can render recipients/subject/body for emails or attendees/time
+       for calendar events.
+
+    The frontend swaps the chat input for an approval bar until the
+    next user message resumes the session.
     """
+    kind: str  # 'deliverable' | 'send_email' | 'create_event'
     deliverable_kind: str
     document_id: str | None
     summary_for_user: str
     url: str | None = None
     model: str | None = None
+    pending_action: dict | None = None  # populated when kind != 'deliverable'
 
 
 _SKILL_METADATA_KEYS = ("active_skill", "active_skill_phase", "pending_deliverable")
+
+
+def _summarize_pending_action(kind: str, preview: dict) -> str:
+    """One-line summary used as the AwaitingReviewEvent.summary_for_user
+    fallback when the frontend hasn't loaded the full preview yet."""
+    if kind == "send_email":
+        recipients = ", ".join(preview.get("to") or [])
+        return f"Send email '{preview.get('subject', '')}' to {recipients}"
+    if kind == "create_event":
+        attendees = ", ".join(preview.get("attendees") or [])
+        return (
+            f"Create event '{preview.get('summary', '')}' with invites to {attendees}"
+        )
+    return "Action staged for approval"
 
 _APPROVE_WORDS = {"/approve", "approve", "approved", "looks good", "lgtm"}
 _RESTART_WORDS = {"/restart", "restart", "start over", "cancel"}
@@ -189,10 +222,26 @@ def _classify_review_response(text: str) -> str | None:
     return None
 
 
-def _apply_review_resolution(session: Session, intent: str, user_text: str) -> str:
-    """Mutate session state for an approve/revise/restart reply. Returns a
-    synthetic system note to inject into the LLM history (not persisted).
+async def _apply_review_resolution(
+    db: AsyncSession, session: Session, intent: str, user_text: str
+) -> str:
+    """Mutate session state for an approve/revise/restart reply.
+
+    Returns a synthetic system note to inject into the LLM history
+    (not persisted as a message). On approve of a pending_action this
+    actually runs the staged action (sending an email, sending invites)
+    and includes the result in the system note so the model can
+    acknowledge it accurately.
+
+    Async because executing a pending_action talks to Google APIs.
     """
+    pending_action = get_pending_action(session)
+    if pending_action is not None:
+        return await _resolve_pending_action(
+            db, session, intent, user_text, pending_action
+        )
+
+    # Existing deliverable-flow path (skill workflow).
     meta = dict(session.session_metadata or {})
     meta.pop("pending_deliverable", None)
     skill_name = meta.get("active_skill")
@@ -229,6 +278,130 @@ def _apply_review_resolution(session: Session, intent: str, user_text: str) -> s
     session.status = "active"
     session.session_metadata = meta
     return note
+
+
+async def _resolve_pending_action(
+    db: AsyncSession,
+    session: Session,
+    intent: str,
+    user_text: str,
+    action: dict,
+) -> str:
+    """Approve / revise / restart for a staged send-side action.
+
+    On approve we execute the action; if execution fails we leave the
+    pause cleared but tell the model what went wrong so it can apologize
+    and offer to retry.
+    """
+    kind = action.get("kind", "")
+    tool_name = action.get("tool_name", "tool")
+
+    if intent == "approve":
+        try:
+            success_summary = await execute_pending_action(db, session.user_id, action)
+        except Exception as e:  # noqa: BLE001 — surface to model, not user
+            logger.exception("pending_action %s execution failed", kind)
+            clear_pending_action(session)
+            session.status = "active"
+            await _rewrite_staged_tool_result(
+                db, session.id,
+                f"[STAGED → FAILED] Execution of the staged {kind.replace('_', ' ')} "
+                f"failed: {e}. The action did NOT complete.",
+            )
+            return (
+                f"[SYSTEM] The user approved the {kind.replace('_', ' ')}, "
+                f"but executing it failed: {e}. Apologize briefly and ask "
+                f"if they want to retry. Do NOT call {tool_name} again "
+                f"automatically — wait for confirmation."
+            )
+        clear_pending_action(session)
+        session.status = "active"
+        # Critical: rewrite the staged tool_result in the DB so the next
+        # turn's LLM history shows a definitive "done" state instead of
+        # the "[Pending approval]" marker. Without this, weak instruction
+        # followers (Scout) re-call the tool after seeing the resume note,
+        # causing duplicate sends.
+        await _rewrite_staged_tool_result(
+            db, session.id,
+            f"[STAGED → APPROVED & EXECUTED] {success_summary} "
+            f"This is the final result. The action is COMPLETE. Do not call "
+            f"{tool_name} again.",
+        )
+        return (
+            f"[SYSTEM — ACTION COMPLETE] {success_summary} "
+            f"The previous {tool_name} call has been EXECUTED. There is "
+            f"nothing left to do. Reply with ONE short sentence acknowledging "
+            f"to the user. DO NOT call {tool_name} or any other tool — just text."
+        )
+
+    if intent == "revise":
+        stripped = user_text.strip()
+        revision = (
+            stripped[len("/revise"):].lstrip()
+            if stripped.lower().startswith("/revise")
+            else stripped
+        )
+        clear_pending_action(session)
+        session.status = "active"
+        await _rewrite_staged_tool_result(
+            db, session.id,
+            f"[STAGED → REVISED] The user requested changes; the staged "
+            f"{kind.replace('_', ' ')} was discarded.",
+        )
+        return (
+            f"[SYSTEM] The user wants changes to the staged {kind.replace('_', ' ')}: "
+            + (revision or "(no specific detail — ask them what to change)")
+            + f". Re-call {tool_name} with the updated parameters; the new "
+            "version will be staged for approval again. Keep free-form text minimal."
+        )
+
+    # restart
+    clear_pending_action(session)
+    session.status = "active"
+    await _rewrite_staged_tool_result(
+        db, session.id,
+        f"[STAGED → CANCELLED] The user cancelled the staged "
+        f"{kind.replace('_', ' ')}. Nothing was sent.",
+    )
+    return (
+        f"[SYSTEM] The user cancelled the staged {kind.replace('_', ' ')}. "
+        "Treat the next message as a fresh request. Do NOT re-stage."
+    )
+
+
+async def _rewrite_staged_tool_result(
+    db: AsyncSession, session_id: UUID, replacement_output: str
+) -> bool:
+    """Find the most recent tool_result block that contains the "[Pending
+    approval]" marker for this session and replace its output text. Used
+    after approve/revise/restart to give the model a definitive end-state
+    in its tool history (not a stale "Pending" message it might re-act on)."""
+    stmt = (
+        select(Message)
+        .where(Message.session_id == session_id, Message.role == "tool")
+        .order_by(Message.created_at.desc())
+        .limit(10)
+    )
+    candidates = list((await db.scalars(stmt)).all())
+    for msg in candidates:
+        new_blocks: list[dict] = []
+        modified = False
+        for block in msg.content or []:
+            if (
+                isinstance(block, dict)
+                and block.get("type") == "tool_result"
+                and "[Pending approval]" in (block.get("output") or "")
+            ):
+                new_block = dict(block)
+                new_block["output"] = replacement_output
+                new_blocks.append(new_block)
+                modified = True
+            else:
+                new_blocks.append(block)
+        if modified:
+            msg.content = new_blocks
+            return True
+    return False
 
 
 def _apply_skill_detection(session: Session, user_text: str) -> None:
@@ -342,7 +515,9 @@ async def process_message(
     if session.status == "awaiting_review":
         intent = _classify_review_response(user_text)
         if intent is not None:
-            resume_note = _apply_review_resolution(session, intent, user_text)
+            resume_note = await _apply_review_resolution(
+                db, session, intent, user_text
+            )
 
     # Skill detection runs before we load the system prompt so the active
     # skill (if any) shows up as Section 15. Rules (full logic in
@@ -565,6 +740,43 @@ async def process_message(
 
         await _safe_commit(db, session_id, stage="persist_tool_results")
 
+        # Pause cases (in priority order):
+        #
+        # 1. A staged pending_action (SendEmail / CreateCalendarEvent
+        #    with attendees) — pause regardless of skill state. The
+        #    user clicks Approve in the UI to actually execute the
+        #    side effect.
+        # 2. AwaitReview during an active skill — existing skill
+        #    deliverable flow.
+        #
+        # Plain AwaitReview without an active skill is intentionally
+        # NOT a pause trigger (Scout occasionally calls it spuriously
+        # in casual chat).
+        pending_action = get_pending_action(session)
+        if pending_action is not None:
+            preview = pending_action.get("preview") or {}
+            kind = pending_action.get("kind") or ""
+            summary = _summarize_pending_action(kind, preview)
+
+            session.status = "awaiting_review"
+            session.total_input_tokens += total_input_tokens
+            session.total_output_tokens += total_output_tokens
+            session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
+            await _safe_commit(db, session_id, stage="pause_for_action")
+
+            yield AwaitingReviewEvent(
+                kind=kind,
+                deliverable_kind=kind,
+                document_id=None,
+                summary_for_user=summary,
+                url=None,
+                model=turn_model,
+                pending_action=pending_action,
+            )
+            await redis.delete(_cancel_key(session_id))
+            reset_context(ctx_token)
+            return
+
         # A successful AwaitReview call ends the turn: the skill is signalling
         # it has a deliverable ready for review. We transition the session
         # into awaiting_review status, stash the pending deliverable, emit a
@@ -605,11 +817,13 @@ async def process_message(
             await _safe_commit(db, session_id, stage="pause_for_review")
 
             yield AwaitingReviewEvent(
+                kind="deliverable",
                 deliverable_kind=deliverable["deliverable_kind"],
                 document_id=deliverable["document_id"],
                 summary_for_user=deliverable["summary_for_user"],
                 url=doc_url,
                 model=turn_model,
+                pending_action=None,
             )
             await redis.delete(_cancel_key(session_id))
             reset_context(ctx_token)

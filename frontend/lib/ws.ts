@@ -86,17 +86,20 @@ class WsClient {
         });
       }
     } else if (event.type === "stream.awaiting_review") {
-      // Skill workflow produced a deliverable and is waiting for the user
-      // to approve, request revisions, or restart. Swap the chat input for
-      // the approval bar until the user replies. The backend stopped the
-      // turn without emitting stream.done, so finalize the stream here too.
+      // The session paused for approval — either a skill deliverable
+      // (kind='deliverable') or a staged send-side action (kind='send_email'
+      // / 'create_event'). Swap the chat input for the approval bar until
+      // the user replies. The backend stopped the turn without emitting
+      // stream.done, so finalize the stream here too.
       const sessionId = event.session_id;
       if (event.model) store.setLastModel(sessionId, event.model);
       store.setAwaitingReview(sessionId, {
+        kind: event.kind ?? "deliverable",
         deliverable_kind: event.deliverable_kind,
         document_id: event.document_id,
         summary_for_user: event.summary_for_user,
         url: event.url ?? null,
+        pending_action: event.pending_action ?? null,
       });
       // Refetch so the persisted state (messages, session_metadata) is
       // canonical, then drop the live streaming state.

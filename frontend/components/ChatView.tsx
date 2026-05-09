@@ -107,18 +107,32 @@ export function ChatView({ sessionId }: Props) {
         if (cancelled) return;
         setMessages(sessionId, detail.messages);
         upsertSession(detail);
-        // Rehydrate the pause state after a browser refresh: if the backend
-        // says this session is still awaiting review, show the approval bar
-        // using the persisted pending_deliverable in session_metadata.
-        const pending = detail.session_metadata?.pending_deliverable;
-        if (detail.status === "awaiting_review" && pending) {
+        // Rehydrate the pause state after a browser refresh. The backend
+        // stores ONE of: pending_action (Chunk E send-side action) or
+        // pending_deliverable (skill workflow). Pending action wins if both
+        // are somehow set.
+        const meta = detail.session_metadata ?? {};
+        const pendingAction = meta.pending_action;
+        const pendingDeliverable = meta.pending_deliverable;
+        if (detail.status === "awaiting_review" && pendingAction) {
           setAwaitingReview(sessionId, {
-            deliverable_kind: String(pending.deliverable_kind ?? ""),
-            document_id: pending.document_id
-              ? String(pending.document_id)
+            kind: pendingAction.kind,
+            deliverable_kind: pendingAction.kind,
+            document_id: null,
+            summary_for_user: "Action staged for approval",
+            url: null,
+            pending_action: pendingAction,
+          });
+        } else if (detail.status === "awaiting_review" && pendingDeliverable) {
+          setAwaitingReview(sessionId, {
+            kind: "deliverable",
+            deliverable_kind: String(pendingDeliverable.deliverable_kind ?? ""),
+            document_id: pendingDeliverable.document_id
+              ? String(pendingDeliverable.document_id)
               : null,
-            summary_for_user: String(pending.summary_for_user ?? ""),
-            url: pending.url ? String(pending.url) : null,
+            summary_for_user: String(pendingDeliverable.summary_for_user ?? ""),
+            url: pendingDeliverable.url ? String(pendingDeliverable.url) : null,
+            pending_action: null,
           });
         } else {
           clearAwaitingReview(sessionId);

@@ -7,7 +7,34 @@ export interface SessionMetadata {
     summary_for_user?: string;
     url?: string | null;
   };
+  pending_action?: PendingAction;
   [key: string]: unknown;
+}
+
+export interface SendEmailPreview {
+  to: string[];
+  cc: string[];
+  subject: string;
+  body_snippet: string;
+}
+
+export interface CreateEventPreview {
+  summary: string;
+  start_iso: string;
+  end_iso: string;
+  attendees: string[];
+  location?: string;
+  description?: string;
+}
+
+export type PendingActionKind = "send_email" | "create_event";
+
+export interface PendingAction {
+  kind: PendingActionKind;
+  tool_name: string;
+  params: Record<string, unknown>;
+  preview: SendEmailPreview | CreateEventPreview;
+  staged_at: string;
 }
 
 export interface Session {
@@ -66,12 +93,18 @@ export type WsInbound =
   | { type: "session.message"; session_id: string; content: string }
   | { type: "session.cancel"; session_id: string };
 
+export type AwaitingReviewKind = "deliverable" | PendingActionKind;
+
 export interface AwaitingReview {
+  /** Discriminator: 'deliverable' for skill outputs, 'send_email' / 'create_event' for staged actions. */
+  kind: AwaitingReviewKind;
   deliverable_kind: string;
   document_id: string | null;
   summary_for_user: string;
   /** When the deliverable lives in Google Docs, a direct "Open in Google Docs" URL. */
   url?: string | null;
+  /** Populated when kind is 'send_email' or 'create_event'. */
+  pending_action?: PendingAction | null;
 }
 
 export type WsOutbound =
@@ -95,6 +128,7 @@ export type WsOutbound =
       type: "stream.awaiting_review";
       session_id: string;
       model?: string | null;
+      pending_action?: PendingAction | null;
     } & AwaitingReview)
   | {
       type: "stream.done";

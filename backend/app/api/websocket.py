@@ -112,11 +112,13 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
                         {
                             "type": "stream.awaiting_review",
                             "session_id": str(session_id),
+                            "kind": event.kind,
                             "deliverable_kind": event.deliverable_kind,
                             "document_id": event.document_id,
                             "summary_for_user": event.summary_for_user,
                             "url": event.url,
                             "model": event.model,
+                            "pending_action": event.pending_action,
                         }
                     )
                 elif isinstance(event, DoneEvent):

@@ -63,8 +63,17 @@ async def get_session(session_id: UUID, db: AsyncSession = Depends(get_db)) -> d
     )
     messages = list((await db.scalars(msg_stmt)).all())
 
+    # The DB column "metadata" is exposed on the model as `session_metadata`
+    # to avoid clashing with SQLAlchemy's reserved attribute. Skip the raw
+    # column name in the loop so we don't double-emit it under the wrong key,
+    # and add the renamed field by hand.
     return {
-        **{c.name: getattr(session, c.name) for c in session.__table__.columns if c.name != "metadata"},
+        **{
+            c.name: getattr(session, c.name)
+            for c in session.__table__.columns
+            if c.name != "metadata"
+        },
+        "session_metadata": session.session_metadata or {},
         "messages": [MessageRead.model_validate(m) for m in messages],
     }
 

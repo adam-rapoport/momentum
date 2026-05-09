@@ -77,7 +77,7 @@ async def main() -> None:
             "active_skill_phase": "review",
             "pending_deliverable": {"deliverable_kind": "prd", "document_id": "x"},
         }
-        note = _apply_review_resolution(session, "approve", "/approve")
+        note = await _apply_review_resolution(db, session, "approve", "/approve")
         assert session.status == "active"
         assert "active_skill" not in session.session_metadata
         assert "pending_deliverable" not in session.session_metadata
@@ -92,8 +92,8 @@ async def main() -> None:
             "active_skill_phase": "review",
             "pending_deliverable": {"deliverable_kind": "prd"},
         }
-        note = _apply_review_resolution(
-            session, "revise", "/revise add a non-goals section"
+        note = await _apply_review_resolution(
+            db, session, "revise", "/revise add a non-goals section"
         )
         assert session.status == "active"
         assert session.session_metadata.get("active_skill") == "write-prd"
@@ -109,7 +109,7 @@ async def main() -> None:
             "active_skill_phase": "review",
             "pending_deliverable": {"deliverable_kind": "prd"},
         }
-        note = _apply_review_resolution(session, "restart", "/restart")
+        note = await _apply_review_resolution(db, session, "restart", "/restart")
         assert session.status == "active"
         assert "active_skill" not in session.session_metadata
         assert "pending_deliverable" not in session.session_metadata
