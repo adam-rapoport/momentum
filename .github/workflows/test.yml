@@ -32,6 +32,15 @@ jobs:
       # creates the `pmomentum_test` database and runs alembic migrations
       # against it.
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+      # `app.config.Settings` validates these at import time, and most
+      # tests transitively import the settings module. Locally the values
+      # come from backend/.env (gitignored). CI has no .env, so fill in
+      # placeholders. Real connections during tests use TEST_DATABASE_URL
+      # via tests/conftest.py; GROQ_API_KEY isn't called from any unit
+      # test (LLM clients are constructed lazily and not exercised here).
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+      REDIS_URL: redis://localhost:6379
+      GROQ_API_KEY: ci-placeholder-not-a-real-key
 
     steps:
       - uses: actions/checkout@v4
