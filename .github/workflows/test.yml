@@ -41,6 +41,11 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
       REDIS_URL: redis://localhost:6379
       GROQ_API_KEY: ci-placeholder-not-a-real-key
+      # The model_router tests assert that Gemini/Gemma models are
+      # picker-available; the registry filters Google models out when
+      # GOOGLE_AI_API_KEY is unset. Placeholder is enough — no actual
+      # call goes out to Google during tests.
+      GOOGLE_AI_API_KEY: ci-placeholder-not-a-real-key
 
     steps:
       - uses: actions/checkout@v4
