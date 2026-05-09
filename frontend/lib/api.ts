@@ -61,6 +61,14 @@ export const api = {
     }),
   googleDisconnect: () =>
     request<void>(`/api/v1/integrations/google`, { method: "DELETE" }),
+
+  getModelPreferences: () =>
+    request<ModelPreferences>(`/api/v1/preferences/models`),
+  setModelPreferences: (body: ModelPreferencesUpdate) =>
+    request<ModelPreferences>(`/api/v1/preferences/models`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 };
 
 export interface GoogleStatus {
@@ -71,4 +79,26 @@ export interface GoogleStatus {
   scopes: string[];
   enabled_services: string[]; // subset of ["docs", "gmail", "calendar"]
   needs_reconnect: boolean;   // true when connected but missing new scopes
+}
+
+export interface ModelEntry {
+  id: string;
+  provider: "groq" | "google";
+  display_name: string;
+  role: "light" | "heavy" | "either";
+  notes: string;
+}
+
+export interface ModelPreferences {
+  light_model: string | null;            // user's pick, or null if unset
+  heavy_model: string | null;
+  effective_light_model: string;         // what would actually be used right now
+  effective_heavy_model: string;
+  available_light_models: ModelEntry[];
+  available_heavy_models: ModelEntry[];
+}
+
+export interface ModelPreferencesUpdate {
+  light_model?: string | null;           // null/empty clears the pick
+  heavy_model?: string | null;
 }

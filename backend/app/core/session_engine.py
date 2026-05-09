@@ -39,7 +39,7 @@ from app.core.tools import (
     set_context,
     to_openai_tools,
 )
-from app.models import Message, Session
+from app.models import Message, Session, User
 
 logger = logging.getLogger(__name__)
 
@@ -530,7 +530,14 @@ async def process_message(
     # Per-turn model selection. Runs AFTER skill detection so that a turn
     # that just activated a skill (slash command) is routed to the heavy
     # model immediately, not only on the following turn.
-    turn_model = select_model(user_text, session.session_metadata)
+    # User preferences from `users.preferences.{light_model,heavy_model}`
+    # override env-var defaults when set (Sprint 6 Chunk C).
+    turn_user = await db.scalar(select(User).where(User.id == session.user_id))
+    turn_model = select_model(
+        user_text,
+        session.session_metadata,
+        user_preferences=(turn_user.preferences if turn_user else None),
+    )
 
     stmt = (
         select(Message)

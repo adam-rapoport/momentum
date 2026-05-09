@@ -71,3 +71,70 @@ def test_none_metadata_is_equivalent_to_empty(default_model, heavy_model):
     # should behave the same for routing decisions.
     assert select_model("hi", None) == default_model
     assert select_model("/write-prd", None) == heavy_model
+
+
+# ---- Sprint 6 Chunk C: user-preference overrides ---------------------------
+
+
+def test_user_preference_overrides_light_default_when_available():
+    # Llama 3.1 8B Instant is registered as a light model and Groq is the
+    # always-available provider, so this should win over the env default.
+    prefs = {"light_model": "llama-3.1-8b-instant"}
+    assert select_model("hi there", {}, user_preferences=prefs) == "llama-3.1-8b-instant"
+
+
+def test_user_preference_overrides_heavy_default_for_slash_command():
+    # gemini-2.5-pro is registered as heavy. If GOOGLE_AI_API_KEY is set
+    # (it is, in our test env), the preference should win.
+    prefs = {"heavy_model": "gemini-2.5-pro"}
+    chosen = select_model("/write-prd topic", {}, user_preferences=prefs)
+    assert chosen == "gemini-2.5-pro"
+
+
+def test_user_preference_overrides_heavy_default_when_skill_active():
+    prefs = {"heavy_model": "gemini-2.5-pro"}
+    meta = {"active_skill": "write-prd", "active_skill_phase": "intake"}
+    chosen = select_model("ok proceed", meta, user_preferences=prefs)
+    assert chosen == "gemini-2.5-pro"
+
+
+def test_unknown_preference_falls_back_to_env_default(default_model, heavy_model):
+    # If a user has a stale preference for a model we removed from the
+    # registry (or an outright bogus value), routing must fall back to the
+    # env-var default rather than passing the bad ID through.
+    bad_prefs_light = {"light_model": "not-a-real-model"}
+    bad_prefs_heavy = {"heavy_model": "also-not-real"}
+    assert select_model("hi", {}, user_preferences=bad_prefs_light) == default_model
+    assert (
+        select_model("/write-prd topic", {}, user_preferences=bad_prefs_heavy)
+        == heavy_model
+    )
+
+
+def test_role_mismatched_preference_falls_back(default_model, heavy_model):
+    # A user who saved a heavy-only model into the light slot (e.g. via
+    # API tampering) should fall back, not get the heavy model on light turns.
+    prefs = {"light_model": "gemini-2.5-pro"}  # gemini-2.5-pro is heavy-only
+    assert select_model("hi", {}, user_preferences=prefs) == default_model
+
+
+def test_either_role_model_works_in_both_slots():
+    prefs = {
+        "light_model": "gemini-2.5-flash",
+        "heavy_model": "gemini-2.5-flash",
+    }
+    assert select_model("hi", {}, user_preferences=prefs) == "gemini-2.5-flash"
+    assert (
+        select_model("/write-prd topic", {}, user_preferences=prefs)
+        == "gemini-2.5-flash"
+    )
+
+
+def test_empty_preference_dict_uses_env_defaults(default_model, heavy_model):
+    assert select_model("hi", {}, user_preferences={}) == default_model
+    assert select_model("/write-prd t", {}, user_preferences={}) == heavy_model
+
+
+def test_preference_with_empty_string_is_ignored(default_model):
+    prefs = {"light_model": ""}
+    assert select_model("hi", {}, user_preferences=prefs) == default_model

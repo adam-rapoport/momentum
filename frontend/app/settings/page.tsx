@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { IntegrationCard } from "@/components/IntegrationCard";
+import { ModelPreferencesCard } from "@/components/ModelPreferencesCard";
 import { api, type GoogleStatus } from "@/lib/api";
 
 export default function SettingsPage() {
@@ -57,7 +58,14 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-6">
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-2">
+            Models
+          </h2>
+          <ModelPreferencesCard />
+        </section>
+
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-2">
             Integrations
