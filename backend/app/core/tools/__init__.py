@@ -130,4 +130,13 @@ async def execute_tool(name: str, input_data: dict | str) -> str:
 
 def _load_builtin_tools() -> None:
     """Import every tool module so each one's `register(...)` call runs."""
-    from app.core.tools import comms, documents, memory, pm, research, utility  # noqa: F401
+    from app.core.tools import (  # noqa: F401
+        calendar,
+        comms,
+        documents,
+        gmail,
+        memory,
+        pm,
+        research,
+        utility,
+    )
