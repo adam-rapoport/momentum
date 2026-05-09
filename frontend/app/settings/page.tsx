@@ -22,7 +22,8 @@ export default function SettingsPage() {
     googleFlag === "connected"
       ? {
           kind: "success" as const,
-          message: "Google Docs connected. New documents will be saved to your Drive.",
+          message:
+            "Google connected. Docs, Gmail, and Calendar are now available to the agent.",
         }
       : googleFlag === "error"
       ? {

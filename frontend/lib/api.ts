@@ -68,4 +68,7 @@ export interface GoogleStatus {
   status: "connected" | "disconnected" | "error";
   connected_at: string | null;
   google_email: string | null;
+  scopes: string[];
+  enabled_services: string[]; // subset of ["docs", "gmail", "calendar"]
+  needs_reconnect: boolean;   // true when connected but missing new scopes
 }

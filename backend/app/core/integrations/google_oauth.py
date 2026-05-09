@@ -3,10 +3,19 @@
 Single-user local-dev variant: simple state-token in Redis (5 min TTL),
 no PKCE beyond Google's default flow. Refresh happens lazily on 401.
 
+One integration row (`provider='google'`) covers all Google services we
+talk to. The granted scope list decides which services are actually
+available — see `missing_scopes()` for the reconnect trigger.
+
 Scopes requested:
-- documents         — create / read / edit Google Docs
-- drive.file        — narrow Drive scope limited to files the app creates
-  (we never see the user's full Drive)
+- documents             — create / read / edit Google Docs
+- drive.file            — narrow Drive scope limited to files we create
+- gmail.readonly        — list + read messages
+- gmail.compose         — create drafts (not sent until /approve)
+- gmail.send            — send messages (always gated by pause-and-review)
+- calendar.readonly     — list events, free/busy
+- calendar.events       — create / update events (send-invite actions
+                          are gated by pause-and-review)
 """
 from __future__ import annotations
 
@@ -32,13 +41,73 @@ from app.models import Integration
 
 logger = logging.getLogger(__name__)
 
-PROVIDER = "google_docs"
+PROVIDER = "google"
+# Legacy provider string used by Sprint 3 (Docs-only). Migration 006
+# renames existing rows to the new value; this constant is kept so we
+# can reference the old name in the migration and in any back-compat
+# lookups without spelling the literal twice.
+LEGACY_PROVIDER = "google_docs"
+
+# Scopes we always request. The list of scopes Google actually *granted*
+# is stored per-integration on `Integration.scopes` — compare the two
+# via `missing_scopes()` to decide whether a reconnect is needed.
 SCOPES = [
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
     "openid",
-    "email",
+    # Use the full URL form here: Google accepts the "email" shorthand on
+    # the authorization request but always returns the full URL in the
+    # granted-scopes list, so comparing shorthand→full would falsely flag
+    # `needs_reconnect=true` even for a complete consent.
+    "https://www.googleapis.com/auth/userinfo.email",
 ]
+
+
+# Services → the scopes that enable them. Drives the "connected services"
+# list on the settings page and helps surface "reconnect to enable Gmail"
+# when only a subset of scopes was previously granted.
+SERVICE_SCOPES: dict[str, tuple[str, ...]] = {
+    "docs": (
+        "https://www.googleapis.com/auth/documents",
+        "https://www.googleapis.com/auth/drive.file",
+    ),
+    "gmail": (
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/gmail.send",
+    ),
+    "calendar": (
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
+    ),
+}
+
+
+def missing_scopes(granted: list[str] | None) -> list[str]:
+    """Return the required scopes that are NOT in the granted list.
+    Empty result means the integration has everything it needs."""
+    granted_set = set(granted or [])
+    return [s for s in SCOPES if s not in granted_set]
+
+
+def enabled_services(granted: list[str] | None) -> list[str]:
+    """Return the subset of services (docs/gmail/calendar) whose scopes
+    are all present in the granted list. Used to show the user which
+    pieces of Google are actually wired up."""
+    granted_set = set(granted or [])
+    return [
+        name
+        for name, needed in SERVICE_SCOPES.items()
+        if all(s in granted_set for s in needed)
+    ]
+
+
+
 AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
@@ -332,7 +401,13 @@ def integration_public_view(integration: Integration | None) -> dict:
             "status": "disconnected",
             "connected_at": None,
             "google_email": None,
+            "scopes": [],
+            "enabled_services": [],
+            "needs_reconnect": False,
         }
+    granted = integration.scopes or []
+    missing = missing_scopes(granted)
+    is_connected = integration.status == "connected"
     return {
         "provider": integration.provider,
         "status": integration.status,
@@ -340,4 +415,10 @@ def integration_public_view(integration: Integration | None) -> dict:
             integration.connected_at.isoformat() if integration.connected_at else None
         ),
         "google_email": (integration.meta or {}).get("google_email"),
+        "scopes": granted,
+        "enabled_services": enabled_services(granted),
+        # True only when the user IS connected but is missing required scopes —
+        # i.e. they connected under Sprint 3 (Docs only) and we now need Gmail
+        # + Calendar. Disconnected users see "Connect", not "Reconnect".
+        "needs_reconnect": is_connected and bool(missing),
     }
