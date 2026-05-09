@@ -32,6 +32,13 @@ dev = [
     "psycopg[binary]>=3.2",
 ]
 
+[tool.setuptools.packages.find]
+# Without this, setuptools' auto-discovery fails on a fresh `pip install -e .`
+# because it sees `app/` AND `alembic/` as top-level dirs and refuses to
+# pick. Restrict the package to `app/` (alembic is migrations, not a
+# Python package; scripts/ and tests/ are dev tooling).
+include = ["app*"]
+
 [tool.uvicorn]
 reload = true
 
