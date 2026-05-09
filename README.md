@@ -1,5 +1,7 @@
 # pMomentum
 
+[![Backend tests](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml/badge.svg)](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml)
+
 An AI assistant for product management work — drafts PRDs, stakeholder updates,
 and meeting prep docs through guided skill workflows, with persistent memory
 across sessions and Google Docs integration for deliverables.
