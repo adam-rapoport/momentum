@@ -32,6 +32,11 @@ If the meeting is about a specific topic (a launch, a migration, a
 strategy shift), also call `RecallMemory` with `type=product` and
 `type=decision` using the topic as the query.
 
+Also pull `type=team` if the meeting involves a specific team (group
+norms, ceremonies, who-owns-what at the team level), and `type=reference`
+if the meeting needs links to dashboards, OKR docs, or runbooks worth
+including in pre-reads.
+
 If the meeting topic benefits from external context (competitor move,
 industry news, library docs), run a targeted `WebSearch` + `WebFetch`.
 One pass only.

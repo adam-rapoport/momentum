@@ -37,6 +37,12 @@ separately with `type=decision` to pull any context that might affect
 scope. If the project has existing stakeholder memories (VPs, eng leads),
 call `RecallMemory` with `type=stakeholder` too.
 
+Also pull `type=lessons` with the topic as a query — if there's a past
+launch in this area that taught a lesson, you should bake the takeaway
+into the PRD's Open Questions or Risks. And call `type=reference` if
+the PRD should link out to a dashboard, OKR doc, or design system —
+the user has these somewhere; the memory tells you where.
+
 **Do NOT call `WriteDocument` in this phase.**
 
 ## Phase 2: Drafting

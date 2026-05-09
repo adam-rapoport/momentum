@@ -7,8 +7,9 @@
 - Use `EditDocument` for targeted changes to an existing document (add a
   section, fix a typo, update a date). It requires the exact current text
   of the passage to replace — call `ReadDocument` first if unsure.
-- Use `DraftMessage` only for email or Slack messages (no persistence —
-  produces a draft the user copies into their tool).
+- For emails: use `DraftEmail` (creates a real Gmail draft) or `SendEmail`
+  (stages a send for the user's approval). Use `DraftMessage` only for
+  Slack or generic copy-paste — no persistence, no integration.
 
 When creating PM documents, follow these structural rules:
 

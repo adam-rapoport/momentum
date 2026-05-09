@@ -21,9 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.integrations.google_oauth import (
+    PROVIDER as GOOGLE_PROVIDER,
+    enabled_services,
+)
 from app.core.memory.store import project_memory_dir
 from app.core.skills import get_skill
-from app.models import Project, User
+from app.models import Integration, Project, User
 
 logger = logging.getLogger(__name__)
 
@@ -52,20 +56,32 @@ def load_static() -> str:
     return _cached_static
 
 
-def _build_environment_section(user: User) -> str:
+def _build_environment_section(user: User, google_email: str | None) -> str:
     tz = ZoneInfo(settings.user_timezone)
     now = datetime.now(tz)
     role = "Product Manager"
     prefs = user.preferences or {}
     if isinstance(prefs, dict) and prefs.get("role"):
         role = str(prefs["role"])
-    return (
-        "## Section 11: Environment Context\n\n"
-        f"- Current date: {now.strftime('%A, %B %-d, %Y')} ({now.strftime('%I:%M %p %Z')})\n"
-        f"- User: {user.display_name or user.email}\n"
-        f"- Role: {role}\n"
-        f"- Platform: pMomentum MVP (local dev, Groq + Llama 3.3)\n"
+    lines = [
+        "## Section 11: Environment Context\n",
+        f"- Current date: {now.strftime('%A, %B %-d, %Y')} ({now.strftime('%I:%M %p %Z')})",
+        f"- User: {user.display_name or user.email}",
+    ]
+    if google_email:
+        # Surface the Google address explicitly so "send me an email" /
+        # "put it on my calendar" map to a real address, not a placeholder.
+        lines.append(
+            f"- User email (use this when the user says 'send me' / 'email me' / "
+            f"'put it on my calendar'): {google_email}"
+        )
+    lines.extend(
+        [
+            f"- Role: {role}",
+            "- Platform: pMomentum MVP (local dev, Groq + Llama 3.3)",
+        ]
     )
+    return "\n".join(lines) + "\n"
 
 
 def _build_project_section(project: Project) -> str:
@@ -102,16 +118,36 @@ def _build_memory_section(project: Project) -> str:
     )
 
 
-def _build_integrations_section(project: Project) -> str:
+def _build_integrations_section(project: Project, google_services: list[str]) -> str:
     mem_dir = project_memory_dir(project)
+    if google_services:
+        google_line = (
+            "- **Google Workspace:** "
+            + ", ".join(_GOOGLE_SERVICE_DESCRIPTIONS[svc] for svc in google_services)
+            + ". Sends and meeting invites go through pause-and-review (the user "
+            "approves in the UI before the action fires)."
+        )
+    else:
+        google_line = (
+            "- **Google Workspace:** not connected. Tell the user to visit "
+            "Settings and connect Google to use Docs / Gmail / Calendar tools."
+        )
     return (
         "## Section 14: Active Integrations\n\n"
         "- **Web search:** Tavily (active)\n"
         "- **Web fetch:** httpx + trafilatura (active)\n"
         "- **Project management:** `QueryTickets` returns MOCK data only. Real Jira/Linear integration is post-MVP — always flag this to the user.\n"
-        "- **Email / Slack:** `DraftMessage` produces drafts only. No send capability exists in this build.\n"
+        f"{google_line}\n"
+        "- **Slack / Teams / Discord:** no integration in this build. Use `DraftMessage` for a copy-paste draft.\n"
         f"- **Memory storage:** local filesystem at `{mem_dir}` (markdown + Postgres index).\n"
     )
+
+
+_GOOGLE_SERVICE_DESCRIPTIONS = {
+    "docs": "Docs (`ReadDocument` / `WriteDocument` / `EditDocument` / `ListDocuments`)",
+    "gmail": "Gmail (`ListEmails` / `ReadEmail` / `DraftEmail` / `SendEmail`)",
+    "calendar": "Calendar (`ListCalendarEvents` / `FindAvailability` / `CreateCalendarEvent`)",
+}
 
 
 def _build_skill_section(session_metadata: dict | None) -> str | None:
@@ -147,17 +183,37 @@ def _build_skill_section(session_metadata: dict | None) -> str | None:
     return header + skill.body.strip() + "\n"
 
 
+async def _load_google_integration(
+    db: AsyncSession, user_id: UUID
+) -> tuple[str | None, list[str]]:
+    """Return (connected Google email, list of enabled service names).
+    Used to surface the user's actual address in Section 11 and the live
+    Google service list in Section 14."""
+    integration = await db.scalar(
+        select(Integration).where(
+            Integration.user_id == user_id,
+            Integration.provider == GOOGLE_PROVIDER,
+        )
+    )
+    if integration is None or integration.status != "connected":
+        return None, []
+    google_email = (integration.meta or {}).get("google_email")
+    services = enabled_services(integration.scopes or [])
+    return google_email, services
+
+
 async def build_dynamic(
     db: AsyncSession,
     user: User,
     project: Project,
     session_metadata: dict | None = None,
 ) -> str:
+    google_email, google_services = await _load_google_integration(db, user.id)
     parts = [
-        _build_environment_section(user),
+        _build_environment_section(user, google_email),
         _build_project_section(project),
         _build_memory_section(project),
-        _build_integrations_section(project),
+        _build_integrations_section(project, google_services),
     ]
     skill_section = _build_skill_section(session_metadata)
     if skill_section:

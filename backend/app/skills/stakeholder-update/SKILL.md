@@ -30,7 +30,10 @@ Ask these in order, skipping any the user already answered:
 
 If the memory system has relevant **decisions**, **lessons**, or
 **product** notes for this audience/window, pull them with `RecallMemory`
-now so you have context.
+now so you have context. Also pull `type=team` if the audience is a
+group with known norms (e.g. exec team prefers one-pagers; eng team
+wants concrete metrics) and `type=reference` if the update should link
+to a dashboard, OKR doc, or other canonical resource.
 
 ## Phase 2: Drafting
 
