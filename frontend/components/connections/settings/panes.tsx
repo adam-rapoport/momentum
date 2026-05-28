@@ -61,6 +61,13 @@ export function ModelsPane({ connections, onChanged }: { connections: ConnMap; o
           status={connections["llm:google_ai"]}
           onChanged={onChanged}
         />
+        <ConnectionKeyCard
+          meta={PROVIDERS.openai}
+          title="OpenAI"
+          subtitle="Optional · paid · GPT-4o"
+          status={connections["llm:openai"]}
+          onChanged={onChanged}
+        />
       </div>
 
       <div className="mt-5">
@@ -195,7 +202,7 @@ export function AccountPane({ onChanged }: { onChanged: () => void }) {
     setWiping(true);
     try {
       await Promise.all(
-        (["llm:groq", "llm:google_ai", "search:tavily", "search:perplexity"] as KeyProvider[]).map((p) =>
+        (["llm:groq", "llm:google_ai", "llm:openai", "search:tavily", "search:perplexity"] as KeyProvider[]).map((p) =>
           api.deleteConnection(p).catch(() => undefined),
         ),
       );

@@ -35,7 +35,7 @@ def test_every_entry_has_valid_role():
 
 def test_every_entry_has_known_provider():
     for m in REGISTRY:
-        assert m.provider in ("groq", "google"), m
+        assert m.provider in ("groq", "google", "openai"), m
 
 
 def test_get_available_models_unfiltered_returns_all_when_both_providers_on():

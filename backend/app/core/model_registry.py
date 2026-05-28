@@ -25,10 +25,16 @@ from app.config import settings
 @dataclass(frozen=True)
 class ModelEntry:
     id: str               # Model ID passed to the LLM client.
-    provider: str         # "groq" | "google".
+    provider: str         # "groq" | "google" | "openai".
     display_name: str     # Shown in the Settings dropdown.
     role: str             # "light" | "heavy" | "either".
     notes: str = ""       # One-line note shown under the dropdown.
+    # Which client library serves this model. Only consulted for Google
+    # models: "openai_compat" goes through the OpenAI-compatible endpoint
+    # (app.core.google_client); "genai_sdk" goes through Google's native
+    # SDK (app.core.google_genai_client), which is required for Gemini 3.x.
+    # Groq/OpenAI models ignore this field.
+    client: str = "openai_compat"
 
 
 REGISTRY: tuple[ModelEntry, ...] = (
@@ -67,6 +73,41 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="heavy",
         notes="Strongest free-tier Gemini for drafting. Slower than Flash.",
     ),
+    # --- Google via the native google-genai SDK (F5) ---
+    # Gemini 3.x preview models only work through the native SDK: the
+    # OpenAI-compat endpoint can't carry the `thought_signature` they
+    # require on tool-call history, which breaks multi-step skill flows.
+    ModelEntry(
+        id="gemini-3.1-pro-preview",
+        provider="google",
+        display_name="Gemini 3 Pro (Google, native SDK)",
+        role="heavy",
+        notes="Newest Gemini for drafting. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    ModelEntry(
+        id="gemini-3-flash-preview",
+        provider="google",
+        display_name="Gemini 3 Flash (Google, native SDK)",
+        role="either",
+        notes="Fast newest Gemini. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    # --- OpenAI (paid) ---
+    ModelEntry(
+        id="gpt-4o",
+        provider="openai",
+        display_name="GPT-4o (OpenAI)",
+        role="either",
+        notes="OpenAI's flagship. Paid — needs billing on your OpenAI key.",
+    ),
+    ModelEntry(
+        id="gpt-4o-mini",
+        provider="openai",
+        display_name="GPT-4o mini (OpenAI)",
+        role="light",
+        notes="Cheaper, faster OpenAI model. Paid — needs billing.",
+    ),
 )
 
 
@@ -83,6 +124,8 @@ def _provider_available(
         return bool(settings.groq_api_key)
     if provider == "google":
         return bool(settings.google_ai_api_key)
+    if provider == "openai":
+        return bool(settings.openai_api_key)
     return False
 
 

@@ -134,6 +134,7 @@ export interface SearchPreferences {
 export type KeyProvider =
   | "llm:groq"
   | "llm:google_ai"
+  | "llm:openai"
   | "search:tavily"
   | "search:perplexity";
 
@@ -166,7 +167,7 @@ export interface GoogleStatus {
 
 export interface ModelEntry {
   id: string;
-  provider: "groq" | "google";
+  provider: "groq" | "google" | "openai";
   display_name: string;
   role: "light" | "heavy" | "either";
   notes: string;

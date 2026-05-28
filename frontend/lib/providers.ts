@@ -21,6 +21,9 @@ export interface ProviderMeta {
   keyPrefix: string;
   keyLength: [number, number];
   defaultModel: string; // exact model auto-selected when this provider is chosen
+  wizard?: boolean; // show in the first-run wizard? Defaults to true. Paid
+                    // providers (OpenAI) stay false — Settings-only — so the
+                    // free first-run flow isn't cluttered with billing.
 }
 
 export const PROVIDERS: Record<string, ProviderMeta> = {
@@ -56,10 +59,29 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyLength: [35, 50],
     defaultModel: "gemma-4-31b-it",
   },
+  openai: {
+    id: "openai",
+    credProvider: "llm:openai",
+    name: "OpenAI",
+    tier: "heavy",
+    badge: "Paid",
+    badgeKind: "default",
+    pricing: "Paid · billing required on your OpenAI account",
+    description: "GPT-4o and friends. Optional — adds OpenAI's models alongside your free providers.",
+    helpUrl: "https://platform.openai.com/api-keys",
+    helpText: 'In OpenAI → API keys → "Create new secret key".',
+    keyHint: "Starts with sk-",
+    keyPrefix: "sk-",
+    keyLength: [20, 200],
+    defaultModel: "gpt-4o",
+    wizard: false, // Settings-only; keep the free first-run flow uncluttered.
+  },
 };
 
 export function providersForTier(tier: Tier): ProviderMeta[] {
-  return Object.values(PROVIDERS).filter((p) => p.tier === tier);
+  // `wizard: false` providers (paid extras) are excluded from the first-run
+  // wizard but still usable from Settings.
+  return Object.values(PROVIDERS).filter((p) => p.tier === tier && p.wizard !== false);
 }
 
 // Search providers (for the Web Search connection). Same key-card shape as

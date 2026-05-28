@@ -30,17 +30,20 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 5.0
 PERPLEXITY_BASE_URL = "https://api.perplexity.ai"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 # Cheapest/fastest model per OpenAI-compatible provider, used only for the
 # 1-token validation ping.
 _PING_MODEL = {
     "llm:groq": "llama-3.1-8b-instant",
     "llm:google_ai": "gemini-2.5-flash",
+    "llm:openai": "gpt-4o-mini",
     "search:perplexity": "sonar",
 }
 _BASE_URL = {
     "llm:groq": settings.groq_base_url,
     "llm:google_ai": GOOGLE_BASE_URL,
+    "llm:openai": OPENAI_BASE_URL,
     "search:perplexity": PERPLEXITY_BASE_URL,
 }
 

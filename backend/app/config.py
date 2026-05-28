@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     # required if the model router sends a turn to a Google-hosted model.
     google_ai_api_key: str | None = Field(None, alias="GOOGLE_AI_API_KEY")
 
+    # OpenAI API key (paid). Optional — only required if the user picks an
+    # OpenAI model (gpt-*) in Settings. Talks to api.openai.com directly.
+    openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
+
     # Perplexity API key for the WebSearch tool's Perplexity provider option
     # (alternative to Tavily). Optional — only required if the user picks
     # Perplexity as their search provider (see app.core.search).

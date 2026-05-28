@@ -185,10 +185,11 @@ export function StatusPill({
 }
 
 export function ProviderGlyph({ id }: { id: string }) {
-  const letter: Record<string, string> = { groq: "G", google: "✦", tavily: "T", perplexity: "P" };
+  const letter: Record<string, string> = { groq: "G", google: "✦", openai: "O", tavily: "T", perplexity: "P" };
   const color: Record<string, string> = {
     groq: "#F47C2A",
     google: "#5279E0",
+    openai: "#10A37F",
     tavily: "#3B7F6A",
     perplexity: "#20808D",
   };

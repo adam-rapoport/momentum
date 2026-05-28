@@ -15,6 +15,12 @@ def test_llm_provider_for_model_maps_google_prefixes():
     assert credentials.llm_provider_for_model("gemma-4-31b-it") == "llm:google_ai"
 
 
+def test_llm_provider_for_model_maps_openai_prefixes():
+    assert credentials.llm_provider_for_model("gpt-4o") == "llm:openai"
+    assert credentials.llm_provider_for_model("gpt-4o-mini") == "llm:openai"
+    assert credentials.llm_provider_for_model("o3-mini") == "llm:openai"
+
+
 def test_llm_provider_for_model_defaults_to_groq():
     assert (
         credentials.llm_provider_for_model("meta-llama/llama-4-scout-17b-16e-instruct")
@@ -24,7 +30,7 @@ def test_llm_provider_for_model_defaults_to_groq():
 
 
 def test_known_providers_namespaced_and_disjoint():
-    assert set(credentials.LLM_PROVIDERS) == {"llm:groq", "llm:google_ai"}
+    assert set(credentials.LLM_PROVIDERS) == {"llm:groq", "llm:google_ai", "llm:openai"}
     assert set(credentials.SEARCH_PROVIDERS) == {"search:tavily", "search:perplexity"}
     # no overlap, and KEY_PROVIDERS is the union
     assert not (set(credentials.LLM_PROVIDERS) & set(credentials.SEARCH_PROVIDERS))

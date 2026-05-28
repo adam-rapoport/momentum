@@ -13,6 +13,7 @@ key rows never collide with the OAuth `google` row:
 
     llm:groq          -> GROQ_API_KEY
     llm:google_ai     -> GOOGLE_AI_API_KEY   (Google AI Studio key, AIza...)
+    llm:openai        -> OPENAI_API_KEY      (OpenAI key, sk-..., paid)
     search:tavily     -> TAVILY_API_KEY
     search:perplexity -> PERPLEXITY_API_KEY
 
@@ -41,6 +42,7 @@ from app.models import Integration
 LLM_PROVIDERS: dict[str, str] = {
     "llm:groq": "groq_api_key",
     "llm:google_ai": "google_ai_api_key",
+    "llm:openai": "openai_api_key",
 }
 SEARCH_PROVIDERS: dict[str, str] = {
     "search:tavily": "tavily_api_key",
@@ -52,15 +54,19 @@ KEY_PROVIDERS: dict[str, str] = {**LLM_PROVIDERS, **SEARCH_PROVIDERS}
 _REGISTRY_PROVIDER: dict[str, str] = {
     "llm:groq": "groq",
     "llm:google_ai": "google",
+    "llm:openai": "openai",
 }
 
 _GOOGLE_MODEL_PREFIXES = ("gemini-", "gemma-")
+_OPENAI_MODEL_PREFIXES = ("gpt-", "o1-", "o3-", "o4-", "chatgpt-")
 
 
 def llm_provider_for_model(model_id: str) -> str:
     """Map a model ID to the credential provider whose key serves it."""
     if model_id.startswith(_GOOGLE_MODEL_PREFIXES):
         return "llm:google_ai"
+    if model_id.startswith(_OPENAI_MODEL_PREFIXES):
+        return "llm:openai"
     return "llm:groq"
 
 

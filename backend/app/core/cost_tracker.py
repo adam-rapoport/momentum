@@ -41,6 +41,10 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gemini-2.5-pro": ModelPricing("2.50", "15.00"),
     "gemini-2.5-flash": ModelPricing("0.30", "2.50"),
     "gemini-2.5-flash-lite": ModelPricing("0.10", "0.40"),
+
+    # --- OpenAI (paid) ---
+    "gpt-4o": ModelPricing("2.50", "10.00"),
+    "gpt-4o-mini": ModelPricing("0.15", "0.60"),
 }
 
 _MILLION = Decimal("1000000")
