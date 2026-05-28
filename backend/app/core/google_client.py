@@ -89,34 +89,37 @@ class _ThoughtStripper:
         return result
 
 
-_client: AsyncOpenAI | None = None
+# Clients are cached by API key so per-user keys (from the Connections UI /
+# C8) each get their own reused client. `api_key=None` falls back to the env
+# default, preserving the original behavior.
+_clients: dict[str, AsyncOpenAI] = {}
 
 
-def get_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        if not settings.google_ai_api_key:
-            raise RuntimeError(
-                "GOOGLE_AI_API_KEY is not configured — set it in .env to "
-                "route turns to Google-hosted models."
-            )
-        _client = AsyncOpenAI(
-            api_key=settings.google_ai_api_key,
-            base_url=GOOGLE_BASE_URL,
+def get_client(api_key: str | None = None) -> AsyncOpenAI:
+    key = api_key or settings.google_ai_api_key
+    if not key:
+        raise RuntimeError(
+            "GOOGLE_AI_API_KEY is not configured — set it in .env or connect "
+            "Google in Settings to route turns to Google-hosted models."
         )
-    return _client
+    client = _clients.get(key)
+    if client is None:
+        client = AsyncOpenAI(api_key=key, base_url=GOOGLE_BASE_URL)
+        _clients[key] = client
+    return client
 
 
 async def stream_message(
     messages: list[dict],
     model: str,
     tools: list[dict] | None = None,
+    api_key: str | None = None,
 ) -> AsyncIterator[StreamChunk | StreamResult]:
     """Stream a chat completion from Google AI Studio. Same contract as
     `groq_client.stream_message` — yields StreamChunks for text deltas,
     then a StreamResult with text, tool calls, usage, and cost.
     """
-    client = get_client()
+    client = get_client(api_key)
 
     request_kwargs: dict = {
         "model": model,

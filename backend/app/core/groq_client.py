@@ -39,20 +39,26 @@ class StreamResult:
     finish_reason: str | None = None
 
 
-_client: AsyncOpenAI | None = None
+# Clients are cached by API key so that per-user keys (from the Connections
+# UI / C8) each get their own reused client. When `api_key` is None we fall
+# back to the env default — that path is byte-for-byte the old behavior.
+_clients: dict[str, AsyncOpenAI] = {}
 
 
-def get_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(api_key=settings.groq_api_key, base_url=settings.groq_base_url)
-    return _client
+def get_client(api_key: str | None = None) -> AsyncOpenAI:
+    key = api_key or settings.groq_api_key
+    client = _clients.get(key)
+    if client is None:
+        client = AsyncOpenAI(api_key=key, base_url=settings.groq_base_url)
+        _clients[key] = client
+    return client
 
 
 async def stream_message(
     messages: list[dict],
     model: str | None = None,
     tools: list[dict] | None = None,
+    api_key: str | None = None,
 ) -> AsyncIterator[StreamChunk | StreamResult]:
     """Stream a chat completion. Yields StreamChunks for each text delta,
     then a final StreamResult with text, tool calls, usage, and cost.
@@ -61,7 +67,7 @@ async def stream_message(
     only surface the assembled list on the StreamResult at the end.
     """
     model = model or settings.groq_model
-    client = get_client()
+    client = get_client(api_key)
 
     request_kwargs: dict = {
         "model": model,

@@ -2,6 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────────────────
+   C8 theme — warm cream + terracotta, with a dark variant.
+   Variables drive the Connections component kit (components/connections/*).
+   Toggle dark mode by setting data-theme="dark" on <html>.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-page: #efe9de;
+  --bg-canvas: #f4efe6;
+  --bg-elev: #faf6ee;
+  --bg-elev-2: #efe7d8;
+  --bg-inset: #e7decd;
+
+  --text: #1f1a14;
+  --text-muted: #6b6357;
+  --text-dim: #9a9081;
+
+  --border: #e0d7c8;
+  --border-strong: #cdc2ae;
+  --border-faint: #ece4d6;
+
+  --accent: #ab5f3f;
+  --accent-fg: #fff6ee;
+  --accent-tint: #f0e2d8;
+  --accent-soft: #e4c9b8;
+  --accent-text: #8a4b30;
+
+  --success: #5c7b53;
+  --success-soft: #e1ecdc;
+  --warn: #9a6a1f;
+  --warn-soft: #f2e6cf;
+  --danger: #b0463c;
+  --danger-soft: #f3dad5;
+
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 2px rgba(31, 26, 20, 0.05);
+  --shadow-lift: 0 12px 32px rgba(31, 26, 20, 0.18);
+}
+
+[data-theme="dark"] {
+  --bg-page: #15110d;
+  --bg-canvas: #1b1611;
+  --bg-elev: #221c16;
+  --bg-elev-2: #2a2219;
+  --bg-inset: #120e0a;
+
+  --text: #f0e9dd;
+  --text-muted: #b6ac9c;
+  --text-dim: #837868;
+
+  --border: #322a20;
+  --border-strong: #41372a;
+  --border-faint: #2a2219;
+
+  --accent: #c2774f;
+  --accent-fg: #1a130e;
+  --accent-tint: #2e241b;
+  --accent-soft: #3a2c20;
+  --accent-text: #e0b89e;
+
+  --success: #8fb07f;
+  --success-soft: #23301e;
+  --warn: #d0a24e;
+  --warn-soft: #322713;
+  --danger: #d77468;
+  --danger-soft: #3a211c;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
 html,
 body,
 #__next {
@@ -10,6 +80,102 @@ body,
   color: #1f1f1f;
 }
 
+/* The Connections surfaces opt into the warm theme via this class on a
+   wrapping element, so the rest of the app keeps its existing look. */
+.c8-surface {
+  background-color: var(--bg-page);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+.c8-surface .mono,
+.c8-surface code {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── Reusable component classes (match the design prototype vocabulary) ── */
+@layer components {
+  .c8-surface .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors;
+    padding: 8px 14px;
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    cursor: pointer;
+  }
+  .c8-surface .btn:hover { background: var(--bg-elev-2); }
+  .c8-surface .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .c8-surface .btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+  }
+  .c8-surface .btn.primary:hover { filter: brightness(0.95); background: var(--accent); }
+  .c8-surface .btn.ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+  }
+  .c8-surface .btn.ghost:hover { background: var(--bg-elev-2); }
+  .c8-surface .btn.small { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
+  .c8-surface .btn.large { padding: 11px 20px; font-size: 15px; border-radius: 10px; }
+  .c8-surface .btn.danger-ghost {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--danger);
+  }
+  .c8-surface .btn.danger-ghost:hover { background: var(--danger-soft); }
+
+  .c8-surface .input {
+    @apply block w-full rounded-lg text-sm;
+    padding: 9px 12px;
+    background: var(--bg-canvas);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    outline: none;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+  }
+  .c8-surface .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
+  }
+  .c8-surface .input.valid { border-color: var(--success); }
+  .c8-surface .input.invalid { border-color: var(--danger); }
+
+  .c8-surface .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .c8-surface .tag {
+    @apply inline-flex items-center rounded-full text-xs font-medium;
+    height: 20px;
+    padding: 0 8px;
+    background: var(--bg-inset);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .c8-surface .tag.accent {
+    background: var(--accent-tint);
+    color: var(--accent-text);
+    border-color: var(--accent-soft);
+  }
+  .c8-surface .tag.success {
+    background: var(--success-soft);
+    color: var(--success);
+    border-color: transparent;
+  }
+
+  .c8-surface .link {
+    color: var(--accent-text);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+/* ── existing markdown styles (chat surface) ── */
 .markdown-body {
   line-height: 1.55;
 }

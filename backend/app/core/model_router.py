@@ -37,16 +37,24 @@ HEAVY_SLASH_COMMANDS = {
 _SLASH_RE = re.compile(r"^/([a-z][a-z0-9-]*)", re.IGNORECASE)
 
 
-def _resolve_light(prefs: dict | None) -> str:
+def _resolve_light(prefs: dict | None, configured: set[str] | None) -> str:
     pref = (prefs or {}).get("light_model")
-    if isinstance(pref, str) and pref and is_model_available(pref, role="light"):
+    if (
+        isinstance(pref, str)
+        and pref
+        and is_model_available(pref, role="light", configured_providers=configured)
+    ):
         return pref
     return settings.groq_model
 
 
-def _resolve_heavy(prefs: dict | None) -> str:
+def _resolve_heavy(prefs: dict | None, configured: set[str] | None) -> str:
     pref = (prefs or {}).get("heavy_model")
-    if isinstance(pref, str) and pref and is_model_available(pref, role="heavy"):
+    if (
+        isinstance(pref, str)
+        and pref
+        and is_model_available(pref, role="heavy", configured_providers=configured)
+    ):
         return pref
     return settings.groq_heavy_model
 
@@ -55,18 +63,22 @@ def select_model(
     user_text: str,
     session_metadata: dict | None,
     user_preferences: dict | None = None,
+    configured_providers: set[str] | None = None,
 ) -> str:
     """Return the model ID for this turn.
 
     `user_preferences` is the JSONB blob from `users.preferences`.
-    Defaults to None for backward compat with callers that don't yet pass
-    it; tests + older callers continue to fall back to env-var defaults.
+    `configured_providers`, when given, is the per-user set of providers with
+    a usable key (stored or env), so a model the user picked but only has a
+    *stored* (non-env) key for is still honored. Both default to None for
+    backward compat with callers that don't pass them; tests + older callers
+    continue to fall back to env-var defaults.
     """
     slug_match = _SLASH_RE.match((user_text or "").strip())
     if slug_match and slug_match.group(1).lower() in HEAVY_SLASH_COMMANDS:
-        return _resolve_heavy(user_preferences)
+        return _resolve_heavy(user_preferences, configured_providers)
 
     if (session_metadata or {}).get("active_skill"):
-        return _resolve_heavy(user_preferences)
+        return _resolve_heavy(user_preferences, configured_providers)
 
-    return _resolve_light(user_preferences)
+    return _resolve_light(user_preferences, configured_providers)

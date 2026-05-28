@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core import credentials
 from app.core.documents import router as docs_router
 from app.core.groq_client import StreamChunk, StreamResult
 from app.core.llm import stream_message
@@ -533,10 +534,18 @@ async def process_message(
     # User preferences from `users.preferences.{light_model,heavy_model}`
     # override env-var defaults when set (Sprint 6 Chunk C).
     turn_user = await db.scalar(select(User).where(User.id == session.user_id))
+    # Per-user configured providers (stored key OR env) so a model the user
+    # picked with only a stored key is still honored. Also used to resolve the
+    # actual key to pass to the provider client (C8 Connections).
+    configured = await credentials.configured_llm_providers(db, session.user_id)
     turn_model = select_model(
         user_text,
         session.session_metadata,
         user_preferences=(turn_user.preferences if turn_user else None),
+        configured_providers=configured,
+    )
+    turn_api_key = await credentials.resolve_api_key(
+        db, session.user_id, credentials.llm_provider_for_model(turn_model)
     )
 
     stmt = (
@@ -595,7 +604,7 @@ async def process_message(
         stream_result: StreamResult | None = None
 
         async for event in stream_message(
-            llm_messages, model=turn_model, tools=tool_specs
+            llm_messages, model=turn_model, tools=tool_specs, api_key=turn_api_key
         ):
             if isinstance(event, StreamChunk):
                 if await redis.exists(_cancel_key(session_id)):

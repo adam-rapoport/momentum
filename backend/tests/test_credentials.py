@@ -1,0 +1,41 @@
+"""Unit tests for the pure-logic parts of app.core.credentials (C8).
+
+DB round-trip behavior (store/resolve/delete) is covered by the
+scripts/try_credentials.py smoke test against a real Postgres + vault key.
+"""
+from __future__ import annotations
+
+import pytest
+
+from app.core import credentials
+
+
+def test_llm_provider_for_model_maps_google_prefixes():
+    assert credentials.llm_provider_for_model("gemini-2.5-flash") == "llm:google_ai"
+    assert credentials.llm_provider_for_model("gemma-4-31b-it") == "llm:google_ai"
+
+
+def test_llm_provider_for_model_defaults_to_groq():
+    assert (
+        credentials.llm_provider_for_model("meta-llama/llama-4-scout-17b-16e-instruct")
+        == "llm:groq"
+    )
+    assert credentials.llm_provider_for_model("llama-3.1-8b-instant") == "llm:groq"
+
+
+def test_known_providers_namespaced_and_disjoint():
+    assert set(credentials.LLM_PROVIDERS) == {"llm:groq", "llm:google_ai"}
+    assert set(credentials.SEARCH_PROVIDERS) == {"search:tavily", "search:perplexity"}
+    # no overlap, and KEY_PROVIDERS is the union
+    assert not (set(credentials.LLM_PROVIDERS) & set(credentials.SEARCH_PROVIDERS))
+    assert set(credentials.KEY_PROVIDERS) == set(credentials.LLM_PROVIDERS) | set(
+        credentials.SEARCH_PROVIDERS
+    )
+
+
+def test_env_fallback_reads_settings(monkeypatch):
+    monkeypatch.setattr(credentials.settings, "groq_api_key", "gsk_env_value")
+    monkeypatch.setattr(credentials.settings, "perplexity_api_key", None)
+    assert credentials._env_fallback("llm:groq") == "gsk_env_value"
+    assert credentials._env_fallback("search:perplexity") is None
+    assert credentials._env_fallback("not-a-provider") is None

@@ -18,13 +18,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core import credentials
 from app.core.default_user import get_default_user
 from app.core.model_registry import get_available_models, is_model_available
+from app.core.search import DEFAULT_PROVIDER, VALID_PROVIDERS
 from app.dependencies import get_db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/preferences", tags=["preferences"])
+
+
+class SearchPreferenceUpdate(BaseModel):
+    provider: str = Field(..., description="Active search provider: 'tavily' or 'perplexity'.")
 
 
 class ModelPreferencesUpdate(BaseModel):
@@ -44,24 +50,32 @@ class ModelPreferencesUpdate(BaseModel):
     )
 
 
-def _public_view(user_preferences: dict) -> dict:
+def _public_view(user_preferences: dict, configured: set[str]) -> dict:
     light_pick = user_preferences.get("light_model") or None
     heavy_pick = user_preferences.get("heavy_model") or None
 
-    available_light = [asdict(m) for m in get_available_models(role="light")]
-    available_heavy = [asdict(m) for m in get_available_models(role="heavy")]
+    available_light = [
+        asdict(m)
+        for m in get_available_models(role="light", configured_providers=configured)
+    ]
+    available_heavy = [
+        asdict(m)
+        for m in get_available_models(role="heavy", configured_providers=configured)
+    ]
 
     return {
         "light_model": light_pick,
         "heavy_model": heavy_pick,
         "effective_light_model": (
             light_pick
-            if light_pick and is_model_available(light_pick, role="light")
+            if light_pick
+            and is_model_available(light_pick, role="light", configured_providers=configured)
             else settings.groq_model
         ),
         "effective_heavy_model": (
             heavy_pick
-            if heavy_pick and is_model_available(heavy_pick, role="heavy")
+            if heavy_pick
+            and is_model_available(heavy_pick, role="heavy", configured_providers=configured)
             else settings.groq_heavy_model
         ),
         "available_light_models": available_light,
@@ -72,7 +86,8 @@ def _public_view(user_preferences: dict) -> dict:
 @router.get("/models")
 async def get_model_preferences(db: AsyncSession = Depends(get_db)) -> dict:
     user = await get_default_user(db)
-    return _public_view(user.preferences or {})
+    configured = await credentials.configured_llm_providers(db, user.id)
+    return _public_view(user.preferences or {}, configured)
 
 
 @router.put("/models")
@@ -81,6 +96,7 @@ async def put_model_preferences(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     user = await get_default_user(db)
+    configured = await credentials.configured_llm_providers(db, user.id)
     prefs = dict(user.preferences or {})
 
     raw = payload.model_dump(exclude_unset=True)
@@ -88,7 +104,7 @@ async def put_model_preferences(
     if "light_model" in raw:
         new_light = raw["light_model"]
         if new_light:
-            if not is_model_available(new_light, role="light"):
+            if not is_model_available(new_light, role="light", configured_providers=configured):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Model '{new_light}' is not an available light-slot model.",
@@ -100,7 +116,7 @@ async def put_model_preferences(
     if "heavy_model" in raw:
         new_heavy = raw["heavy_model"]
         if new_heavy:
-            if not is_model_available(new_heavy, role="heavy"):
+            if not is_model_available(new_heavy, role="heavy", configured_providers=configured):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Model '{new_heavy}' is not an available heavy-slot model.",
@@ -112,4 +128,35 @@ async def put_model_preferences(
     user.preferences = prefs
     await db.flush()
     await db.commit()
-    return _public_view(prefs)
+    return _public_view(prefs, configured)
+
+
+@router.get("/search")
+async def get_search_preferences(db: AsyncSession = Depends(get_db)) -> dict:
+    user = await get_default_user(db)
+    statuses = {s["provider"]: s for s in await credentials.get_key_status(db, user.id)}
+    pref = (user.preferences or {}).get("search_provider")
+    return {
+        "provider": pref if pref in VALID_PROVIDERS else DEFAULT_PROVIDER,
+        "tavily_configured": statuses.get("search:tavily", {}).get("configured", False),
+        "perplexity_configured": statuses.get("search:perplexity", {}).get("configured", False),
+    }
+
+
+@router.put("/search")
+async def put_search_preferences(
+    payload: SearchPreferenceUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if payload.provider not in VALID_PROVIDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"provider must be one of {VALID_PROVIDERS}",
+        )
+    user = await get_default_user(db)
+    prefs = dict(user.preferences or {})
+    prefs["search_provider"] = payload.provider
+    user.preferences = prefs
+    await db.flush()
+    await db.commit()
+    return {"provider": payload.provider}

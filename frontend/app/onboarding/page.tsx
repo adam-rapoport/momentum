@@ -1,0 +1,54 @@
+"use client";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/lib/api";
+import { OnboardingWizard } from "@/components/connections/wizard/OnboardingWizard";
+
+function OnboardingInner() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const restart = search.get("restart") === "1";
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .onboardingStatus()
+      .then((s) => {
+        if (cancelled) return;
+        // Reverse-guard: already configured and not an explicit re-run.
+        if (s.configured && !restart) {
+          router.replace("/chat");
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReady(true); // show wizard if status can't be read
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [restart, router]);
+
+  if (!ready) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center text-sm"
+        style={{ color: "var(--text-dim)" }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  return <OnboardingWizard />;
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingInner />
+    </Suspense>
+  );
+}

@@ -25,14 +25,18 @@ async def stream_message(
     messages: list[dict],
     model: str,
     tools: list[dict] | None = None,
+    api_key: str | None = None,
 ) -> AsyncIterator[StreamChunk | StreamResult]:
+    """Dispatch to the right provider client. `api_key`, when provided, is the
+    user's stored key for that provider (resolved by app.core.credentials);
+    None means use the env-var default."""
     if is_google_model(model):
         async for event in google_client.stream_message(
-            messages, model=model, tools=tools
+            messages, model=model, tools=tools, api_key=api_key
         ):
             yield event
         return
     async for event in groq_client.stream_message(
-        messages, model=model, tools=tools
+        messages, model=model, tools=tools, api_key=api_key
     ):
         yield event

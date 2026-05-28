@@ -70,7 +70,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
 )
 
 
-def _provider_available(provider: str) -> bool:
+def _provider_available(
+    provider: str, configured_providers: set[str] | None = None
+) -> bool:
+    # When the caller passes a per-user set of configured providers (computed
+    # from stored keys OR env by app.core.credentials), honor it. Otherwise
+    # fall back to the global env check — the original behavior, which keeps
+    # tests and env-only deployments working unchanged.
+    if configured_providers is not None:
+        return provider in configured_providers
     if provider == "groq":
         return bool(settings.groq_api_key)
     if provider == "google":
@@ -78,22 +86,44 @@ def _provider_available(provider: str) -> bool:
     return False
 
 
-def get_available_models(role: str | None = None) -> list[ModelEntry]:
+def get_available_models(
+    role: str | None = None, configured_providers: set[str] | None = None
+) -> list[ModelEntry]:
     """Return registry entries whose provider is configured.
 
     If `role` is provided ("light" or "heavy"), filter to entries that
-    can serve that role (including those marked "either").
+    can serve that role (including those marked "either"). If
+    `configured_providers` is provided, availability is judged against that
+    per-user set instead of the global env vars.
     """
-    entries = [m for m in REGISTRY if _provider_available(m.provider)]
+    if configured_providers is None:
+        # Default (env-based) path — call with one arg so monkeypatched
+        # single-arg stand-ins in tests keep working.
+        entries = [m for m in REGISTRY if _provider_available(m.provider)]
+    else:
+        entries = [
+            m
+            for m in REGISTRY
+            if _provider_available(m.provider, configured_providers)
+        ]
     if role in ("light", "heavy"):
         entries = [m for m in entries if m.role == role or m.role == "either"]
     return entries
 
 
-def is_model_available(model_id: str, role: str | None = None) -> bool:
+def is_model_available(
+    model_id: str,
+    role: str | None = None,
+    configured_providers: set[str] | None = None,
+) -> bool:
     """Whether `model_id` is in the registry, has its provider configured,
     and (optionally) can serve the requested role."""
-    return any(m.id == model_id for m in get_available_models(role=role))
+    return any(
+        m.id == model_id
+        for m in get_available_models(
+            role=role, configured_providers=configured_providers
+        )
+    )
 
 
 def get_model(model_id: str) -> ModelEntry | None:

@@ -15,29 +15,33 @@ import logging
 
 import httpx
 import trafilatura
-from tavily import AsyncTavilyClient
 
 from app.config import settings
-from app.core.tools import Tool, register
+from app.core.search import get_active_search_provider
+from app.core.search.base import SearchProvider, SearchResultItem
+from app.core.search.tavily_provider import TavilyProvider
+from app.core.tools import Tool, get_context, register
 
 logger = logging.getLogger(__name__)
 
 MAX_FETCH_BYTES = 2_000_000  # 2 MB — refuse pages larger than this
 MAX_OUTPUT_CHARS = 20_000  # ~5k tokens of cleaned text per fetch
 
-_tavily_client: AsyncTavilyClient | None = None
 
-
-def _get_tavily() -> AsyncTavilyClient:
-    global _tavily_client
-    if _tavily_client is None:
-        if not settings.tavily_api_key:
-            raise RuntimeError(
-                "TAVILY_API_KEY is not set. Add it to pmomentum/backend/.env and "
-                "restart the backend."
-            )
-        _tavily_client = AsyncTavilyClient(api_key=settings.tavily_api_key)
-    return _tavily_client
+async def _resolve_search_provider() -> SearchProvider | None:
+    """Pick the user's configured provider when running inside a turn; fall
+    back to an env-keyed Tavily client for context-free callers (scripts)."""
+    try:
+        ctx = get_context()
+    except RuntimeError:
+        ctx = None
+    if ctx is not None:
+        provider = await get_active_search_provider(ctx.db, ctx.user_id)
+        if provider is not None:
+            return provider
+    if settings.tavily_api_key:
+        return TavilyProvider(settings.tavily_api_key)
+    return None
 
 
 async def _web_search(input_data: dict) -> str:
@@ -48,30 +52,29 @@ async def _web_search(input_data: dict) -> str:
     max_results = int(input_data.get("max_results", 5))
     max_results = max(1, min(max_results, 10))
 
-    client = _get_tavily()
-    try:
-        response = await client.search(
-            query=query,
-            max_results=max_results,
-            search_depth="basic",
+    provider = await _resolve_search_provider()
+    if provider is None:
+        return (
+            "Error: No web search provider is configured. Add a Tavily or "
+            "Perplexity key under Settings → Integrations → Web Search."
         )
-    except Exception as e:  # noqa: BLE001
-        logger.exception("tavily search failed")
-        return f"Error: Tavily search failed: {e}"
 
-    results = response.get("results", []) if isinstance(response, dict) else []
+    try:
+        results: list[SearchResultItem] = await provider.search(query, max_results)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("%s search failed", provider.name)
+        return f"Error: {provider.name} search failed: {e}"
+
     if not results:
         return f"No results found for: {query}"
 
-    lines = [f"Search results for: {query}", ""]
+    lines = [f"Search results for: {query} (via {provider.name})", ""]
     for i, r in enumerate(results, 1):
-        title = r.get("title", "(no title)")
-        url = r.get("url", "")
-        snippet = (r.get("content") or "").strip()
-        lines.append(f"[{i}] {title}")
-        lines.append(f"    {url}")
-        if snippet:
-            lines.append(f"    {snippet}")
+        lines.append(f"[{i}] {r.title}")
+        if r.url:
+            lines.append(f"    {r.url}")
+        if r.snippet:
+            lines.append(f"    {r.snippet}")
         lines.append("")
     return "\n".join(lines).strip()
 
