@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.config import settings
-from app.core.model_router import HEAVY_SLASH_COMMANDS, select_model
+from app.core.model_router import HEAVY_SLASH_COMMANDS, parse_deep_flag, select_model
 
 
 @pytest.fixture
@@ -138,3 +138,61 @@ def test_empty_preference_dict_uses_env_defaults(default_model, heavy_model):
 def test_preference_with_empty_string_is_ignored(default_model):
     prefs = {"light_model": ""}
     assert select_model("hi", {}, user_preferences=prefs) == default_model
+
+
+# ---- Sprint 7 K1: /deep escape-hatch flag ----------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw,expected_clean",
+    [
+        ("/deep summarize the roadmap", "summarize the roadmap"),
+        ("/DEEP shout it", "shout it"),
+        ("  /deep   leading space  ", "leading space"),
+        ("/deep\nmulti\nline", "multi\nline"),
+        ("/deep", ""),  # flag alone -> empty remainder
+    ],
+)
+def test_parse_deep_flag_detects_and_strips(raw, expected_clean):
+    is_deep, cleaned = parse_deep_flag(raw)
+    assert is_deep is True
+    assert cleaned == expected_clean
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "   ",
+        "just a normal message",
+        "/deepdive into the metrics",  # no space after deep -> not the flag
+        "tell me about /deep mode",  # not at the start
+        "/write-prd topic",
+    ],
+)
+def test_parse_deep_flag_ignores_non_flag(raw):
+    is_deep, cleaned = parse_deep_flag(raw)
+    assert is_deep is False
+    assert cleaned == raw
+
+
+def test_deep_flag_routes_to_heavy(heavy_model):
+    # A casual message that would normally be light routes heavy with /deep.
+    assert select_model("/deep what's on the roadmap?", {}) == heavy_model
+
+
+def test_deep_flag_routes_heavy_even_with_light_preference(heavy_model):
+    # /deep must win over a user's saved light-model preference.
+    prefs = {"light_model": "llama-3.1-8b-instant"}
+    assert select_model("/deep quick question", {}, user_preferences=prefs) == heavy_model
+
+
+def test_deepdive_is_not_the_deep_flag(default_model):
+    # Guard the word-boundary: /deepdive is an ordinary (unknown) slash word.
+    assert select_model("/deepdive into metrics", {}) == default_model
+
+
+def test_force_heavy_param_routes_heavy(heavy_model):
+    # The explicit force_heavy path (how session_engine passes the parsed flag)
+    # routes heavy even when the text itself is already clean.
+    assert select_model("clean text", {}, force_heavy=True) == heavy_model

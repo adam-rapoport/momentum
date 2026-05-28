@@ -23,7 +23,7 @@ from app.core import credentials
 from app.core.documents import router as docs_router
 from app.core.groq_client import StreamChunk, StreamResult
 from app.core.llm import stream_message
-from app.core.model_router import select_model
+from app.core.model_router import parse_deep_flag, select_model
 from app.core.pending_actions import (
     clear_pending_action,
     execute_pending_action,
@@ -507,6 +507,11 @@ async def process_message(
     if session is None:
         raise ValueError(f"session {session_id} not found")
 
+    # `/deep` escape hatch: strip the flag up front so the cleaned text is what
+    # we classify, persist, and send to the model; `is_deep` forces this turn
+    # to the heavy model below.
+    is_deep, user_text = parse_deep_flag(user_text)
+
     # If the session was paused (status=awaiting_review from a prior
     # AwaitReview call), classify this reply as approve/revise/restart. If
     # recognised, clear pause state and queue a synthetic system note that
@@ -543,6 +548,7 @@ async def process_message(
         session.session_metadata,
         user_preferences=(turn_user.preferences if turn_user else None),
         configured_providers=configured,
+        force_heavy=is_deep,
     )
     turn_api_key = await credentials.resolve_api_key(
         db, session.user_id, credentials.llm_provider_for_model(turn_model)

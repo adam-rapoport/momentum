@@ -36,6 +36,26 @@ HEAVY_SLASH_COMMANDS = {
 }
 _SLASH_RE = re.compile(r"^/([a-z][a-z0-9-]*)", re.IGNORECASE)
 
+# `/deep` is an escape hatch: prefixing a message with it forces that one turn
+# to the heavy model, overriding the routing heuristics. It must be followed by
+# whitespace (or be the whole message) so `/deepdive` doesn't trigger it.
+_DEEP_RE = re.compile(r"^/deep(?:\s+(.*))?$", re.IGNORECASE | re.DOTALL)
+
+
+def parse_deep_flag(user_text: str | None) -> tuple[bool, str]:
+    """Detect a leading `/deep` flag and strip it.
+
+    Returns `(is_deep, cleaned_text)`. When the flag is present the caller
+    should persist + send the cleaned text (flag removed) and route the turn
+    to the heavy model. When absent, the original text is returned unchanged.
+    """
+    if not user_text:
+        return False, user_text or ""
+    match = _DEEP_RE.match(user_text.strip())
+    if not match:
+        return False, user_text
+    return True, (match.group(1) or "").strip()
+
 
 def _resolve_light(prefs: dict | None, configured: set[str] | None) -> str:
     pref = (prefs or {}).get("light_model")
@@ -64,6 +84,7 @@ def select_model(
     session_metadata: dict | None,
     user_preferences: dict | None = None,
     configured_providers: set[str] | None = None,
+    force_heavy: bool = False,
 ) -> str:
     """Return the model ID for this turn.
 
@@ -73,7 +94,13 @@ def select_model(
     *stored* (non-env) key for is still honored. Both default to None for
     backward compat with callers that don't pass them; tests + older callers
     continue to fall back to env-var defaults.
+
+    `force_heavy` is the `/deep` escape hatch — when True the turn routes to
+    the heavy model regardless of the slash-command / active-skill heuristics.
     """
+    if force_heavy or parse_deep_flag(user_text)[0]:
+        return _resolve_heavy(user_preferences, configured_providers)
+
     slug_match = _SLASH_RE.match((user_text or "").strip())
     if slug_match and slug_match.group(1).lower() in HEAVY_SLASH_COMMANDS:
         return _resolve_heavy(user_preferences, configured_providers)

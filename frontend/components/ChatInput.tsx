@@ -63,6 +63,9 @@ export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
           </button>
         )}
       </div>
+      <div className="max-w-3xl mx-auto mt-1.5 px-0.5 text-[11px] text-neutral-400">
+        Tip: start a message with <code className="text-neutral-500">/deep</code> to use the more capable model for one reply.
+      </div>
     </div>
   );
 }

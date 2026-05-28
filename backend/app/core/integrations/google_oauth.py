@@ -114,6 +114,25 @@ USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 _STATE_TTL_SECONDS = 300  # 5 minutes; states aren't reusable
 
+# How far ahead of expiry we refresh the access token. A wide margin means a
+# token handed to a long-running turn won't expire mid-task. Google access
+# tokens live ~60 min, so refreshing with 10 min to spare is cheap and safe.
+_REFRESH_MARGIN = timedelta(minutes=10)
+
+
+def _should_refresh(
+    expires_at: datetime | None,
+    *,
+    margin: timedelta = _REFRESH_MARGIN,
+    now: datetime | None = None,
+) -> bool:
+    """True if the access token is missing an expiry or is within `margin` of
+    expiring (so callers should refresh before using it)."""
+    if expires_at is None:
+        return True
+    now = now or datetime.now(timezone.utc)
+    return expires_at - now < margin
+
 
 class OAuthNotConfigured(RuntimeError):
     pass
@@ -353,12 +372,7 @@ async def get_valid_access_token(
     except ValueError:
         expires_at = None
 
-    # Refresh proactively if token has <2 minutes left (or expiry is missing).
-    needs_refresh = (
-        expires_at is None or expires_at - datetime.now(timezone.utc) < timedelta(minutes=2)
-    )
-
-    if not needs_refresh:
+    if not _should_refresh(expires_at):
         return creds["access_token"]
 
     refresh_token = creds.get("refresh_token")
@@ -391,6 +405,40 @@ async def get_valid_access_token(
     integration.last_refreshed_at = datetime.now(timezone.utc)
     await db.commit()
     return new_access
+
+
+async def refresh_expiring_tokens(db: AsyncSession) -> int:
+    """Best-effort startup pass: proactively refresh any connected Google
+    tokens that are at or near expiry, so the first task of the session doesn't
+    pay the refresh latency (or fail) on-demand.
+
+    Reuses `get_valid_access_token`, which refreshes only when needed and marks
+    the integration `error` if the refresh token itself is dead (surfacing the
+    "Reconnect" prompt). Per-integration failures are logged and swallowed so
+    one bad token can't abort the pass or block startup.
+
+    Returns the number of connected integrations processed.
+    """
+    integrations = (
+        await db.scalars(
+            select(Integration).where(
+                Integration.provider == PROVIDER,
+                Integration.status == "connected",
+                Integration.encrypted_credentials.is_not(None),
+            )
+        )
+    ).all()
+
+    processed = 0
+    for integ in integrations:
+        try:
+            await get_valid_access_token(db, integ)
+        except OAuthFlowError as e:
+            logger.warning(
+                "startup token refresh failed for integration %s: %s", integ.id, e
+            )
+        processed += 1
+    return processed
 
 
 def integration_public_view(integration: Integration | None) -> dict:

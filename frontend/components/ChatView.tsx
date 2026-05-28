@@ -10,6 +10,7 @@ import type {
 } from "@/lib/types";
 import { ApprovalBar } from "./ApprovalBar";
 import { ChatInput } from "./ChatInput";
+import { Banner } from "./connections/kit";
 import { MessageBubble, StreamingBubble } from "./MessageBubble";
 import { ToolCallBlock } from "./ToolCallBlock";
 
@@ -241,31 +242,23 @@ export function ChatView({ sessionId }: Props) {
           )}
 
           {lastError && (
-            <div className="rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 px-3 py-2 text-sm text-amber-900">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">
-                    {lastError.code === "MODEL_TOOL_CALL_FAILED"
-                      ? "Model stumbled on a tool call"
-                      : lastError.code === "MODEL_API_ERROR"
-                      ? "Model service error"
-                      : lastError.code === "TOOL_ERROR"
-                      ? "A tool failed"
-                      : lastError.code === "DB_ERROR"
-                      ? "Couldn't save this turn"
-                      : "Something went wrong"}
-                  </div>
-                  <div className="mt-0.5 text-amber-800">{lastError.message}</div>
-                </div>
-                <button
-                  onClick={() => clearLastError(sessionId)}
-                  className="shrink-0 text-amber-700 hover:text-amber-900 text-xs"
-                  aria-label="Dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+            <Banner
+              kind="warn"
+              title={
+                lastError.code === "MODEL_TOOL_CALL_FAILED"
+                  ? "Model stumbled on a tool call"
+                  : lastError.code === "MODEL_API_ERROR"
+                  ? "Model service error"
+                  : lastError.code === "TOOL_ERROR"
+                  ? "A tool failed"
+                  : lastError.code === "DB_ERROR"
+                  ? "Couldn't save this turn"
+                  : "Something went wrong"
+              }
+              onDismiss={() => clearLastError(sessionId)}
+            >
+              {lastError.message}
+            </Banner>
           )}
         </div>
       </div>

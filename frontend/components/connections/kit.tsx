@@ -51,10 +51,12 @@ export function Banner({
   kind = "info",
   title,
   children,
+  onDismiss,
 }: {
   kind?: "info" | "warn" | "danger" | "success";
   title?: string;
   children: ReactNode;
+  onDismiss?: () => void;
 }) {
   const palette = {
     info: { bg: "var(--accent-tint)", fg: "var(--accent-text)" },
@@ -80,6 +82,16 @@ export function Banner({
           {children}
         </div>
       </div>
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          style={{ color: palette.fg }}
+          className="shrink-0 -mr-1 -mt-0.5 px-1 text-sm leading-none opacity-70 hover:opacity-100"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
