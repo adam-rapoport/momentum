@@ -20,8 +20,11 @@ const STEPS: { key: StepKey; label: string }[] = [
 ];
 
 function initialModelState(tier: "light" | "heavy"): ModelStepState {
-  const only = providersForTier(tier);
-  return { providerId: only.length === 1 ? only[0].id : null, key: "" };
+  // Pre-select the recommended (first-listed) provider for the slot so the
+  // common path is one click, but the user can switch to any other option —
+  // free or paid — from the tiles.
+  const list = providersForTier(tier);
+  return { providerId: list[0]?.id ?? null, key: "" };
 }
 
 export function OnboardingWizard() {
@@ -42,17 +45,17 @@ export function OnboardingWizard() {
     setIdx((i) => Math.max(0, i - 1));
   }
 
-  async function saveModel(state: ModelStepState): Promise<boolean> {
+  async function saveModel(state: ModelStepState, tier: "light" | "heavy"): Promise<boolean> {
     if (!state.providerId) return false;
     const provider = PROVIDERS[state.providerId];
+    const model = provider.defaultModel[tier];
+    if (!model) return false;
     setSaving(true);
     setError(null);
     try {
       await api.setConnection(provider.credProvider, state.key.trim());
       await api.setModelPreferences(
-        provider.tier === "light"
-          ? { light_model: provider.defaultModel }
-          : { heavy_model: provider.defaultModel },
+        tier === "light" ? { light_model: model } : { heavy_model: model },
       );
       return true;
     } catch (e) {
@@ -92,11 +95,11 @@ export function OnboardingWizard() {
       return;
     }
     if (step.key === "light") {
-      if (await saveModel(light)) setIdx(2);
+      if (await saveModel(light, "light")) setIdx(2);
       return;
     }
     if (step.key === "heavy") {
-      if (await saveModel(heavy)) setIdx(3);
+      if (await saveModel(heavy, "heavy")) setIdx(3);
       return;
     }
     if (step.key === "gtky") {

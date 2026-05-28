@@ -10,7 +10,7 @@ export interface ProviderMeta {
   id: string; // UI id
   credProvider: KeyProvider; // backend connection provider string
   name: string;
-  tier: Tier; // which model slot this provider fills in the wizard
+  tiers: Tier[]; // which model slots this provider can fill (light, heavy, or both)
   badge?: string;
   badgeKind?: "success" | "default";
   pricing: string;
@@ -20,10 +20,7 @@ export interface ProviderMeta {
   keyHint: string;
   keyPrefix: string;
   keyLength: [number, number];
-  defaultModel: string; // exact model auto-selected when this provider is chosen
-  wizard?: boolean; // show in the first-run wizard? Defaults to true. Paid
-                    // providers (OpenAI) stay false — Settings-only — so the
-                    // free first-run flow isn't cluttered with billing.
+  defaultModel: Partial<Record<Tier, string>>; // model auto-selected per slot when this provider is chosen
 }
 
 export const PROVIDERS: Record<string, ProviderMeta> = {
@@ -31,7 +28,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     id: "groq",
     credProvider: "llm:groq",
     name: "Groq",
-    tier: "light",
+    tiers: ["light"],
     badge: "Free",
     badgeKind: "success",
     pricing: "Free up to 14,400 requests/day · no credit card",
@@ -41,13 +38,13 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with gsk_, ~56 chars",
     keyPrefix: "gsk_",
     keyLength: [40, 100],
-    defaultModel: "meta-llama/llama-4-scout-17b-16e-instruct",
+    defaultModel: { light: "meta-llama/llama-4-scout-17b-16e-instruct" },
   },
   google: {
     id: "google",
     credProvider: "llm:google_ai",
     name: "Google Gemini",
-    tier: "heavy",
+    tiers: ["heavy"],
     badge: "Free tier",
     badgeKind: "success",
     pricing: "Free tier available · paid tier unlocks higher limits",
@@ -57,31 +54,28 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with AIza, ~39 chars",
     keyPrefix: "AIza",
     keyLength: [35, 50],
-    defaultModel: "gemma-4-31b-it",
+    defaultModel: { heavy: "gemma-4-31b-it" },
   },
   openai: {
     id: "openai",
     credProvider: "llm:openai",
     name: "OpenAI",
-    tier: "heavy",
+    tiers: ["light", "heavy"],
     badge: "Paid",
     badgeKind: "default",
     pricing: "Paid · billing required on your OpenAI account",
-    description: "GPT-4o and friends. Optional — adds OpenAI's models alongside your free providers.",
+    description: "GPT-4o for either slot. Paid, but works as a light or heavy model.",
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: 'In OpenAI → API keys → "Create new secret key".',
     keyHint: "Starts with sk-",
     keyPrefix: "sk-",
     keyLength: [20, 200],
-    defaultModel: "gpt-4o",
-    wizard: false, // Settings-only; keep the free first-run flow uncluttered.
+    defaultModel: { light: "gpt-4o-mini", heavy: "gpt-4o" },
   },
 };
 
 export function providersForTier(tier: Tier): ProviderMeta[] {
-  // `wizard: false` providers (paid extras) are excluded from the first-run
-  // wizard but still usable from Settings.
-  return Object.values(PROVIDERS).filter((p) => p.tier === tier && p.wizard !== false);
+  return Object.values(PROVIDERS).filter((p) => p.tiers.includes(tier));
 }
 
 // Search providers (for the Web Search connection). Same key-card shape as

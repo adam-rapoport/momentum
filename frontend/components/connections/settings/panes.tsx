@@ -1,11 +1,10 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, type ConnectionStatus, type GoogleStatus, type KeyProvider } from "@/lib/api";
-import { PROVIDERS } from "@/lib/providers";
-import { ConnectionKeyCard } from "../ConnectionKeyCard";
 import { WebSearchCard } from "./WebSearchCard";
 import { Banner, SectionHeader, StatusPill } from "../kit";
 import { AdvancedModelPicker } from "./AdvancedModelPicker";
+import { SlotModelCard } from "./SlotModelCard";
 
 type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
 
@@ -44,30 +43,11 @@ export function ModelsPane({ connections, onChanged }: { connections: ConnMap; o
     <div>
       <SectionHeader
         title="Models"
-        sub="The two AI brains pmomentum uses. Swap providers anytime — the next message uses the new one."
+        sub="Choose which AI powers each slot. Connect a provider once and use it for either slot — free or paid."
       />
       <div className="flex flex-col gap-3.5">
-        <ConnectionKeyCard
-          meta={PROVIDERS.groq}
-          title="Light model"
-          subtitle="Groq · fast everyday work"
-          status={connections["llm:groq"]}
-          onChanged={onChanged}
-        />
-        <ConnectionKeyCard
-          meta={PROVIDERS.google}
-          title="Heavy model"
-          subtitle="Google · big asks, longer reasoning"
-          status={connections["llm:google_ai"]}
-          onChanged={onChanged}
-        />
-        <ConnectionKeyCard
-          meta={PROVIDERS.openai}
-          title="OpenAI"
-          subtitle="Optional · paid · GPT-4o"
-          status={connections["llm:openai"]}
-          onChanged={onChanged}
-        />
+        <SlotModelCard tier="light" connections={connections} onChanged={onChanged} />
+        <SlotModelCard tier="heavy" connections={connections} onChanged={onChanged} />
       </div>
 
       <div className="mt-5">
