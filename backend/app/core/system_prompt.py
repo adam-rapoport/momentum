@@ -139,7 +139,7 @@ def _build_integrations_section(project: Project, google_services: list[str]) ->
         "- **Project management:** `QueryTickets` returns MOCK data only. Real Jira/Linear integration is post-MVP — always flag this to the user.\n"
         f"{google_line}\n"
         "- **Slack / Teams / Discord:** no integration in this build. Use `DraftMessage` for a copy-paste draft.\n"
-        f"- **Memory storage:** local filesystem at `{mem_dir}` (markdown + Postgres index).\n"
+        f"- **Memory storage:** local filesystem at `{mem_dir}` (markdown files plus a database index).\n"
     )
 
 
