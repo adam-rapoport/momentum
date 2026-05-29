@@ -47,6 +47,13 @@ _clients: dict[str, AsyncOpenAI] = {}
 
 def get_client(api_key: str | None = None) -> AsyncOpenAI:
     key = api_key or settings.groq_api_key
+    if not key:
+        # Mirror openai_client / google_client: a clear, correct message instead
+        # of AsyncOpenAI(api_key=None) raising about the wrong (OPENAI) env var.
+        raise RuntimeError(
+            "GROQ_API_KEY is not configured — set it in .env or connect "
+            "Groq in Settings to route turns to Groq models."
+        )
     client = _clients.get(key)
     if client is None:
         client = AsyncOpenAI(api_key=key, base_url=settings.groq_base_url)

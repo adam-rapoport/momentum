@@ -1,13 +1,30 @@
-from pydantic import Field
+import os
+from pathlib import Path
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str = Field(..., alias="DATABASE_URL")
+    # Per-user writable folder for the desktop build. The desktop launcher
+    # (app/desktop.py) sets this to e.g. ~/Library/Application Support/pMomentum
+    # before the app imports. When set, the SQLite DB, memory/documents, and the
+    # credential vault key all root here. Unset (web dev) → the explicit/relative
+    # defaults below apply unchanged. This is config precedence, not a flag.
+    data_dir: str | None = Field(None, alias="DATA_DIR")
 
-    groq_api_key: str = Field(..., alias="GROQ_API_KEY")
+    # Optional so the app can boot with no config: resolution is explicit env
+    # var > derived from DATA_DIR > a self-contained SQLite file in the cwd
+    # (matches .env.example). Always a real string after _apply_data_dir runs.
+    database_url: str | None = Field(None, alias="DATABASE_URL")
+
+    # Optional at import. Since C8 (the Connections UI), API keys resolve
+    # stored-key→env-fallback at call time (app.core.credentials), not at
+    # startup — so a fresh desktop user with no key can still boot to the
+    # onboarding wizard and enter it there.
+    groq_api_key: str | None = Field(None, alias="GROQ_API_KEY")
     groq_model: str = Field(
         "meta-llama/llama-4-scout-17b-16e-instruct", alias="GROQ_MODEL"
     )
@@ -75,5 +92,74 @@ class Settings(BaseSettings):
     # Perplexity as their search provider (see app.core.search).
     perplexity_api_key: str | None = Field(None, alias="PERPLEXITY_API_KEY")
 
+    @model_validator(mode="after")
+    def _resolve_paths(self) -> "Settings":
+        """Derive DB/memory paths from DATA_DIR. Pure & side-effect-free.
+
+        Precedence: an explicitly-provided value (env or .env) always wins; else
+        a value derived from DATA_DIR (desktop); else a built-in default. We
+        detect "explicitly provided" via `model_fields_set` (verified: env- and
+        .env-sourced fields appear there; defaults don't). Snapshot it BEFORE we
+        assign anything, since assigning also adds the field to that set.
+
+        This runs at construction (before app.dependencies builds the engine),
+        but touches no disk and mints no secrets — those happen later in
+        bootstrap_data_dir(), called explicitly from the app lifespan.
+        """
+        explicit = set(self.model_fields_set)
+        if self.data_dir:
+            root = Path(self.data_dir).expanduser()
+            # as_posix() keeps the SQLite URL valid on Windows (C:/...) too.
+            if "database_url" not in explicit:
+                self.database_url = f"sqlite+aiosqlite:///{(root / 'pmomentum.db').as_posix()}"
+            if "memory_root" not in explicit:
+                # get_memory_root() picks up an absolute path via its existing
+                # `if p.is_absolute()` branch; documents derive from it.
+                self.memory_root = (root / "memory").as_posix()
+        # Guarantee a usable DB URL even with no DATA_DIR and no DATABASE_URL, so
+        # the app boots out of the box (SQLite is the project default).
+        if not self.database_url:
+            self.database_url = "sqlite+aiosqlite:///./pmomentum.db"
+        return self
+
 
 settings = Settings()
+
+
+def _load_or_create_vault_key(root: Path) -> str:
+    """Return the persisted credential vault key under `root`, minting one if
+    absent. Treats an empty/truncated file as absent (a half-written key from a
+    crash or full disk must not brick the vault). Writes atomically so a partial
+    file is never observed."""
+    key_path = root / "vault.key"
+    if key_path.exists():
+        existing = key_path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+        # else: empty/truncated → fall through and mint a fresh key
+
+    from cryptography.fernet import Fernet
+
+    new_key = Fernet.generate_key().decode("utf-8")
+    tmp = root / f"vault.key.{os.getpid()}.tmp"
+    tmp.write_text(new_key, encoding="utf-8")
+    try:
+        tmp.chmod(0o600)
+    except OSError:
+        pass  # best-effort; some filesystems/platforms lack POSIX perms
+    os.replace(tmp, key_path)  # atomic publish
+    return new_key
+
+
+def bootstrap_data_dir() -> None:
+    """Prepare the per-user data dir: create it and ensure a credential vault
+    key exists. Explicit (called once from the app lifespan), NOT an import
+    side effect — so importing app.config never touches disk or mints secrets.
+    No-op unless DATA_DIR is set (web dev). Idempotent; an explicit
+    CREDENTIAL_VAULT_KEY always wins."""
+    if not settings.data_dir:
+        return
+    root = Path(settings.data_dir).expanduser()
+    root.mkdir(parents=True, exist_ok=True)
+    if not settings.credential_vault_key:
+        settings.credential_vault_key = _load_or_create_vault_key(root)
