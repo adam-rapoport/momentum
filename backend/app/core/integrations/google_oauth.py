@@ -1,7 +1,7 @@
 """Google OAuth 2.0 flow + token refresh + Integration-row helpers.
 
-Single-user local-dev variant: simple state-token in Redis (5 min TTL),
-no PKCE beyond Google's default flow. Refresh happens lazily on 401.
+Single-user variant: simple state-token in the in-process KV store (5 min
+TTL), no PKCE beyond Google's default flow. Refresh happens lazily on 401.
 
 One integration row (`provider='google'`) covers all Google services we
 talk to. The granted scope list decides which services are actually
@@ -26,7 +26,7 @@ from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
 import httpx
-from redis.asyncio import Redis
+from app.core.local_store import LocalKVStore
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -159,9 +159,9 @@ def _state_key(state: str) -> str:
     return f"google_oauth:state:{state}"
 
 
-async def start_authorization(redis: Redis, user_id: UUID) -> str:
-    """Issue a signed state token, stash the user_id behind it in Redis, and
-    return the Google consent URL to redirect the browser to."""
+async def start_authorization(kv: LocalKVStore, user_id: UUID) -> str:
+    """Issue a signed state token, stash the user_id behind it in the in-process
+    store, and return the Google consent URL to redirect the browser to."""
     client_id, _, redirect_uri = _require_client_config()
 
     # Ensure the vault is usable BEFORE sending the user on a round-trip
@@ -173,7 +173,7 @@ async def start_authorization(redis: Redis, user_id: UUID) -> str:
         raise
 
     state = secrets.token_urlsafe(32)
-    await redis.set(_state_key(state), str(user_id), ex=_STATE_TTL_SECONDS)
+    await kv.set(_state_key(state), str(user_id), ex=_STATE_TTL_SECONDS)
 
     params = {
         "client_id": client_id,
@@ -188,14 +188,14 @@ async def start_authorization(redis: Redis, user_id: UUID) -> str:
     return f"{AUTHORIZATION_URL}?{urlencode(params)}"
 
 
-async def _consume_state(redis: Redis, state: str) -> UUID:
-    value = await redis.get(_state_key(state))
+async def _consume_state(kv: LocalKVStore, state: str) -> UUID:
+    value = await kv.get(_state_key(state))
     if not value:
         raise OAuthFlowError(
             "Google OAuth state token is missing or expired. Start the "
             "connection flow again from Settings."
         )
-    await redis.delete(_state_key(state))
+    await kv.delete(_state_key(state))
     try:
         return UUID(value if isinstance(value, str) else value.decode())
     except (ValueError, AttributeError) as e:
@@ -252,11 +252,11 @@ async def _fetch_userinfo(access_token: str) -> dict:
 
 
 async def complete_authorization(
-    db: AsyncSession, redis: Redis, code: str, state: str
+    db: AsyncSession, kv: LocalKVStore, code: str, state: str
 ) -> Integration:
     """Called from the OAuth callback. Exchanges the code, encrypts tokens,
     upserts the Integration row for the user bound to the state token."""
-    user_id = await _consume_state(redis, state)
+    user_id = await _consume_state(kv, state)
 
     token_response = await _exchange_code(code)
     access_token = token_response.get("access_token")

@@ -2,22 +2,21 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.models.base import Base, JSONColumn
 
 
 class Session(Base):
     __tablename__ = "sessions"
 
-    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     project_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True
     )
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     permission_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
@@ -32,7 +31,7 @@ class Session(Base):
     total_cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False, default=0)
     turn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     session_metadata: Mapped[dict] = mapped_column(
-        "metadata", JSONB, nullable=False, default=dict
+        "metadata", JSONColumn, nullable=False, default=dict
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

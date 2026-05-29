@@ -7,11 +7,10 @@ tokens are stored encrypted with Fernet — see `app/core/integrations/vault.py`
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
+from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, JSONColumn
 
 
 class Integration(Base):
@@ -20,9 +19,9 @@ class Integration(Base):
         UniqueConstraint("user_id", "provider", name="uq_integration_user_provider"),
     )
 
-    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     # connected | disconnected | error
@@ -30,9 +29,9 @@ class Integration(Base):
     # Fernet-encrypted JSON blob: {"access_token": "...", "refresh_token": "...",
     # "expires_at": "iso8601", "scopes": [...]}.
     encrypted_credentials: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    scopes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    scopes: Mapped[list] = mapped_column(JSONColumn, nullable=False, default=list)
     # Free-form provider metadata (Google email, display name, workspace id, …).
-    meta: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    meta: Mapped[dict] = mapped_column("metadata", JSONColumn, nullable=False, default=dict)
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_refreshed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

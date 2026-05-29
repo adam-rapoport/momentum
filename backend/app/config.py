@@ -6,7 +6,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = Field(..., alias="DATABASE_URL")
-    redis_url: str = Field(..., alias="REDIS_URL")
 
     groq_api_key: str = Field(..., alias="GROQ_API_KEY")
     groq_model: str = Field(
@@ -37,6 +36,11 @@ class Settings(BaseSettings):
 
     app_env: str = Field("development", alias="APP_ENV")
     frontend_origin: str = Field("http://localhost:3000", alias="FRONTEND_ORIGIN")
+    log_level: str = Field("INFO", alias="LOG_LEVEL")
+
+    # Optional Sentry crash reporting. OFF unless a DSN is supplied — a
+    # privacy-respecting desktop app must not phone home without opt-in.
+    sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
 
     user_timezone: str = Field("America/Los_Angeles", alias="USER_TIMEZONE")
     tavily_api_key: str | None = Field(None, alias="TAVILY_API_KEY")

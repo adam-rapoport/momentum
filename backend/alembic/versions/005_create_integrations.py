@@ -17,18 +17,18 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "integrations",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.Uuid(as_uuid=True),
             sa.ForeignKey("users.id"),
             nullable=False,
         ),
         sa.Column("provider", sa.String(50), nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="connected"),
         sa.Column("encrypted_credentials", sa.LargeBinary, nullable=True),
-        sa.Column("scopes", postgresql.JSONB, nullable=False, server_default="[]"),
-        sa.Column("metadata", postgresql.JSONB, nullable=False, server_default="{}"),
+        sa.Column("scopes", sa.JSON().with_variant(postgresql.JSONB(), "postgresql"), nullable=False, server_default="[]"),
+        sa.Column("metadata", sa.JSON().with_variant(postgresql.JSONB(), "postgresql"), nullable=False, server_default="{}"),
         sa.Column("connected_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_refreshed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(

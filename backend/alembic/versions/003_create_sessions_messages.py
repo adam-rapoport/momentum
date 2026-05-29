@@ -17,16 +17,16 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "sessions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.Uuid(as_uuid=True),
             sa.ForeignKey("users.id"),
             nullable=False,
         ),
         sa.Column(
             "project_id",
-            postgresql.UUID(as_uuid=True),
+            sa.Uuid(as_uuid=True),
             sa.ForeignKey("projects.id"),
             nullable=False,
         ),
@@ -45,7 +45,7 @@ def upgrade() -> None:
         sa.Column("total_cache_read_tokens", sa.Integer, nullable=False, server_default="0"),
         sa.Column("total_cost_usd", sa.Numeric(10, 6), nullable=False, server_default="0"),
         sa.Column("turn_count", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("metadata", postgresql.JSONB, nullable=False, server_default="{}"),
+        sa.Column("metadata", sa.JSON().with_variant(postgresql.JSONB(), "postgresql"), nullable=False, server_default="{}"),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
@@ -58,16 +58,16 @@ def upgrade() -> None:
 
     op.create_table(
         "messages",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
             "session_id",
-            postgresql.UUID(as_uuid=True),
+            sa.Uuid(as_uuid=True),
             sa.ForeignKey("sessions.id"),
             nullable=False,
         ),
         sa.Column("turn_id", sa.Integer, nullable=False),
         sa.Column("role", sa.String(20), nullable=False),
-        sa.Column("content", postgresql.JSONB, nullable=False),
+        sa.Column("content", sa.JSON().with_variant(postgresql.JSONB(), "postgresql"), nullable=False),
         sa.Column("token_count_estimate", sa.Integer, nullable=True),
         sa.Column("is_compacted", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column(

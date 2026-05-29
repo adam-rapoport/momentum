@@ -17,10 +17,10 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "projects",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
             "organization_id",
-            postgresql.UUID(as_uuid=True),
+            sa.Uuid(as_uuid=True),
             sa.ForeignKey("organizations.id"),
             nullable=False,
         ),
@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("slug", sa.String(100), nullable=False),
         sa.Column("description", sa.Text, nullable=True),
         sa.Column("project_md", sa.Text, nullable=True),
-        sa.Column("settings", postgresql.JSONB, nullable=False, server_default="{}"),
+        sa.Column("settings", sa.JSON().with_variant(postgresql.JSONB(), "postgresql"), nullable=False, server_default="{}"),
         sa.Column("memory_path", sa.String(500), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()

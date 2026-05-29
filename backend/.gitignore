@@ -4,3 +4,8 @@ __pycache__/
 .env
 .pytest_cache/
 *.egg-info/
+
+# Local SQLite databases (the default DB for the desktop build)
+*.db
+*.db-journal
+*.db-wal

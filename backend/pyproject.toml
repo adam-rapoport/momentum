@@ -7,11 +7,16 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
+    # SQLite (aiosqlite) is the default DB for the desktop build — no service
+    # to install. asyncpg stays so a Postgres DATABASE_URL still works.
+    "aiosqlite>=0.20",
     "asyncpg>=0.29",
     "alembic>=1.13",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
-    "redis>=5.0",
+    # Optional crash reporting — only active when SENTRY_DSN is set (off by
+    # default; a desktop app must not phone home without opt-in).
+    "sentry-sdk[fastapi]>=2.0",
     "openai>=1.50",
     "httpx>=0.27",
     "tavily-python>=0.5",
@@ -33,9 +38,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
-    # psycopg (sync) is used by tests/conftest.py to probe the test DB,
-    # CREATE DATABASE pmomentum_test if missing, and run alembic
-    # migrations against it. asyncpg handles the runtime connection.
+    # psycopg (sync) is only needed to run the test suite against Postgres
+    # (set PMOMENTUM_TEST_DATABASE_URL to a postgres URL). The default test
+    # DB is SQLite, which needs no extra driver.
     "psycopg[binary]>=3.2",
 ]
 

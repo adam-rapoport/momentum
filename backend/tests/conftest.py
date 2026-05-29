@@ -7,16 +7,14 @@ Layered scope:
   Gmail body parser, Calendar interval math, pending_action staging) —
   pure logic, no DB. They don't depend on any DB fixture below.
 
-- Sprint 6 Chunk D integration tests — talk to a real Postgres DB.
-  Gated behind the `db` / `seeded` fixtures. The session-scoped
-  `test_engine` fixture probes the test DB; if unreachable it `skip`s
-  the integration tests rather than failing them, so `pytest -q` stays
-  green for someone running only the unit suite.
+- Sprint 6 Chunk D integration tests — talk to a real DB via the
+  `db` / `seeded` fixtures.
 
-  Configure the test DB with the `TEST_DATABASE_URL` env var. Default:
-  `postgresql+asyncpg://localhost/pmomentum_test`. CI's GitHub Actions
-  workflow stands up a Postgres service container and points this var
-  at it.
+  Default test DB is a throwaway SQLite file (no service needed), matching
+  the desktop build. To run the suite against Postgres instead, set
+  `TEST_DATABASE_URL=postgresql+asyncpg://localhost/pmomentum_test`; the
+  fixture then probes that DB and `skip`s the integration tests if it's
+  unreachable (so `pytest -q` stays green when only running the unit suite).
 """
 from __future__ import annotations
 
@@ -24,6 +22,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 from urllib.parse import urlparse
@@ -43,11 +42,27 @@ if str(_BACKEND_ROOT) not in sys.path:
 # Imports that depend on app.* live below the sys.path patch.
 from app.models import Base, Organization, Project, User  # noqa: E402
 
-DEFAULT_TEST_DB_URL = "postgresql+asyncpg://localhost/pmomentum_test"
+# Default: a throwaway SQLite file in the temp dir (no service to install).
+# Override with TEST_DATABASE_URL to run the suite against Postgres.
+_SQLITE_TEST_PATH = os.path.join(tempfile.gettempdir(), "pmomentum_pytest.db")
+DEFAULT_TEST_DB_URL = f"sqlite+aiosqlite:///{_SQLITE_TEST_PATH}"
 
 
 def _test_db_url() -> str:
-    return os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DB_URL)
+    # Empty or unset -> SQLite default (lets CI pass TEST_DATABASE_URL="" to
+    # select the SQLite matrix leg).
+    return os.environ.get("TEST_DATABASE_URL") or DEFAULT_TEST_DB_URL
+
+
+def _is_sqlite(url: str) -> bool:
+    return url.startswith("sqlite")
+
+
+def _reset_sqlite_file(url: str) -> None:
+    """Delete any leftover SQLite test file so migrations apply to a clean DB."""
+    path = url.split(":///", 1)[1] if ":///" in url else ""
+    if path and path != ":memory:" and os.path.exists(path):
+        os.remove(path)
 
 
 def _async_url_to_sync(url: str) -> str:
@@ -125,18 +140,28 @@ def _run_alembic_upgrade(test_db_url: str) -> None:
 
 @pytest.fixture(scope="session")
 def _test_db_ready() -> str:
-    """One-time per session: probe Postgres, create the DB if missing,
-    run migrations. Returns the URL. Sync fixture so it runs before any
-    asyncio-scoped fixture spins up its own engine."""
+    """One-time per session: prepare the test DB and run migrations. Returns
+    the URL. Sync fixture so it runs before any asyncio-scoped fixture spins
+    up its own engine.
+
+    SQLite (default): wipe any stale file, then migrate a fresh one.
+    Postgres (TEST_DATABASE_URL): probe, create the DB if missing, migrate;
+    skip the integration tests cleanly if Postgres isn't reachable."""
+    url = _test_db_url()
+    if _is_sqlite(url):
+        _reset_sqlite_file(url)
+        _run_alembic_upgrade(url)
+        return url
+
     reachable, reason = _can_reach_test_db()
     if not reachable:
         pytest.skip(
-            f"Test DB unreachable at {_test_db_url()} ({reason}). "
-            f"Set TEST_DATABASE_URL or start Postgres to run integration tests."
+            f"Test DB unreachable at {url} ({reason}). "
+            f"Unset TEST_DATABASE_URL to use SQLite, or start Postgres."
         )
     _ensure_test_db_exists()
-    _run_alembic_upgrade(_test_db_url())
-    return _test_db_url()
+    _run_alembic_upgrade(url)
+    return url
 
 
 @pytest_asyncio.fixture
@@ -162,11 +187,17 @@ async def test_engine(_test_db_ready: str) -> AsyncIterator:
 async def _truncate_all(engine) -> None:
     """Wipe every data table — leaves alembic's `alembic_version` alone so
     migrations don't re-run between tests."""
-    table_names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     async with engine.begin() as conn:
-        await conn.execute(
-            text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
-        )
+        if engine.dialect.name == "sqlite":
+            # SQLite has no TRUNCATE. Delete in reverse dependency order
+            # (children before parents) so FK constraints are satisfied.
+            for table in reversed(Base.metadata.sorted_tables):
+                await conn.execute(table.delete())
+        else:
+            table_names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+            await conn.execute(
+                text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
+            )
 
 
 @pytest_asyncio.fixture

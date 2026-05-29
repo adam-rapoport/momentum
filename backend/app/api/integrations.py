@@ -16,7 +16,6 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -31,7 +30,8 @@ from app.core.integrations.google_oauth import (
     start_authorization,
 )
 from app.core.integrations.vault import VaultNotConfigured
-from app.dependencies import get_db, get_redis
+from app.core.local_store import LocalKVStore
+from app.dependencies import get_db, get_kv
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +48,11 @@ async def google_status(db: AsyncSession = Depends(get_db)) -> dict:
 @router.post("/google/connect")
 async def google_connect(
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    kv: LocalKVStore = Depends(get_kv),
 ) -> dict:
     user = await get_default_user(db)
     try:
-        authorize_url = await start_authorization(redis, user.id)
+        authorize_url = await start_authorization(kv, user.id)
     except OAuthNotConfigured as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except VaultNotConfigured as e:
@@ -64,7 +64,7 @@ async def google_connect(
 async def google_callback(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    kv: LocalKVStore = Depends(get_kv),
 ):
     """Google redirects the browser here with ?code=...&state=... (or error=...).
     We complete the exchange and redirect back to the settings page."""
@@ -84,7 +84,7 @@ async def google_callback(
         )
 
     try:
-        await complete_authorization(db, redis, code, state)
+        await complete_authorization(db, kv, code, state)
     except (OAuthFlowError, OAuthNotConfigured, VaultNotConfigured) as e:
         logger.warning("google oauth callback failed: %s", e)
         return RedirectResponse(

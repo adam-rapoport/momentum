@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from redis.asyncio import Redis
+from app.core.local_store import LocalKVStore
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -497,7 +497,7 @@ def _history_to_llm_messages(history: list[Message]) -> list[dict]:
 async def process_message(
     *,
     db: AsyncSession,
-    redis: Redis,
+    kv: LocalKVStore,
     session_id: UUID,
     user_text: str,
 ) -> AsyncIterator[
@@ -589,7 +589,7 @@ async def process_message(
     await db.flush()
     await _safe_commit(db, session_id, stage="persist_user_message")
 
-    await redis.delete(_cancel_key(session_id))
+    await kv.delete(_cancel_key(session_id))
 
     tool_ctx = ToolContext(
         db=db,
@@ -613,7 +613,7 @@ async def process_message(
             llm_messages, model=turn_model, tools=tool_specs, api_key=turn_api_key
         ):
             if isinstance(event, StreamChunk):
-                if await redis.exists(_cancel_key(session_id)):
+                if await kv.exists(_cancel_key(session_id)):
                     cancelled = True
                     break
                 assistant_chunks.append(event.text)
@@ -795,7 +795,7 @@ async def process_message(
                 model=turn_model,
                 pending_action=pending_action,
             )
-            await redis.delete(_cancel_key(session_id))
+            await kv.delete(_cancel_key(session_id))
             reset_context(ctx_token)
             return
 
@@ -847,7 +847,7 @@ async def process_message(
                 model=turn_model,
                 pending_action=None,
             )
-            await redis.delete(_cancel_key(session_id))
+            await kv.delete(_cancel_key(session_id))
             reset_context(ctx_token)
             return
         # loop continues — give the model another turn to respond to tool results
@@ -861,7 +861,7 @@ async def process_message(
     session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
 
     await _safe_commit(db, session_id, stage="finalize_turn")
-    await redis.delete(_cancel_key(session_id))
+    await kv.delete(_cancel_key(session_id))
     reset_context(ctx_token)
 
     yield DoneEvent(
@@ -874,5 +874,5 @@ async def process_message(
     )
 
 
-async def cancel_session(redis: Redis, session_id: UUID) -> None:
-    await redis.set(_cancel_key(session_id), "1", ex=60)
+async def cancel_session(kv: LocalKVStore, session_id: UUID) -> None:
+    await kv.set(_cancel_key(session_id), "1", ex=60)

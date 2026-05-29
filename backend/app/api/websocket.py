@@ -12,6 +12,7 @@ Outbound:
 import logging
 from uuid import UUID
 
+import sentry_sdk
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from openai import APIError as OpenAIAPIError
 from pydantic import ValidationError
@@ -26,7 +27,7 @@ from app.core.session_engine import (
     cancel_session,
     process_message,
 )
-from app.dependencies import SessionLocal, redis_client
+from app.dependencies import SessionLocal, kv_store
 from app.schemas.websocket import InboundCancel, InboundMessage
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 except ValidationError as e:
                     await ws.send_json({"type": "error", "code": "VALIDATION_ERROR", "message": str(e)})
                     continue
-                await cancel_session(redis_client, payload_c.session_id)
+                await cancel_session(kv_store, payload_c.session_id)
 
             else:
                 await ws.send_json(
@@ -80,7 +81,7 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
     try:
         async with SessionLocal() as db:
             async for event in process_message(
-                db=db, redis=redis_client, session_id=session_id, user_text=content
+                db=db, kv=kv_store, session_id=session_id, user_text=content
             ):
                 if isinstance(event, TextEvent):
                     await ws.send_json(
@@ -152,6 +153,9 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
         logger.warning(
             "commit failure at stage=%s for session %s", e.stage, session_id
         )
+        # Genuine failure (not user-recoverable) — report it. No-op if Sentry
+        # isn't configured.
+        sentry_sdk.capture_exception(e)
         await ws.send_json(
             {
                 "type": "error",
@@ -197,8 +201,10 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
                     "session_id": str(session_id),
                 }
             )
-    except Exception:
+    except Exception as e:
         logger.exception("error processing message for session %s", session_id)
+        # Unexpected crash — report it. No-op if Sentry isn't configured.
+        sentry_sdk.capture_exception(e)
         await ws.send_json(
             {
                 "type": "error",

@@ -7,11 +7,10 @@ two in sync by routing every save through `app/core/memory/store.py`.
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.models.base import Base, JSONColumn
 
 
 class MemoryRecord(Base):
@@ -20,15 +19,15 @@ class MemoryRecord(Base):
         UniqueConstraint("project_id", "type", "slug", name="uq_memory_project_type_slug"),
     )
 
-    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     project_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True
     )
     type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    tags: Mapped[list] = mapped_column(JSONColumn, nullable=False, default=list)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

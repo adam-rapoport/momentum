@@ -8,13 +8,25 @@ on:
 
 jobs:
   pytest:
-    name: pytest (Python 3.12)
+    name: pytest (${{ matrix.db }})
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # SQLite is the shipping default (desktop build) — no service needed.
+          - db: sqlite
+            test_database_url: ""
+          # Postgres proves the dialect-portable models still work there too.
+          - db: postgres
+            test_database_url: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+
     services:
+      # Always available; only the Postgres matrix leg actually connects to it.
       postgres:
         image: postgres:16
         env:
@@ -28,23 +40,20 @@ jobs:
           --health-retries 10
 
     env:
-      # Sprint 6 Chunk D: integration tests use this URL. tests/conftest.py
-      # creates the `pmomentum_test` database and runs alembic migrations
-      # against it.
-      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
-      # `app.config.Settings` validates these at import time, and most
-      # tests transitively import the settings module. Locally the values
-      # come from backend/.env (gitignored). CI has no .env, so fill in
-      # placeholders. Real connections during tests use TEST_DATABASE_URL
-      # via tests/conftest.py; GROQ_API_KEY isn't called from any unit
-      # test (LLM clients are constructed lazily and not exercised here).
+      # Which DB the integration tests run against. Empty -> tests/conftest.py
+      # uses a throwaway SQLite file. Set -> it creates pmomentum_test and runs
+      # alembic migrations against Postgres.
+      TEST_DATABASE_URL: ${{ matrix.test_database_url }}
+      # `app.config.Settings` validates these at import time, and most tests
+      # transitively import the settings module. CI has no .env (it's
+      # gitignored), so fill in placeholders. DATABASE_URL is never connected
+      # to during tests — conftest uses TEST_DATABASE_URL. GROQ_API_KEY isn't
+      # called from any unit test (LLM clients are constructed lazily).
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
-      REDIS_URL: redis://localhost:6379
       GROQ_API_KEY: ci-placeholder-not-a-real-key
-      # The model_router tests assert that Gemini/Gemma models are
-      # picker-available; the registry filters Google models out when
-      # GOOGLE_AI_API_KEY is unset. Placeholder is enough — no actual
-      # call goes out to Google during tests.
+      # The model_router tests assert Gemini/Gemma models are picker-available;
+      # the registry filters Google models out when GOOGLE_AI_API_KEY is unset.
+      # Placeholder is enough — no actual call goes out to Google during tests.
       GOOGLE_AI_API_KEY: ci-placeholder-not-a-real-key
 
     steps:
