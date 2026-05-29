@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
 
 export function Sidebar() {
   const router = useRouter();
-  const params = useParams<{ sessionId?: string }>();
+  const activeSessionId = useChatStore((s) => s.activeSessionId);
   const sessions = useChatStore((s) => s.sessions);
   const setSessions = useChatStore((s) => s.setSessions);
   const upsertSession = useChatStore((s) => s.upsertSession);
@@ -23,7 +23,7 @@ export function Sidebar() {
     try {
       const s = await api.createSession({});
       upsertSession(s);
-      router.push(`/chat/${s.id}`);
+      router.push(`/chat?s=${s.id}`);
     } catch (err) {
       console.error("failed to create session:", err);
     }
@@ -47,11 +47,11 @@ export function Sidebar() {
         ) : (
           <ul className="py-1">
             {sessions.map((s) => {
-              const active = s.id === params.sessionId;
+              const active = s.id === activeSessionId;
               return (
                 <li key={s.id}>
                   <Link
-                    href={`/chat/${s.id}`}
+                    href={`/chat?s=${s.id}`}
                     className={`block px-3 py-2 text-sm truncate border-l-2 ${
                       active
                         ? "border-neutral-900 bg-neutral-100 font-medium"

@@ -18,10 +18,11 @@ import os
 import sys
 from pathlib import Path
 
-# Fixed loopback port. Kept at 8000 to match the frontend's default API/WS base
-# and the registered Google OAuth redirect URI (localhost:8000/...). Changing it
-# means also updating GOOGLE_REDIRECT_URI *and* the Google Cloud console
-# redirect registration, or "Connect Google" breaks.
+# Default loopback port. 8000 matches the frontend's default API/WS base and the
+# registered Google OAuth redirect URI (localhost:8000/...). Overridable via
+# PMOMENTUM_PORT, but note: changing it means also updating GOOGLE_REDIRECT_URI
+# *and* the Google Cloud console redirect registration, or "Connect Google"
+# breaks.
 PORT = 8000
 APP_NAME = "pMomentum"
 
@@ -39,12 +40,64 @@ def default_data_dir() -> Path:
     return (Path(base) if base else home / ".local" / "share") / APP_NAME
 
 
+def _selfcheck() -> int:
+    """Validate that the bundled dependencies + data files actually work inside
+    the frozen binary. Run with `pmomentum-backend --selfcheck`. Returns a
+    non-zero exit code on any failure. Useful as a smoke test of every build —
+    catches PyInstaller omitting a data dir or a native dep before we ship.
+    """
+    ok = True
+
+    def check(name: str, fn) -> None:
+        nonlocal ok
+        try:
+            fn()
+            print(f"  [ok]   {name}")
+        except Exception as e:  # noqa: BLE001 — we report every failure, not just the first
+            ok = False
+            print(f"  [FAIL] {name}: {type(e).__name__}: {e}")
+
+    def _crypto() -> None:
+        from cryptography.fernet import Fernet
+
+        f = Fernet(Fernet.generate_key())
+        assert f.decrypt(f.encrypt(b"pm")) == b"pm"
+
+    def _trafilatura() -> None:
+        import trafilatura
+
+        # Return value may be None for trivial input; we only need it to run.
+        trafilatura.extract("<html><body><article><p>body text</p></article></body></html>")
+
+    def _prompts() -> None:
+        from app.core.system_prompt import _STATIC_DIR
+
+        assert list(_STATIC_DIR.glob("*.md")), f"no prompt files under {_STATIC_DIR}"
+
+    def _skills() -> None:
+        from app.core.skills import _SKILLS_DIR
+
+        assert list(_SKILLS_DIR.glob("*/SKILL.md")), f"no SKILL.md under {_SKILLS_DIR}"
+
+    check("cryptography Fernet round-trip", _crypto)
+    check("trafilatura import + extract", _trafilatura)
+    check("bundled prompts/static readable", _prompts)
+    check("bundled skills readable", _skills)
+    print("selfcheck:", "PASS" if ok else "FAIL")
+    return 0 if ok else 1
+
+
 def main() -> None:
+    if "--selfcheck" in sys.argv:
+        raise SystemExit(_selfcheck())
+
     # Honour an explicit DATA_DIR (e.g. set by the Tauri shell) if present,
     # otherwise fall back to the per-OS default. The directory itself is created
     # later by bootstrap_data_dir() in the app lifespan — single owner.
     data_dir = os.environ.get("DATA_DIR") or str(default_data_dir())
     os.environ["DATA_DIR"] = str(Path(data_dir).expanduser())
+
+    port = int(os.environ.get("PMOMENTUM_PORT", PORT))
 
     # Import only AFTER DATA_DIR is set so app.config resolves paths against it.
     import uvicorn
@@ -54,7 +107,7 @@ def main() -> None:
     # log_config=None so uvicorn doesn't clobber our JSON logging (set up in the
     # app lifespan via configure_logging). Bind loopback only — never expose the
     # desktop backend on the network.
-    uvicorn.run(app, host="127.0.0.1", port=PORT, log_config=None)
+    uvicorn.run(app, host="127.0.0.1", port=port, log_config=None)
 
 
 if __name__ == "__main__":

@@ -43,6 +43,11 @@ dev = [
     # DB is SQLite, which needs no extra driver.
     "psycopg[binary]>=3.2",
 ]
+# Sprint 8B Stage 2: freezes the backend into the desktop sidecar binary.
+# Only needed to BUILD the desktop app, not to run the web app or tests.
+desktop = [
+    "pyinstaller>=6.0",
+]
 
 [tool.setuptools.packages.find]
 # Without this, setuptools' auto-discovery fails on a fresh `pip install -e .`

@@ -9,3 +9,8 @@ __pycache__/
 *.db
 *.db-journal
 *.db-wal
+
+# PyInstaller output (the frozen desktop sidecar). Regenerated from
+# pmomentum.spec via `pyinstaller pmomentum.spec`; not committed.
+/build/
+/dist/

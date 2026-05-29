@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.api.router import api_router, ws_router
 from app.config import bootstrap_data_dir, settings
 from app.core.integrations import google_oauth
+from app.core.seed import ensure_default_setup
 from app.dependencies import SessionLocal, engine
 from app.logging_config import configure_logging
 
@@ -74,6 +75,16 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("startup: database migration failed")
             raise
+        # Self-contained DB → ensure the default single-user workspace exists so
+        # a fresh desktop install is functional with no manual seed step. The
+        # faked auth (app.core.default_user) resolves this user/project on every
+        # request. Idempotent; best-effort (a transient failure retries next
+        # launch rather than bricking startup).
+        try:
+            async with SessionLocal() as db:
+                await ensure_default_setup(db)
+        except Exception:
+            logger.exception("startup: default workspace seeding failed")
     # Proactively refresh near-expiry Google OAuth tokens at startup so the
     # first integration call of the session doesn't fail mid-task. Best-effort:
     # never block or crash startup on this.

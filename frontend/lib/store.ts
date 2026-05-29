@@ -29,6 +29,10 @@ interface ChatState {
   documents: DocumentArtifact[];
   documentsLoadedAt: number;
   wsConnected: boolean;
+  // The session currently shown on /chat (from the ?s= query param). Tracked in
+  // the store so the Sidebar can highlight it without reading search params
+  // itself (which would need its own <Suspense> boundary under static export).
+  activeSessionId: string | null;
 
   setSessions: (s: Session[]) => void;
   upsertSession: (s: Session) => void;
@@ -61,6 +65,7 @@ interface ChatState {
   setDocuments: (documents: DocumentArtifact[]) => void;
 
   setWsConnected: (connected: boolean) => void;
+  setActiveSession: (id: string | null) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -78,6 +83,7 @@ export const useChatStore = create<ChatState>((set) => ({
   documents: [],
   documentsLoadedAt: 0,
   wsConnected: false,
+  activeSessionId: null,
 
   setSessions: (sessions) => set({ sessions }),
   upsertSession: (s) =>
@@ -207,4 +213,5 @@ export const useChatStore = create<ChatState>((set) => ({
     set({ documents, documentsLoadedAt: Date.now() }),
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+  setActiveSession: (activeSessionId) => set({ activeSessionId }),
 }));
