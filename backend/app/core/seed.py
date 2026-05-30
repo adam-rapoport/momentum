@@ -13,18 +13,32 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.default_user import DEFAULT_PROJECT_SLUG, DEFAULT_USER_EMAIL
+from app.config import settings
+from app.core.default_user import (
+    DEFAULT_ORG_SLUG,
+    DEFAULT_PROJECT_SLUG,
+    DEFAULT_USER_EMAIL,
+    LEGACY_ORG_SLUG,
+    LEGACY_USER_EMAIL,
+)
 from app.models import Organization, Project, User
 
 
 async def ensure_default_setup(db: AsyncSession) -> None:
-    """Create the default org, user, and project if they don't already exist."""
-    org = await db.scalar(select(Organization).where(Organization.slug == "adam"))
+    """Create the default org, user, and project if they don't already exist.
+
+    New installs get neutral defaults ("My Workspace" / "You"). If an older
+    local DB already has the pre-genericization rows, we reuse those instead
+    of creating a second workspace, so existing data stays intact.
+    """
+    org = await db.scalar(select(Organization).where(Organization.slug == DEFAULT_ORG_SLUG))
+    if org is None:  # reuse a pre-genericization workspace if present
+        org = await db.scalar(select(Organization).where(Organization.slug == LEGACY_ORG_SLUG))
     if org is None:
         org = Organization(
             id=uuid4(),
-            name="Adam's Workspace",
-            slug="adam",
+            name="My Workspace",
+            slug=DEFAULT_ORG_SLUG,
             plan="free",
             settings={},
             llm_api_keys={},
@@ -33,16 +47,18 @@ async def ensure_default_setup(db: AsyncSession) -> None:
         await db.flush()
 
     user = await db.scalar(select(User).where(User.email == DEFAULT_USER_EMAIL))
+    if user is None:  # reuse a pre-genericization local user if present
+        user = await db.scalar(select(User).where(User.email == LEGACY_USER_EMAIL))
     if user is None:
         user = User(
             id=uuid4(),
             email=DEFAULT_USER_EMAIL,
-            display_name="Adam",
+            display_name="You",
             auth_provider="local",
-            auth_provider_id="local-adam",
+            auth_provider_id="local-default",
             organization_id=org.id,
             role="owner",
-            preferences={"timezone": "America/Los_Angeles"},
+            preferences={"timezone": settings.user_timezone},
         )
         db.add(user)
         await db.flush()

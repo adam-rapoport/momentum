@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
 
@@ -11,6 +11,7 @@ export function Sidebar() {
   const sessions = useChatStore((s) => s.sessions);
   const setSessions = useChatStore((s) => s.setSessions);
   const upsertSession = useChatStore((s) => s.upsertSession);
+  const [displayName, setDisplayName] = useState<string>("You");
 
   useEffect(() => {
     api
@@ -18,6 +19,15 @@ export function Sidebar() {
       .then(setSessions)
       .catch((err) => console.error("failed to load sessions:", err));
   }, [setSessions]);
+
+  useEffect(() => {
+    api
+      .getProfile()
+      .then((p) => {
+        if (p.display_name?.trim()) setDisplayName(p.display_name.trim());
+      })
+      .catch((err) => console.error("failed to load profile:", err));
+  }, []);
 
   async function handleNewSession() {
     try {
@@ -67,7 +77,7 @@ export function Sidebar() {
         )}
       </div>
       <div className="border-t border-neutral-200 p-3 flex items-center justify-between text-xs text-neutral-500">
-        <span>Signed in as Adam</span>
+        <span>Signed in as {displayName}</span>
         <Link
           href="/settings"
           className="rounded px-2 py-1 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"

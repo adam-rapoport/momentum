@@ -19,7 +19,7 @@ async def seed() -> None:
     async with SessionLocal() as db:
         await ensure_default_setup(db)
     await engine.dispose()
-    print("[seed] default workspace ensured (organization 'adam', user adam@local.dev, project 'default').")
+    print("[seed] default workspace ensured (organization 'local', user you@pmomentum.local, project 'default').")
 
 
 if __name__ == "__main__":

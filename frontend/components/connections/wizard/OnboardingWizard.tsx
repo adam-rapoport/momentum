@@ -70,16 +70,28 @@ export function OnboardingWizard() {
   }
 
   async function saveProfileStep(): Promise<boolean> {
+    const name = gtky.name.trim();
+    const workspace = gtky.workspaceName.trim();
     const hasText = gtky.role.trim() || gtky.company.trim() || gtky.goals.trim();
-    if (!hasText) return true; // nothing to save; uploads already persisted
+    if (!name && !workspace && !hasText) return true; // nothing to save
     setSaving(true);
     setError(null);
     try {
-      await api.saveProfile({
-        role: gtky.role.trim() || undefined,
-        company: gtky.company.trim() || undefined,
-        goals: gtky.goals.trim() || undefined,
-      });
+      // Name + workspace → the real user/org record (drives the Sidebar).
+      if (name || workspace) {
+        await api.setProfile({
+          display_name: name || undefined,
+          workspace_name: workspace || undefined,
+        });
+      }
+      // Free-text context → memory records the agent can draw on.
+      if (hasText) {
+        await api.saveProfile({
+          role: gtky.role.trim() || undefined,
+          company: gtky.company.trim() || undefined,
+          goals: gtky.goals.trim() || undefined,
+        });
+      }
       return true;
     } catch (e) {
       setError(extractDetail(e));

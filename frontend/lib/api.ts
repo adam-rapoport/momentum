@@ -123,7 +123,20 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ provider }),
     }),
+
+  // ── User/workspace name (drives the Sidebar; set during onboarding) ──
+  getProfile: () => request<UserProfile>(`/api/v1/preferences/profile`),
+  setProfile: (body: { display_name?: string; workspace_name?: string }) =>
+    request<UserProfile>(`/api/v1/preferences/profile`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 };
+
+export interface UserProfile {
+  display_name: string | null;
+  workspace_name: string | null;
+}
 
 export interface SearchPreferences {
   provider: "tavily" | "perplexity";

@@ -5,12 +5,20 @@ import { extractDetail } from "@/lib/errors";
 import { Banner, SectionHeader } from "../kit";
 
 export interface GtkyState {
+  name: string;
+  workspaceName: string;
   role: string;
   company: string;
   goals: string;
 }
 
-export const emptyGtky: GtkyState = { role: "", company: "", goals: "" };
+export const emptyGtky: GtkyState = {
+  name: "",
+  workspaceName: "",
+  role: "",
+  company: "",
+  goals: "",
+};
 
 interface UploadedDoc {
   name: string;
@@ -74,6 +82,33 @@ export function GtkyStep({
         title="Tell pmomentum about you"
         sub="A little context helps from message one. All optional — skip and add it later from chat anytime."
       />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label style={{ color: "var(--text-muted)" }} className="block text-[12.5px] font-medium mb-1.5">
+            Your name
+          </label>
+          <input
+            className="input"
+            style={{ fontFamily: "var(--font-geist-sans)" }}
+            value={state.name}
+            placeholder="e.g. Maria"
+            onChange={(e) => setState({ ...state, name: e.target.value })}
+          />
+        </div>
+        <div>
+          <label style={{ color: "var(--text-muted)" }} className="block text-[12.5px] font-medium mb-1.5">
+            Workspace name
+          </label>
+          <input
+            className="input"
+            style={{ fontFamily: "var(--font-geist-sans)" }}
+            value={state.workspaceName}
+            placeholder="e.g. Maria's Workspace"
+            onChange={(e) => setState({ ...state, workspaceName: e.target.value })}
+          />
+        </div>
+      </div>
 
       {FIELDS.map((f) => (
         <div key={f.key}>

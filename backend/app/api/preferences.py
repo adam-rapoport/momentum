@@ -23,6 +23,7 @@ from app.core.default_user import get_default_user
 from app.core.model_registry import get_available_models, is_model_available
 from app.core.search import DEFAULT_PROVIDER, VALID_PROVIDERS
 from app.dependencies import get_db
+from app.models import Organization
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,16 @@ router = APIRouter(prefix="/preferences", tags=["preferences"])
 
 class SearchPreferenceUpdate(BaseModel):
     provider: str = Field(..., description="Active search provider: 'tavily' or 'perplexity'.")
+
+
+class ProfileUpdate(BaseModel):
+    # Both optional — the onboarding wizard sends whichever the user filled.
+    display_name: str | None = Field(
+        None, max_length=200, description="What the app calls the user (Sidebar)."
+    )
+    workspace_name: str | None = Field(
+        None, max_length=200, description="The workspace/organization display name."
+    )
 
 
 class ModelPreferencesUpdate(BaseModel):
@@ -129,6 +140,49 @@ async def put_model_preferences(
     await db.flush()
     await db.commit()
     return _public_view(prefs, configured)
+
+
+async def _profile_view(db: AsyncSession) -> dict:
+    user = await get_default_user(db)
+    org = await db.get(Organization, user.organization_id)
+    return {
+        "display_name": user.display_name,
+        "workspace_name": org.name if org else None,
+    }
+
+
+@router.get("/profile")
+async def get_profile(db: AsyncSession = Depends(get_db)) -> dict:
+    """The local user's display name + workspace name (drives the Sidebar)."""
+    return await _profile_view(db)
+
+
+@router.put("/profile")
+async def put_profile(
+    payload: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Set the user's display name and/or workspace name. Blank values are
+    ignored so the onboarding wizard can send a partial update without
+    wiping the existing name."""
+    user = await get_default_user(db)
+    raw = payload.model_dump(exclude_unset=True)
+
+    if "display_name" in raw:
+        name = (raw["display_name"] or "").strip()
+        if name:
+            user.display_name = name
+
+    if "workspace_name" in raw:
+        workspace = (raw["workspace_name"] or "").strip()
+        if workspace:
+            org = await db.get(Organization, user.organization_id)
+            if org is not None:
+                org.name = workspace
+
+    await db.flush()
+    await db.commit()
+    return await _profile_view(db)
 
 
 @router.get("/search")

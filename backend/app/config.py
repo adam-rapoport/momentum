@@ -1,8 +1,34 @@
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _detect_local_timezone() -> str:
+    """Best-effort IANA timezone name for the machine running the app.
+
+    The desktop backend runs on the user's own machine, so the OS timezone
+    IS the user's timezone — no config required. We resolve it from the
+    `/etc/localtime` symlink (works on macOS and Linux), which points at a
+    zoneinfo file like ``.../zoneinfo/America/Los_Angeles``. If we can't
+    resolve a valid name (e.g. Windows, or an unusual setup), fall back to a
+    fixed default so ``ZoneInfo()`` never fails downstream. An explicit
+    USER_TIMEZONE env var always overrides this (see the field below).
+    """
+    fallback = "America/Los_Angeles"
+    localtime = Path("/etc/localtime")
+    try:
+        if localtime.is_symlink():
+            target = os.readlink(localtime)
+            if "zoneinfo/" in target:
+                name = target.split("zoneinfo/", 1)[1]
+                ZoneInfo(name)  # validate; raises if not a real zone
+                return name
+    except Exception:
+        pass
+    return fallback
 
 
 class Settings(BaseSettings):
@@ -59,7 +85,9 @@ class Settings(BaseSettings):
     # privacy-respecting desktop app must not phone home without opt-in.
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
 
-    user_timezone: str = Field("America/Los_Angeles", alias="USER_TIMEZONE")
+    # Defaults to the machine's own timezone (the desktop backend runs on the
+    # user's computer). Set USER_TIMEZONE to override (e.g. server deploys).
+    user_timezone: str = Field(default_factory=_detect_local_timezone, alias="USER_TIMEZONE")
     tavily_api_key: str | None = Field(None, alias="TAVILY_API_KEY")
     memory_root: str = Field("pmomentum/data/memory", alias="MEMORY_ROOT")
 
