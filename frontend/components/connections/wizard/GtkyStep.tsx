@@ -20,9 +20,10 @@ export const emptyGtky: GtkyState = {
   goals: "",
 };
 
-interface UploadedDoc {
+export interface UploadedDoc {
   name: string;
   chars: number;
+  memories: number;
 }
 
 const FIELDS: { key: keyof GtkyState; label: string; placeholder: string }[] = [
@@ -65,7 +66,10 @@ export function GtkyStep({
     try {
       for (const file of Array.from(files)) {
         const res = await api.uploadDocument(file);
-        setUploads([...uploads, { name: res.title, chars: res.char_count }]);
+        setUploads([
+          ...uploads,
+          { name: res.title, chars: res.char_count, memories: res.memories_created },
+        ]);
       }
     } catch (e) {
       setError(extractDetail(e));
@@ -137,10 +141,13 @@ export function GtkyStep({
           style={{ background: "var(--bg-canvas)", border: "1px dashed var(--border-strong)" }}
         >
           <div style={{ color: "var(--text-muted)" }} className="text-sm">
-            {uploading ? "Reading…" : "Click to upload PDF, Word, Markdown, or text"}
+            {uploading
+              ? "Analyzing your document…"
+              : "Click to upload PDF, Word, Markdown, or text"}
           </div>
           <div style={{ color: "var(--text-dim)" }} className="text-[11.5px] mt-1">
-            Stored as private context in your memory — never leaves your machine.
+            We read it and pull out what&apos;s worth remembering — stored as
+            private context in your memory, never leaves your machine.
           </div>
         </button>
         <input
@@ -166,6 +173,9 @@ export function GtkyStep({
               </span>
               <span style={{ color: "var(--text-dim)" }} className="text-[11.5px] mono">
                 {u.chars.toLocaleString()} chars
+                {u.memories > 0
+                  ? ` · ${u.memories} ${u.memories === 1 ? "memory" : "memories"} created`
+                  : ""}
               </span>
             </div>
           ))}

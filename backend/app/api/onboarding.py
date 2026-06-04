@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import credentials
 from app.core.default_user import get_default_project, get_default_user
 from app.core.ingest import UnsupportedFileType, parse_upload
+from app.core.memory.extract import extract_memories_from_document
 from app.core.memory.store import save_memory
 from app.core.model_registry import get_available_models
 from app.dependencies import get_db
@@ -144,9 +145,32 @@ async def upload_document(
         summary=f"Uploaded during onboarding ({file.filename})",
         tags=["onboarding", "upload"],
     )
+    # Persist the reference doc first so it's never lost, even if the
+    # (best-effort) extraction step below fails.
     await db.commit()
+
+    # Have the user's heavy model read the doc and turn its durable facts into
+    # their own memories, so the agent has real context from message one — not
+    # just a doc it has to be asked to look up. Best-effort: a failure here
+    # leaves the reference memory (already committed) intact.
+    memories_created = 0
+    try:
+        derived = await extract_memories_from_document(
+            db,
+            user=user,
+            project=project,
+            doc_title=parsed.title,
+            doc_text=parsed.text,
+        )
+        await db.commit()
+        memories_created = len(derived)
+    except Exception:  # noqa: BLE001 — never let extraction break the upload
+        await db.rollback()
+        logger.exception("reference-doc memory extraction failed (reference saved)")
+
     return {
         "title": parsed.title,
         "memory_id": str(record.id),
         "char_count": len(parsed.text),
+        "memories_created": memories_created,
     }

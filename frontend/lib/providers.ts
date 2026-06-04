@@ -11,8 +11,6 @@ export interface ProviderMeta {
   credProvider: KeyProvider; // backend connection provider string
   name: string;
   tiers: Tier[]; // which model slots this provider can fill (light, heavy, or both)
-  badge?: string;
-  badgeKind?: "success" | "default";
   pricing: string;
   description: string;
   helpUrl: string;
@@ -28,9 +26,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     id: "groq",
     credProvider: "llm:groq",
     name: "Groq",
-    tiers: ["light"],
-    badge: "Free",
-    badgeKind: "success",
+    tiers: ["light", "heavy"],
     pricing: "Free up to 14,400 requests/day · no credit card",
     description: "Fast, free model for routine work. Great default to start with.",
     helpUrl: "https://console.groq.com/keys",
@@ -38,15 +34,16 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with gsk_, ~56 chars",
     keyPrefix: "gsk_",
     keyLength: [40, 100],
-    defaultModel: { light: "meta-llama/llama-4-scout-17b-16e-instruct" },
+    defaultModel: {
+      light: "meta-llama/llama-4-scout-17b-16e-instruct",
+      heavy: "meta-llama/llama-4-scout-17b-16e-instruct",
+    },
   },
   google: {
     id: "google",
     credProvider: "llm:google_ai",
     name: "Google Gemini",
-    tiers: ["heavy"],
-    badge: "Free tier",
-    badgeKind: "success",
+    tiers: ["light", "heavy"],
     pricing: "Free tier available · paid tier unlocks higher limits",
     description: "Capable reasoning model (Gemini & Gemma) on a generous free tier.",
     helpUrl: "https://aistudio.google.com/apikey",
@@ -54,15 +51,13 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with AIza, ~39 chars",
     keyPrefix: "AIza",
     keyLength: [35, 50],
-    defaultModel: { heavy: "gemma-4-31b-it" },
+    defaultModel: { light: "gemini-2.5-flash", heavy: "gemma-4-31b-it" },
   },
   openai: {
     id: "openai",
     credProvider: "llm:openai",
     name: "OpenAI",
     tiers: ["light", "heavy"],
-    badge: "Paid",
-    badgeKind: "default",
     pricing: "Paid · billing required on your OpenAI account",
     description: "GPT-4o for either slot. Paid, but works as a light or heavy model.",
     helpUrl: "https://platform.openai.com/api-keys",

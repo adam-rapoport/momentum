@@ -112,7 +112,12 @@ export const api = {
       const text = await res.text().catch(() => "");
       throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ""}`);
     }
-    return (await res.json()) as { title: string; memory_id: string; char_count: number };
+    return (await res.json()) as {
+      title: string;
+      memory_id: string;
+      char_count: number;
+      memories_created: number;
+    };
   },
 
   // ── C8 Web search provider preference ──

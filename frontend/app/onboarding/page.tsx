@@ -16,8 +16,11 @@ function OnboardingInner() {
       .onboardingStatus()
       .then((s) => {
         if (cancelled) return;
-        // Reverse-guard: already configured and not an explicit re-run.
-        if (s.configured && !restart) {
+        // Reverse-guard: onboarding already finished and not an explicit re-run.
+        // Keyed on `completed_at` (did the wizard finish), matching BootGate —
+        // gating on `configured` instead would ping-pong with it whenever a key
+        // exists but onboarding was never completed.
+        if (s.completed_at && !restart) {
           router.replace("/chat");
         } else {
           setReady(true);

@@ -42,8 +42,10 @@ REGISTRY: tuple[ModelEntry, ...] = (
         id="meta-llama/llama-4-scout-17b-16e-instruct",
         provider="groq",
         display_name="Llama 4 Scout (Groq)",
-        role="light",
-        notes="Default light model. Fast, cheap, reliable for chat and tool-heavy turns.",
+        # "either" so Groq can be picked for the heavy slot too — it's fast and
+        # free, though weaker than Gemma/Gemini for long-form drafting.
+        role="either",
+        notes="Default light model. Fast, cheap, reliable for chat and tool-heavy turns. Usable as a fast (lower-quality) heavy model too.",
     ),
     ModelEntry(
         id="llama-3.1-8b-instant",

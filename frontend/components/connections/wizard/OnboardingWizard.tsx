@@ -7,7 +7,7 @@ import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers"
 import { Wordmark } from "../Brand";
 import { ThemeToggle } from "../ThemeToggle";
 import { DoneStep, ModelPickStep, WelcomeStep, type ModelStepState } from "./steps";
-import { GtkyStep, emptyGtky, type GtkyState } from "./GtkyStep";
+import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
 
 type StepKey = "welcome" | "light" | "heavy" | "gtky" | "done";
 
@@ -19,12 +19,19 @@ const STEPS: { key: StepKey; label: string }[] = [
   { key: "done", label: "Done" },
 ];
 
+// Every provider can now fill either slot; these are just the recommended
+// defaults to pre-select (Groq for fast light work, Google/Gemma for stronger
+// heavy drafting). The user can switch to any other provider from the tiles.
+const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
+  light: "groq",
+  heavy: "google",
+};
+
 function initialModelState(tier: "light" | "heavy"): ModelStepState {
-  // Pre-select the recommended (first-listed) provider for the slot so the
-  // common path is one click, but the user can switch to any other option —
-  // free or paid — from the tiles.
   const list = providersForTier(tier);
-  return { providerId: list[0]?.id ?? null, key: "" };
+  const preferred =
+    list.find((p) => p.id === RECOMMENDED_PROVIDER[tier]) ?? list[0];
+  return { providerId: preferred?.id ?? null, key: "" };
 }
 
 export function OnboardingWizard() {
@@ -33,7 +40,7 @@ export function OnboardingWizard() {
   const [light, setLight] = useState<ModelStepState>(() => initialModelState("light"));
   const [heavy, setHeavy] = useState<ModelStepState>(() => initialModelState("heavy"));
   const [gtky, setGtky] = useState<GtkyState>(emptyGtky);
-  const [uploads, setUploads] = useState<{ name: string; chars: number }[]>([]);
+  const [uploads, setUploads] = useState<UploadedDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);

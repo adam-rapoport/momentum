@@ -58,13 +58,33 @@ export function MemoryPanel() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Initial load
+  // Initial load. BootGate already waits for the backend before this mounts,
+  // but retry a few times anyway so a single transient failure can't leave the
+  // panel permanently blank (the memoriesLoadedAt guard means it won't re-run).
   useEffect(() => {
     if (memoriesLoadedAt !== 0) return;
-    api
-      .listMemories()
-      .then(setMemories)
-      .catch((err) => console.error("[memory] failed to load:", err));
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => {
+      api
+        .listMemories()
+        .then((m) => {
+          if (!cancelled) setMemories(m);
+        })
+        .catch((err) => {
+          console.error("[memory] failed to load:", err);
+          if (!cancelled && attempts < 5) {
+            attempts += 1;
+            timer = setTimeout(load, 1000);
+          }
+        });
+    };
+    load();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [memoriesLoadedAt, setMemories]);
 
   // Fetch detail when selection changes

@@ -230,11 +230,6 @@ export function ProviderTile({
             {provider.name}
           </span>
         </div>
-        {provider.badge && (
-          <span className={`tag ${provider.badgeKind === "success" ? "success" : ""}`}>
-            {provider.badge}
-          </span>
-        )}
       </div>
       <div style={{ color: "var(--text-muted)" }} className="text-[12.5px] leading-snug">
         {provider.description}

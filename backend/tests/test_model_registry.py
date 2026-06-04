@@ -60,6 +60,15 @@ def test_get_available_models_filters_by_role_heavy():
             assert m.id not in heavy_ids
 
 
+def test_groq_is_available_for_heavy_slot():
+    """Regression for the 'all providers in both slots' change (feedback #3):
+    Groq must be pickable as a heavy model, not just light."""
+    heavy = get_available_models(role="heavy")
+    assert any(m.provider == "groq" for m in heavy), (
+        "Groq should be selectable in the heavy slot"
+    )
+
+
 def test_either_role_appears_in_both_filters():
     either_ids = {m.id for m in REGISTRY if m.role == "either"}
     light_ids = {m.id for m in get_available_models(role="light")}

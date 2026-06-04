@@ -1,5 +1,4 @@
 use std::sync::Mutex;
-use std::time::Duration;
 
 use tauri::{Manager, RunEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -10,19 +9,6 @@ struct BackendProcess(Mutex<Option<CommandChild>>);
 /// PID of the sidecar's PyInstaller bootloader, used to terminate the whole
 /// backend process subtree on exit.
 struct BackendPid(u32);
-
-/// Poll the backend's /health endpoint until it answers, or give up after
-/// `attempts`. Runs on a plain thread (blocking HTTP) so it never blocks the
-/// async runtime or the UI thread.
-fn wait_for_health(url: &str, attempts: u32) -> bool {
-    for _ in 0..attempts {
-        if ureq::get(url).timeout(Duration::from_secs(2)).call().is_ok() {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(500));
-    }
-    false
-}
 
 /// Terminate the backend sidecar AND its child worker. The PyInstaller one-file
 /// binary runs as a bootloader parent plus a Python child that holds the port;
@@ -66,19 +52,11 @@ pub fn run() {
                 }
             });
 
-            // Reveal the window only once the backend is serving, so the user
-            // never sees a UI pointed at a backend that isn't listening yet.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                if !wait_for_health("http://127.0.0.1:8000/health", 120) {
-                    log::error!("backend did not become healthy in time; showing window anyway");
-                }
-                if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-            });
-
+            // The window is shown immediately (tauri.conf.json `visible: true`) so
+            // the user sees the web app's "Starting pMomentum…" loading screen right
+            // away instead of a blank wait. The web app (see BootGate) polls the
+            // backend's readiness and only renders the real UI once it's serving, so
+            // we no longer hide the window here.
             Ok(())
         })
         .build(tauri::generate_context!())
