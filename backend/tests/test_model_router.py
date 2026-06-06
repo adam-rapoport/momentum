@@ -84,18 +84,18 @@ def test_user_preference_overrides_light_default_when_available():
 
 
 def test_user_preference_overrides_heavy_default_for_slash_command():
-    # gemini-2.5-pro is registered as heavy. If GOOGLE_AI_API_KEY is set
+    # gemini-3.1-pro-preview is registered as heavy. If GOOGLE_AI_API_KEY is set
     # (it is, in our test env), the preference should win.
-    prefs = {"heavy_model": "gemini-2.5-pro"}
+    prefs = {"heavy_model": "gemini-3.1-pro-preview"}
     chosen = select_model("/write-prd topic", {}, user_preferences=prefs)
-    assert chosen == "gemini-2.5-pro"
+    assert chosen == "gemini-3.1-pro-preview"
 
 
 def test_user_preference_overrides_heavy_default_when_skill_active():
-    prefs = {"heavy_model": "gemini-2.5-pro"}
+    prefs = {"heavy_model": "gemini-3.1-pro-preview"}
     meta = {"active_skill": "write-prd", "active_skill_phase": "intake"}
     chosen = select_model("ok proceed", meta, user_preferences=prefs)
-    assert chosen == "gemini-2.5-pro"
+    assert chosen == "gemini-3.1-pro-preview"
 
 
 def test_unknown_preference_falls_back_to_env_default(default_model, heavy_model):
@@ -111,22 +111,22 @@ def test_unknown_preference_falls_back_to_env_default(default_model, heavy_model
     )
 
 
-def test_role_mismatched_preference_falls_back(default_model, heavy_model):
-    # A user who saved a heavy-only model into the light slot (e.g. via
-    # API tampering) should fall back, not get the heavy model on light turns.
-    prefs = {"light_model": "gemini-2.5-pro"}  # gemini-2.5-pro is heavy-only
-    assert select_model("hi", {}, user_preferences=prefs) == default_model
+def test_any_available_model_allowed_in_light_slot():
+    # Both slots now offer every model — a model whose role hint is "heavy" is
+    # still honored in the light slot when the user picks it there.
+    prefs = {"light_model": "gemini-3.1-pro-preview"}
+    assert select_model("hi", {}, user_preferences=prefs) == "gemini-3.1-pro-preview"
 
 
 def test_either_role_model_works_in_both_slots():
     prefs = {
-        "light_model": "gemini-2.5-flash",
-        "heavy_model": "gemini-2.5-flash",
+        "light_model": "gemini-3.5-flash",
+        "heavy_model": "gemini-3.5-flash",
     }
-    assert select_model("hi", {}, user_preferences=prefs) == "gemini-2.5-flash"
+    assert select_model("hi", {}, user_preferences=prefs) == "gemini-3.5-flash"
     assert (
         select_model("/write-prd topic", {}, user_preferences=prefs)
-        == "gemini-2.5-flash"
+        == "gemini-3.5-flash"
     )
 
 

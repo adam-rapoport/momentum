@@ -9,6 +9,12 @@ class WsClient {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private explicitClose = false;
+  // Messages sent before the socket is OPEN — e.g. the very first message on a
+  // brand-new session, fired before the connection finished handshaking. We
+  // queue them and flush on open instead of silently dropping them (which was
+  // the cause of "I asked a question and got no response" on a fresh chat).
+  private pending: WsInbound[] = [];
+  private pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -20,6 +26,7 @@ class WsClient {
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
       useChatStore.getState().setWsConnected(true);
+      this.flushPending();
     };
 
     this.ws.onmessage = (ev) => {
@@ -52,11 +59,55 @@ class WsClient {
   }
 
   send(msg: WsInbound): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn("[ws] not connected; dropping message");
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg));
       return;
     }
-    this.ws.send(JSON.stringify(msg));
+    // Not open yet — queue the message and make sure we're connecting. It will
+    // be flushed in onopen. A timeout guards against waiting forever if the
+    // backend never comes up.
+    this.pending.push(msg);
+    if (
+      !this.ws ||
+      this.ws.readyState === WebSocket.CLOSED ||
+      this.ws.readyState === WebSocket.CLOSING
+    ) {
+      this.connect();
+    }
+    this.armPendingTimeout();
+  }
+
+  /** Send everything queued while the socket was still connecting. */
+  private flushPending(): void {
+    if (this.pendingTimer) {
+      clearTimeout(this.pendingTimer);
+      this.pendingTimer = null;
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const queued = this.pending;
+    this.pending = [];
+    for (const m of queued) this.ws.send(JSON.stringify(m));
+  }
+
+  /** If queued messages can't be sent within the window, surface an error and
+   * unlock the input instead of leaving the chat spinning forever. */
+  private armPendingTimeout(): void {
+    if (this.pendingTimer) return; // already armed
+    this.pendingTimer = setTimeout(() => {
+      this.pendingTimer = null;
+      if (this.pending.length === 0) return;
+      const stuck = this.pending;
+      this.pending = [];
+      const store = useChatStore.getState();
+      for (const m of stuck) {
+        store.setLastError(m.session_id, {
+          code: "WS_UNAVAILABLE",
+          message:
+            "Couldn't reach pMomentum's backend to send your message. Please make sure it's running, then try again.",
+        });
+        store.finalizeStream(m.session_id, "0", false);
+      }
+    }, 15000);
   }
 
   private handleEvent(event: WsOutbound): void {

@@ -22,11 +22,11 @@ type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
 const SLOT_COPY: Record<Tier, { title: string; sub: string }> = {
   light: {
     title: "Light model",
-    sub: "Fast everyday work — summaries, tags, quick lookups. Pick the provider that powers it.",
+    sub: "Fast everyday work — summaries, tags, quick lookups. Pick the provider, then the exact model.",
   },
   heavy: {
     title: "Heavy model",
-    sub: "The big asks — a PRD, a synthesis, a long rewrite. Pick the provider that powers it.",
+    sub: "The big asks — a PRD, a synthesis, a long rewrite. Pick the provider, then the exact model.",
   },
 };
 
@@ -82,6 +82,32 @@ export function SlotModelCard({
   const shown: ProviderMeta | null = shownId ? PROVIDERS[shownId] ?? null : null;
   const shownStatus = shown ? connections[shown.credProvider] : undefined;
   const shownConnected = shownStatus?.configured ?? false;
+
+  // The exact models this provider offers for this slot, and which one this
+  // slot is currently set to — lets the user pick a specific model, not just
+  // the provider.
+  const providerModels = shown
+    ? available.filter((m) => m.provider === shown.id)
+    : [];
+  const slotPick =
+    effectiveEntry && shown && effectiveEntry.provider === shown.id
+      ? effectiveId
+      : shown?.defaultModel[tier] ?? providerModels[0]?.id ?? "";
+
+  function onSelectModel(modelId: string) {
+    setSaving(true);
+    setError(null);
+    api
+      .setModelPreferences(
+        tier === "light" ? { light_model: modelId } : { heavy_model: modelId },
+      )
+      .then(() => {
+        loadPrefs();
+        onChanged();
+      })
+      .catch((e) => setError(extractDetail(e)))
+      .finally(() => setSaving(false));
+  }
 
   async function setSlotModel(provider: ProviderMeta) {
     const model = provider.defaultModel[tier];
@@ -172,32 +198,57 @@ export function SlotModelCard({
           style={{ borderTop: "1px solid var(--border-faint)" }}
         >
           {!showKeyEditor ? (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span
-                style={{ color: "var(--text-muted)" }}
-                className="inline-flex items-center gap-2 text-[13px]"
-              >
+            <>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <span
-                  style={{ width: 6, height: 6, background: "var(--success)" }}
-                  className="inline-block rounded-full"
-                />
-                {shownStatus?.source === "env"
-                  ? `${shown.name} connected · from .env`
-                  : shownStatus?.key_suffix
-                  ? `${shown.name} connected · ••••${shownStatus.key_suffix}`
-                  : `${shown.name} connected`}
-              </span>
-              <button
-                className="btn small"
-                onClick={() => {
-                  setDraft("");
-                  setError(null);
-                  setChangingKey(true);
-                }}
-              >
-                Change key
-              </button>
-            </div>
+                  style={{ color: "var(--text-muted)" }}
+                  className="inline-flex items-center gap-2 text-[13px]"
+                >
+                  <span
+                    style={{ width: 6, height: 6, background: "var(--success)" }}
+                    className="inline-block rounded-full"
+                  />
+                  {shownStatus?.source === "env"
+                    ? `${shown.name} connected · from .env`
+                    : shownStatus?.key_suffix
+                    ? `${shown.name} connected · ••••${shownStatus.key_suffix}`
+                    : `${shown.name} connected`}
+                </span>
+                <button
+                  className="btn small"
+                  onClick={() => {
+                    setDraft("");
+                    setError(null);
+                    setChangingKey(true);
+                  }}
+                >
+                  Change key
+                </button>
+              </div>
+              {providerModels.length > 1 && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <label
+                    style={{ color: "var(--text-muted)" }}
+                    className="text-[12.5px]"
+                  >
+                    Model
+                  </label>
+                  <select
+                    value={slotPick}
+                    disabled={saving}
+                    onChange={(e) => onSelectModel(e.target.value)}
+                    className="rounded-md border px-2 py-1 text-[13px]"
+                    style={{ borderColor: "var(--border-strong)", background: "var(--bg-canvas)", color: "var(--text)" }}
+                  >
+                    {providerModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           ) : (
             <div>
               <KeyInput provider={shown} value={draft} onChange={setDraft} autoFocus />

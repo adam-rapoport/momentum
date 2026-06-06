@@ -57,12 +57,14 @@ def parse_deep_flag(user_text: str | None) -> tuple[bool, str]:
     return True, (match.group(1) or "").strip()
 
 
+# Any available model can fill either slot — role no longer gates the pick, so
+# we validate only that the model exists and its provider is configured.
 def _resolve_light(prefs: dict | None, configured: set[str] | None) -> str:
     pref = (prefs or {}).get("light_model")
     if (
         isinstance(pref, str)
         and pref
-        and is_model_available(pref, role="light", configured_providers=configured)
+        and is_model_available(pref, configured_providers=configured)
     ):
         return pref
     return settings.groq_model
@@ -73,7 +75,7 @@ def _resolve_heavy(prefs: dict | None, configured: set[str] | None) -> str:
     if (
         isinstance(pref, str)
         and pref
-        and is_model_available(pref, role="heavy", configured_providers=configured)
+        and is_model_available(pref, configured_providers=configured)
     ):
         return pref
     return settings.groq_heavy_model

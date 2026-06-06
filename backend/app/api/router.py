@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.commands import router as commands_router
 from app.api.connections import router as connections_router
 from app.api.documents import router as documents_router
 from app.api.integrations import router as integrations_router
@@ -17,5 +18,6 @@ api_router.include_router(integrations_router)
 api_router.include_router(preferences_router)
 api_router.include_router(connections_router)
 api_router.include_router(onboarding_router)
+api_router.include_router(commands_router)
 
 ws_router = websocket_router

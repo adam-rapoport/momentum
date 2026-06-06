@@ -19,7 +19,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ""}`);
+    // FastAPI returns errors as {"detail": "..."} — surface that human-readable
+    // message rather than the raw JSON blob.
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.detail === "string") detail = parsed.detail;
+    } catch {
+      // not JSON; keep the raw text
+    }
+    throw new Error(detail || `${res.status} ${res.statusText}`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -129,6 +138,10 @@ export const api = {
       body: JSON.stringify({ provider }),
     }),
 
+  // ── Slash-command discovery (powers the "/" menu in the chat input) ──
+  listCommands: () =>
+    request<{ commands: CommandSummary[] }>(`/api/v1/commands`),
+
   // ── User/workspace name (drives the Sidebar; set during onboarding) ──
   getProfile: () => request<UserProfile>(`/api/v1/preferences/profile`),
   setProfile: (body: { display_name?: string; workspace_name?: string }) =>
@@ -141,6 +154,12 @@ export const api = {
 export interface UserProfile {
   display_name: string | null;
   workspace_name: string | null;
+}
+
+export interface CommandSummary {
+  command: string; // the token after "/", e.g. "write-prd" or "deep"
+  description: string;
+  kind: "skill" | "builtin";
 }
 
 export interface SearchPreferences {

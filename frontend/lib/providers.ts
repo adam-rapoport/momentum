@@ -51,7 +51,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with AIza, ~39 chars",
     keyPrefix: "AIza",
     keyLength: [35, 50],
-    defaultModel: { light: "gemini-2.5-flash", heavy: "gemma-4-31b-it" },
+    defaultModel: { light: "gemini-3.5-flash", heavy: "gemma-4-31b-it" },
   },
   openai: {
     id: "openai",

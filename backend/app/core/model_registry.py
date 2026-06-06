@@ -37,7 +37,13 @@ class ModelEntry:
     client: str = "openai_compat"
 
 
+# Model IDs below were verified against each provider's live model-list API in
+# June 2026 (Groq /v1/models, Google /v1beta/models). When refreshing, re-check
+# those endpoints rather than trusting docs — providers retire IDs on their own
+# schedule. Gemini 2.5 was dropped here because Google has it scheduled for
+# shutdown in Oct 2026.
 REGISTRY: tuple[ModelEntry, ...] = (
+    # --- Groq (free tier) ---
     ModelEntry(
         id="meta-llama/llama-4-scout-17b-16e-instruct",
         provider="groq",
@@ -55,53 +61,73 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Smaller alternative — even faster, slightly weaker on multi-turn tool use.",
     ),
     ModelEntry(
+        id="openai/gpt-oss-20b",
+        provider="groq",
+        display_name="GPT-OSS 20B (Groq)",
+        role="light",
+        notes="Very fast open model served on Groq's production tier. A stable light pick.",
+    ),
+    ModelEntry(
+        id="llama-3.3-70b-versatile",
+        provider="groq",
+        display_name="Llama 3.3 70B (Groq)",
+        role="either",
+        notes="Larger Llama — stronger for drafting, still fast and free on Groq.",
+    ),
+    ModelEntry(
+        id="openai/gpt-oss-120b",
+        provider="groq",
+        display_name="GPT-OSS 120B (Groq)",
+        role="heavy",
+        notes="Largest open model on Groq — strong reasoning/drafting, still free.",
+    ),
+    # --- Google: Gemma (open model, free tier) ---
+    ModelEntry(
         id="gemma-4-31b-it",
         provider="google",
         display_name="Gemma 4 31B (Google)",
         role="heavy",
         notes="Strong drafting quality. Emits chain-of-thought blocks that pMomentum strips automatically.",
     ),
+    # --- Google: Gemini 3.x via the native google-genai SDK (F5) ---
+    # Gemini 3.x models go through the native SDK: the OpenAI-compat endpoint
+    # can't carry the `thought_signature` they require on tool-call history,
+    # which breaks multi-step skill flows.
     ModelEntry(
-        id="gemini-2.5-flash",
+        id="gemini-3.1-flash-lite",
         provider="google",
-        display_name="Gemini 2.5 Flash (Google)",
+        display_name="Gemini 3.1 Flash Lite (Google, native SDK)",
+        role="light",
+        notes="Fastest, cheapest current Gemini. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    ModelEntry(
+        id="gemini-3.5-flash",
+        provider="google",
+        display_name="Gemini 3.5 Flash (Google, native SDK)",
         role="either",
-        notes="Fast Gemini variant on the free tier. Works as either light or heavy.",
+        notes="Fast, current all-rounder Gemini. Runs on Google's native SDK.",
+        client="genai_sdk",
     ),
-    ModelEntry(
-        id="gemini-2.5-pro",
-        provider="google",
-        display_name="Gemini 2.5 Pro (Google)",
-        role="heavy",
-        notes="Strongest free-tier Gemini for drafting. Slower than Flash.",
-    ),
-    # --- Google via the native google-genai SDK (F5) ---
-    # Gemini 3.x preview models only work through the native SDK: the
-    # OpenAI-compat endpoint can't carry the `thought_signature` they
-    # require on tool-call history, which breaks multi-step skill flows.
     ModelEntry(
         id="gemini-3.1-pro-preview",
         provider="google",
         display_name="Gemini 3 Pro (Google, native SDK)",
         role="heavy",
-        notes="Newest Gemini for drafting. Runs on Google's native SDK.",
-        client="genai_sdk",
-    ),
-    ModelEntry(
-        id="gemini-3-flash-preview",
-        provider="google",
-        display_name="Gemini 3 Flash (Google, native SDK)",
-        role="either",
-        notes="Fast newest Gemini. Runs on Google's native SDK.",
+        notes="Strongest current Gemini for drafting. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
+    # NOTE: these IDs could not be live-verified here (no OpenAI key in this
+    # environment). gpt-4o / gpt-4o-mini still resolve in the API today but are
+    # OpenAI's older generation; once an OpenAI key is available, verify and add
+    # the current (GPT-5-class) models.
     ModelEntry(
         id="gpt-4o",
         provider="openai",
         display_name="GPT-4o (OpenAI)",
         role="either",
-        notes="OpenAI's flagship. Paid — needs billing on your OpenAI key.",
+        notes="OpenAI model. Paid — needs billing on your OpenAI key.",
     ),
     ModelEntry(
         id="gpt-4o-mini",

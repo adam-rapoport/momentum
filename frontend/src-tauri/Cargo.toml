@@ -25,6 +25,9 @@ tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
 # Spawns + manages the bundled Python backend as a sidecar process.
 tauri-plugin-shell = "2"
+# Opens external URLs (e.g. the Google OAuth login) in the user's real browser;
+# the in-app webview can't navigate to external sites.
+tauri-plugin-opener = "2"
 # Tiny blocking HTTP client used only to poll the backend's /health endpoint
 # before revealing the window.
 ureq = "2"

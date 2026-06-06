@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import type { KeyFormatMeta, ProviderMeta } from "@/lib/providers";
+import { openExternal } from "@/lib/desktop";
 
 export function Dot({ color, size = 6 }: { color: string; size?: number }) {
   return (
@@ -267,15 +268,14 @@ export function HelpHint({ provider }: { provider: KeyFormatMeta | null }) {
         >
           {provider.helpText}
           <br />
-          <a
-            href={provider.helpUrl}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => openExternal(provider.helpUrl!)}
             style={{ color: "var(--text-dim)" }}
-            className="mono text-[11.5px] underline"
+            className="mono text-[11.5px] underline bg-transparent border-0 p-0 cursor-pointer text-left"
           >
-            {provider.helpUrl}
-          </a>
+            {provider.helpUrl} ↗
+          </button>
         </div>
       )}
     </div>

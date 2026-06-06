@@ -38,6 +38,11 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # free-tier usage simply evaluates to $0 per the Google docs.
     "gemini-3.1-pro-preview": ModelPricing("4.00", "18.00"),
     "gemini-3.1-pro-preview-customtools": ModelPricing("4.00", "18.00"),
+    # Current Gemini 3.x flash tier (paid rates; free-tier usage is $0). The
+    # exact 3.5/3.1-lite rates weren't published at time of writing, so these
+    # mirror the equivalent 2.5 flash tiers as a close estimate for display.
+    "gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    "gemini-3.1-flash-lite": ModelPricing("0.10", "0.40"),
     "gemini-2.5-pro": ModelPricing("2.50", "15.00"),
     "gemini-2.5-flash": ModelPricing("0.30", "2.50"),
     "gemini-2.5-flash-lite": ModelPricing("0.10", "0.40"),

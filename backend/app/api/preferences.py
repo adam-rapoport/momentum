@@ -65,14 +65,15 @@ def _public_view(user_preferences: dict, configured: set[str]) -> dict:
     light_pick = user_preferences.get("light_model") or None
     heavy_pick = user_preferences.get("heavy_model") or None
 
-    available_light = [
+    # Both slots offer EVERY available model — the light/heavy distinction is
+    # only about which turns route where, not which models you're allowed to
+    # pick. (role stays on each entry as a hint, but doesn't gate the picker.)
+    available_all = [
         asdict(m)
-        for m in get_available_models(role="light", configured_providers=configured)
+        for m in get_available_models(role=None, configured_providers=configured)
     ]
-    available_heavy = [
-        asdict(m)
-        for m in get_available_models(role="heavy", configured_providers=configured)
-    ]
+    available_light = available_all
+    available_heavy = available_all
 
     return {
         "light_model": light_pick,
@@ -80,13 +81,13 @@ def _public_view(user_preferences: dict, configured: set[str]) -> dict:
         "effective_light_model": (
             light_pick
             if light_pick
-            and is_model_available(light_pick, role="light", configured_providers=configured)
+            and is_model_available(light_pick, configured_providers=configured)
             else settings.groq_model
         ),
         "effective_heavy_model": (
             heavy_pick
             if heavy_pick
-            and is_model_available(heavy_pick, role="heavy", configured_providers=configured)
+            and is_model_available(heavy_pick, configured_providers=configured)
             else settings.groq_heavy_model
         ),
         "available_light_models": available_light,
@@ -115,10 +116,10 @@ async def put_model_preferences(
     if "light_model" in raw:
         new_light = raw["light_model"]
         if new_light:
-            if not is_model_available(new_light, role="light", configured_providers=configured):
+            if not is_model_available(new_light, configured_providers=configured):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Model '{new_light}' is not an available light-slot model.",
+                    detail=f"Model '{new_light}' isn't available — its provider may not be connected.",
                 )
             prefs["light_model"] = new_light
         else:
@@ -127,10 +128,10 @@ async def put_model_preferences(
     if "heavy_model" in raw:
         new_heavy = raw["heavy_model"]
         if new_heavy:
-            if not is_model_available(new_heavy, role="heavy", configured_providers=configured):
+            if not is_model_available(new_heavy, configured_providers=configured):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Model '{new_heavy}' is not an available heavy-slot model.",
+                    detail=f"Model '{new_heavy}' isn't available — its provider may not be connected.",
                 )
             prefs["heavy_model"] = new_heavy
         else:

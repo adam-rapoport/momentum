@@ -1,41 +1,12 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type ConnectionStatus, type GoogleStatus, type KeyProvider } from "@/lib/api";
+import { openExternal } from "@/lib/desktop";
 import { WebSearchCard } from "./WebSearchCard";
 import { Banner, SectionHeader, StatusPill } from "../kit";
-import { AdvancedModelPicker } from "./AdvancedModelPicker";
 import { SlotModelCard } from "./SlotModelCard";
 
 type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
-
-// ── Collapsible ──
-function Collapsible({ title, children }: { title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full text-left p-4 flex items-center justify-between gap-3 bg-transparent border-0"
-      >
-        <span style={{ color: "var(--text)" }} className="text-sm font-semibold">
-          {title}
-        </span>
-        <span
-          style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "none" }}
-          className="transition-transform"
-        >
-          ⌄
-        </span>
-      </button>
-      {open && (
-        <div className="px-4 pb-4 pt-1" style={{ borderTop: "1px solid var(--border-faint)" }}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Models pane ──
 export function ModelsPane({ connections, onChanged }: { connections: ConnMap; onChanged: () => void }) {
@@ -48,12 +19,6 @@ export function ModelsPane({ connections, onChanged }: { connections: ConnMap; o
       <div className="flex flex-col gap-3.5">
         <SlotModelCard tier="light" connections={connections} onChanged={onChanged} />
         <SlotModelCard tier="heavy" connections={connections} onChanged={onChanged} />
-      </div>
-
-      <div className="mt-5">
-        <Collapsible title="Advanced: exact model">
-          <AdvancedModelPicker />
-        </Collapsible>
       </div>
 
       <div
@@ -86,26 +51,82 @@ export function IntegrationsPane({ connections, onChanged }: { connections: Conn
   );
 }
 
+function isFullyConnected(s: GoogleStatus | null): boolean {
+  return s?.status === "connected" && !s.needs_reconnect;
+}
+
 function GoogleCard() {
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  // True after we've opened the login in the browser and are waiting for the
+  // user to come back. Drives the "finish in your browser" UI + polling.
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const waitingRef = useRef(false);
+  waitingRef.current = waiting;
 
-  function load() {
-    api.googleStatus().then(setStatus).catch(() => setStatus(null));
+  async function load() {
+    try {
+      const s = await api.googleStatus();
+      setStatus(s);
+      if (isFullyConnected(s)) setWaiting(false);
+    } catch {
+      setStatus(null);
+    }
   }
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    // When the user finishes the login in their browser and returns to the app,
+    // the window regains focus — re-check status so the card updates on its own.
+    function onFocus() {
+      load();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  // While waiting on the browser, poll status as a backstop to the focus check
+  // (some setups don't fire focus reliably). Stops once connected or after ~3 min.
+  useEffect(() => {
+    if (!waiting) return;
+    let polls = 0;
+    const id = setInterval(() => {
+      polls += 1;
+      if (polls > 72) {
+        clearInterval(id);
+        return;
+      }
+      load();
+    }, 2500);
+    return () => clearInterval(id);
+  }, [waiting]);
 
   async function connect() {
+    setError(null);
     setBusy(true);
+    let authorize_url: string;
     try {
-      const { authorize_url } = await api.googleConnect();
-      window.location.href = authorize_url;
-    } catch {
+      ({ authorize_url } = await api.googleConnect());
+    } catch (e) {
+      // Most likely the app was built without Google login credentials, or the
+      // vault key is missing — surface whatever the backend told us.
+      setError(e instanceof Error ? e.message : "Couldn't start the Google connection.");
       setBusy(false);
+      return;
     }
+    try {
+      await openExternal(authorize_url);
+    } catch {
+      setError("Couldn't open your browser to finish signing in. Please try again.");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    setWaiting(true);
   }
   async function disconnect() {
     setBusy(true);
+    setError(null);
     try {
       await api.googleDisconnect();
       load();
@@ -153,6 +174,10 @@ function GoogleCard() {
             <button className="btn small danger-ghost" onClick={disconnect} disabled={busy}>
               Disconnect
             </button>
+          ) : waiting ? (
+            <button className="btn small primary" onClick={load}>
+              Check now
+            </button>
           ) : (
             <button className="btn small primary" onClick={connect} disabled={busy}>
               {busy ? "Opening…" : "Connect"}
@@ -160,6 +185,27 @@ function GoogleCard() {
           )}
         </div>
       </div>
+      {error ? (
+        <div className="mt-3">
+          <Banner kind="danger" title="Couldn't connect Google">
+            {error}
+          </Banner>
+        </div>
+      ) : null}
+      {waiting && !connected ? (
+        <div
+          className="mt-3 pt-3 flex items-center justify-between gap-3 text-[12.5px]"
+          style={{ borderTop: "1px solid var(--border-faint)", color: "var(--text-muted)" }}
+        >
+          <span>
+            Continue in your browser to finish signing in, then return here — this updates
+            automatically.
+          </span>
+          <button className="btn small" onClick={() => setWaiting(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
       {connected && status?.enabled_services?.length ? (
         <div className="mt-3 pt-3 flex flex-wrap gap-2" style={{ borderTop: "1px solid var(--border-faint)" }}>
           {status.enabled_services.map((s) => (
