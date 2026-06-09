@@ -64,12 +64,17 @@ export function GtkyStep({
     setUploading(true);
     setError(null);
     try {
+      // Accumulate locally instead of spreading the `uploads` prop each
+      // iteration — that closure is stale after the first await, so a
+      // multi-file selection used to record only the last file.
+      let next = uploads;
       for (const file of Array.from(files)) {
         const res = await api.uploadDocument(file);
-        setUploads([
-          ...uploads,
+        next = [
+          ...next,
           { name: res.title, chars: res.char_count, memories: res.memories_created },
-        ]);
+        ];
+        setUploads(next);
       }
     } catch (e) {
       setError(extractDetail(e));
