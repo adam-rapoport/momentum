@@ -119,8 +119,10 @@ async def stream_message(
             if choice.finish_reason:
                 finish_reason = choice.finish_reason
         if chunk.usage:
-            input_tokens = chunk.usage.prompt_tokens
-            output_tokens = chunk.usage.completion_tokens
+            # Groq can omit individual usage fields (None) on some responses;
+            # Decimal(None) in calculate_cost_usd would kill the turn.
+            input_tokens = chunk.usage.prompt_tokens or 0
+            output_tokens = chunk.usage.completion_tokens or 0
 
     full_text = "".join(collected_text)
     tool_calls = [

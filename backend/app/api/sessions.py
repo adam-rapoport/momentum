@@ -59,7 +59,7 @@ async def get_session(session_id: UUID, db: AsyncSession = Depends(get_db)) -> d
     msg_stmt = (
         select(Message)
         .where(Message.session_id == session_id, Message.is_compacted.is_(False))
-        .order_by(Message.turn_id, Message.created_at)
+        .order_by(Message.turn_id, Message.seq)
     )
     messages = list((await db.scalars(msg_stmt)).all())
 

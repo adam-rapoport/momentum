@@ -129,6 +129,18 @@ async def _execute_create_event(
     )
 
 
+def mark_action_executing(session: Session) -> None:
+    """Stamp the staged action as 'executing'. The session engine commits this
+    BEFORE calling execute_pending_action so that a crash between the send and
+    the result being recorded cannot lead to a blind re-send: a later approve
+    of an 'executing' action is refused (see _resolve_pending_action)."""
+    meta = dict(session.session_metadata or {})
+    action = dict(meta.get("pending_action") or {})
+    action["status"] = "executing"
+    meta["pending_action"] = action
+    session.session_metadata = meta
+
+
 def clear_pending_action(session: Session) -> dict[str, Any] | None:
     """Remove any pending_action from session_metadata; return the cleared
     action so callers can log/use it."""

@@ -1,3 +1,4 @@
+import { getBackendToken } from "./desktop";
 import type {
   DocumentArtifact,
   MemoryRecordDetail,
@@ -10,10 +11,14 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Desktop builds authenticate every API call with the shell's per-launch
+  // token; in web dev this resolves to null and no header is sent.
+  const token = await getBackendToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { "X-PMomentum-Token": token } : {}),
       ...(init?.headers ?? {}),
     },
   });

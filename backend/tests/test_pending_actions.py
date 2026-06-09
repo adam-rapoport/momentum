@@ -120,7 +120,10 @@ async def test_resolve_approve_executes_and_clears():
     ), patch(
         "app.core.session_engine._rewrite_staged_tool_result",
         new=AsyncMock(return_value=True),
-    ):
+    ), patch(
+        "app.core.session_engine._safe_commit",
+        new=AsyncMock(return_value=None),
+    ) as commit_mock:
         note = await _resolve_pending_action(
             db=None, session=session, intent="approve", user_text="/approve",
             action=action,
@@ -131,6 +134,39 @@ async def test_resolve_approve_executes_and_clears():
     assert "pending_action" not in session.session_metadata
     # Should tell the model NOT to re-call the tool.
     assert "do not" in note.lower() or "don't" in note.lower()
+    # Two-phase execute: 'executing' stamp committed BEFORE the send, result
+    # committed after — so a crash in between can't double-send.
+    stages = [c.kwargs.get("stage") or c.args[-1] for c in commit_mock.call_args_list]
+    assert stages == ["mark_action_executing", "record_action_executed"]
+
+
+@pytest.mark.asyncio
+async def test_resolve_approve_of_executing_action_refuses_resend():
+    """An action stamped 'executing' means a previous approve was interrupted
+    between the send and the result-commit — re-approving must NOT re-send."""
+    action = _fake_send_email_action()
+    action["status"] = "executing"
+    session = _fake_session({"pending_action": action})
+
+    execute = AsyncMock(return_value="should not run")
+    with patch(
+        "app.core.session_engine.execute_pending_action", new=execute,
+    ), patch(
+        "app.core.session_engine._rewrite_staged_tool_result",
+        new=AsyncMock(return_value=True),
+    ), patch(
+        "app.core.session_engine._safe_commit",
+        new=AsyncMock(return_value=None),
+    ):
+        note = await _resolve_pending_action(
+            db=None, session=session, intent="approve", user_text="/approve",
+            action=action,
+        )
+
+    execute.assert_not_awaited()
+    assert session.status == "active"
+    assert "pending_action" not in session.session_metadata
+    assert "verify" in note.lower()
 
 
 @pytest.mark.asyncio
@@ -146,6 +182,9 @@ async def test_resolve_approve_failure_leaves_clean_state():
     ), patch(
         "app.core.session_engine._rewrite_staged_tool_result",
         new=AsyncMock(return_value=True),
+    ), patch(
+        "app.core.session_engine._safe_commit",
+        new=AsyncMock(return_value=None),
     ):
         note = await _resolve_pending_action(
             db=None, session=session, intent="approve", user_text="/approve",

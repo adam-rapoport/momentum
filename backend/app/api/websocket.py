@@ -29,6 +29,7 @@ from app.core.session_engine import (
 )
 from app.dependencies import SessionLocal, kv_store
 from app.schemas.websocket import InboundCancel, InboundMessage
+from app.security import origin_allowed, token_valid
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,16 @@ router = APIRouter()
 
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket) -> None:
+    # WebSockets are NOT subject to CORS: without this check any website the
+    # user visits could open ws://127.0.0.1:8000/ws and drive the agent (send
+    # email, read memory). Browser WS clients can't set headers, so the
+    # desktop shell's per-launch token arrives as a query param instead.
+    # See app.security for the threat model.
+    if not origin_allowed(ws.headers.get("origin")) or not token_valid(
+        ws.query_params.get("token")
+    ):
+        await ws.close(code=1008)  # policy violation
+        return
     await ws.accept()
     try:
         while True:

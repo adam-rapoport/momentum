@@ -30,8 +30,17 @@ async def get_default_user(db: AsyncSession) -> User:
     if user is None:  # fall back to a pre-genericization local DB
         user = await db.scalar(select(User).where(User.email == LEGACY_USER_EMAIL))
     if user is None:
+        # Self-heal: startup seeding (app.main lifespan) is best-effort, so a
+        # one-time hiccup there must not leave every request 500ing forever.
+        # Import inside the function — seed.py imports our constants.
+        from app.core.seed import ensure_default_setup
+
+        await ensure_default_setup(db)
+        user = await db.scalar(select(User).where(User.email == DEFAULT_USER_EMAIL))
+    if user is None:
         raise RuntimeError(
-            "Default user not found. Run `.venv/bin/python -m scripts.seed` first."
+            "Default user not found and could not be seeded. "
+            "Run `.venv/bin/python -m scripts.seed` for details."
         )
     return user
 

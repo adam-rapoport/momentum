@@ -120,6 +120,13 @@ class Settings(BaseSettings):
     # Perplexity as their search provider (see app.core.search).
     perplexity_api_key: str | None = Field(None, alias="PERPLEXITY_API_KEY")
 
+    # Per-launch shared secret for the local API (see app.security). The Tauri
+    # shell generates it and passes it to the sidecar via this env var and to
+    # the webview over IPC. When set, /api requests must carry it in the
+    # X-PMomentum-Token header and WS connects in the `token` query param.
+    # Unset (web dev, tests) the token check is skipped.
+    auth_token: str | None = Field(None, alias="PMOMENTUM_AUTH_TOKEN")
+
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
         """Derive DB/memory paths from DATA_DIR. Pure & side-effect-free.

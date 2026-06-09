@@ -15,7 +15,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from app.core.local_store import LocalKVStore
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -28,6 +28,7 @@ from app.core.pending_actions import (
     clear_pending_action,
     execute_pending_action,
     get_pending_action,
+    mark_action_executing,
 )
 from app.core.skills import CLEAR_SENTINEL, detect_skill, get_skill
 from app.core.system_prompt import build_prompt
@@ -298,6 +299,31 @@ async def _resolve_pending_action(
     tool_name = action.get("tool_name", "tool")
 
     if intent == "approve":
+        if action.get("status") == "executing":
+            # A previous approve was interrupted between the send and the
+            # result being committed — the email/invite may or may not have
+            # gone out. Never blindly re-execute; make the user verify.
+            clear_pending_action(session)
+            session.status = "active"
+            await _rewrite_staged_tool_result(
+                db, session.id,
+                f"[STAGED → UNKNOWN] A previous approval of this "
+                f"{kind.replace('_', ' ')} was interrupted mid-execution; it may "
+                f"or may not have completed. Do not re-send without verifying.",
+            )
+            await _safe_commit(db, session.id, stage="resolve_interrupted_action")
+            return (
+                f"[SYSTEM] A previous approval of the {kind.replace('_', ' ')} was "
+                f"interrupted mid-execution, so it may have already gone out. "
+                f"Tell the user to verify (e.g. Gmail Sent folder / their "
+                f"calendar) before retrying. Do NOT call {tool_name} again "
+                f"automatically."
+            )
+        # Two-phase execute: commit the 'executing' stamp first so a crash
+        # between the send and the result-commit can't double-send on the
+        # next approve (see the guard above).
+        mark_action_executing(session)
+        await _safe_commit(db, session.id, stage="mark_action_executing")
         try:
             success_summary = await execute_pending_action(db, session.user_id, action)
         except Exception as e:  # noqa: BLE001 — surface to model, not user
@@ -309,6 +335,7 @@ async def _resolve_pending_action(
                 f"[STAGED → FAILED] Execution of the staged {kind.replace('_', ' ')} "
                 f"failed: {e}. The action did NOT complete.",
             )
+            await _safe_commit(db, session.id, stage="record_action_failure")
             return (
                 f"[SYSTEM] The user approved the {kind.replace('_', ' ')}, "
                 f"but executing it failed: {e}. Apologize briefly and ask "
@@ -328,6 +355,10 @@ async def _resolve_pending_action(
             f"This is the final result. The action is COMPLETE. Do not call "
             f"{tool_name} again.",
         )
+        # Persist the executed state immediately — if anything later in the
+        # turn fails, the cleared action and the definitive tool_result must
+        # survive (the side effect already happened).
+        await _safe_commit(db, session.id, stage="record_action_executed")
         return (
             f"[SYSTEM — ACTION COMPLETE] {success_summary} "
             f"The previous {tool_name} call has been EXECUTED. There is "
@@ -380,7 +411,7 @@ async def _rewrite_staged_tool_result(
     stmt = (
         select(Message)
         .where(Message.session_id == session_id, Message.role == "tool")
-        .order_by(Message.created_at.desc())
+        .order_by(Message.seq.desc())
         .limit(10)
     )
     candidates = list((await db.scalars(stmt)).all())
@@ -557,9 +588,25 @@ async def process_message(
     stmt = (
         select(Message)
         .where(Message.session_id == session_id, Message.is_compacted.is_(False))
-        .order_by(Message.turn_id, Message.created_at)
+        .order_by(Message.turn_id, Message.seq)
     )
     history = (await db.scalars(stmt)).all()
+
+    # Per-session monotonic message counter. created_at can't order messages
+    # within a turn (1-second resolution on SQLite), and a tool result sorting
+    # before its assistant tool_use call makes the rebuilt provider history
+    # invalid — permanently. Every message this turn persists gets the next
+    # value.
+    max_seq = await db.scalar(
+        select(func.max(Message.seq)).where(Message.session_id == session_id)
+    )
+    next_seq = (max_seq or 0) + 1
+
+    def _take_seq() -> int:
+        nonlocal next_seq
+        value = next_seq
+        next_seq += 1
+        return value
 
     system_prompt = await build_prompt(
         db=db,
@@ -579,6 +626,7 @@ async def process_message(
         id=uuid4(),
         session_id=session_id,
         turn_id=turn_id,
+        seq=_take_seq(),
         role="user",
         content=[{"type": "text", "text": user_text}],
     )
@@ -675,6 +723,7 @@ async def process_message(
                 id=uuid4(),
                 session_id=session_id,
                 turn_id=turn_id,
+                seq=_take_seq(),
                 role="assistant",
                 content=content_blocks,
             )
@@ -740,6 +789,7 @@ async def process_message(
                 id=uuid4(),
                 session_id=session_id,
                 turn_id=turn_id,
+                seq=_take_seq(),
                 role="tool",
                 content=[
                     {

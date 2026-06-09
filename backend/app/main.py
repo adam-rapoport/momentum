@@ -3,8 +3,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.router import api_router, ws_router
@@ -13,6 +14,7 @@ from app.core.integrations import google_oauth
 from app.core.seed import ensure_default_setup
 from app.dependencies import SessionLocal, engine
 from app.logging_config import configure_logging
+from app.security import host_allowed, origin_allowed, token_required, token_valid
 
 logger = logging.getLogger(__name__)
 
@@ -105,12 +107,31 @@ app.add_middleware(
     CORSMiddleware,
     # Local web-dev origins PLUS the Tauri desktop webview, which serves the app
     # from a custom scheme: tauri://localhost (macOS/Linux) and
-    # http://tauri.localhost (Windows).
+    # http://tauri.localhost (Windows). Keep in sync with app.security.
     allow_origin_regex=r"(tauri://localhost|http://tauri\.localhost|http://(localhost|127\.0\.0\.1)(:\d+)?)",
-    allow_credentials=True,
+    # No cookies or HTTP auth in use — the shared token travels in a plain
+    # header — so don't advertise credentialed CORS.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _local_trust_boundary(request: Request, call_next) -> Response:
+    """Reject requests that can't have come from a legitimate local client:
+    wrong Host (DNS rebinding), cross-site Origin, or — when the desktop shell
+    configured a per-launch token — a missing/wrong X-PMomentum-Token header.
+    The WebSocket equivalent lives in app.api.websocket. See app.security."""
+    if not host_allowed(request.headers.get("host")):
+        return JSONResponse(status_code=403, content={"detail": "forbidden host"})
+    if not origin_allowed(request.headers.get("origin")):
+        return JSONResponse(status_code=403, content={"detail": "forbidden origin"})
+    if token_required(request.url.path) and not token_valid(
+        request.headers.get("x-pmomentum-token")
+    ):
+        return JSONResponse(status_code=401, content={"detail": "missing or invalid token"})
+    return await call_next(request)
 
 
 app.include_router(api_router)

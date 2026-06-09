@@ -15,6 +15,12 @@ class Message(Base):
         Uuid(as_uuid=True), ForeignKey("sessions.id"), nullable=False, index=True
     )
     turn_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Per-session monotonic ordering counter (assigned by the session engine).
+    # created_at can't order messages within a turn — SQLite's CURRENT_TIMESTAMP
+    # has 1-second resolution, so a whole tool batch ties. Sort by
+    # (turn_id, seq). Nullable only for the column-add migration; every row is
+    # backfilled and every new row gets a value.
+    seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[list] = mapped_column(JSONColumn, nullable=False)
     token_count_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)

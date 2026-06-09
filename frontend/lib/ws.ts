@@ -1,5 +1,6 @@
 "use client";
 import { api } from "./api";
+import { getBackendToken } from "./desktop";
 import { useChatStore } from "./store";
 import type { WsInbound, WsOutbound } from "./types";
 
@@ -9,6 +10,9 @@ class WsClient {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private explicitClose = false;
+  // True while we're fetching the auth token ahead of opening the socket —
+  // prevents a second connect() from racing a duplicate socket into existence.
+  private connecting = false;
   // Messages sent before the socket is OPEN — e.g. the very first message on a
   // brand-new session, fired before the connection finished handshaking. We
   // queue them and flush on open instead of silently dropping them (which was
@@ -20,8 +24,28 @@ class WsClient {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
+    if (this.connecting) return;
     this.explicitClose = false;
-    this.ws = new WebSocket(`${WS_BASE}/ws`);
+    this.connecting = true;
+    // Browser WebSocket clients can't set headers, so the desktop shell's
+    // per-launch auth token travels as a query param (null in web dev — the
+    // backend then skips the check). Token fetch is async but cached after
+    // the first call.
+    getBackendToken().then((token) => {
+      this.connecting = false;
+      if (this.explicitClose) return;
+      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      this.open(token);
+    });
+  }
+
+  private open(token: string | null): void {
+    const url = token
+      ? `${WS_BASE}/ws?token=${encodeURIComponent(token)}`
+      : `${WS_BASE}/ws`;
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
