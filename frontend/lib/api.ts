@@ -1,4 +1,4 @@
-import { getBackendToken } from "./desktop";
+import { getApiBase, getBackendToken } from "./desktop";
 import type {
   DocumentArtifact,
   MemoryRecordDetail,
@@ -6,9 +6,6 @@ import type {
   Session,
   SessionDetail,
 } from "./types";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 // Every request gets a deadline. Without one, a wedged backend leaves the
 // promise pending forever — and anything awaiting it (the stream.done
@@ -35,11 +32,12 @@ async function request<T>(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
   // Desktop builds authenticate every API call with the shell's per-launch
-  // token; in web dev this resolves to null and no header is sent.
-  const token = await getBackendToken();
+  // token and derive the base URL from the port the shell actually chose;
+  // in web dev these resolve to null/the compile-time default.
+  const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${base}${path}`, {
       ...init,
       signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
       headers: {
@@ -148,10 +146,10 @@ export const api = {
     form.append("file", file);
     // Note: do NOT set Content-Type — the browser sets the multipart boundary.
     // The auth header still applies (this endpoint is not token-exempt).
-    const token = await getBackendToken();
+    const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/api/v1/onboarding/documents`, {
+      res = await fetch(`${base}/api/v1/onboarding/documents`, {
         method: "POST",
         body: form,
         signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),

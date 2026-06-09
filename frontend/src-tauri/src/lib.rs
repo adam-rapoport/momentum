@@ -15,6 +15,11 @@ struct BackendPid(Mutex<u32>);
 /// the `get_backend_token` command. Without it, any website the user visits
 /// could drive the backend on 127.0.0.1 (see backend/app/security.py).
 struct AuthToken(String);
+/// The loopback port the backend was told to bind (PMOMENTUM_PORT). Usually
+/// 8000, but when something else already holds 8000 (a dev uvicorn, another
+/// app) we fall back to a free OS-assigned port instead of silently talking
+/// to the squatter. The webview reads it via `get_backend_port`.
+struct BackendPort(u16);
 
 /// True once the app has started exiting — a Terminated event caused by our
 /// own kill must not be reported as a crash (or trigger a respawn).
@@ -27,6 +32,29 @@ static RESPAWN_USED: AtomicBool = AtomicBool::new(false);
 #[tauri::command]
 fn get_backend_token(token: tauri::State<AuthToken>) -> String {
     token.0.clone()
+}
+
+#[tauri::command]
+fn get_backend_port(port: tauri::State<BackendPort>) -> u16 {
+    port.0
+}
+
+/// Prefer the historical default port 8000 (matches existing Google OAuth
+/// redirect registrations); when it's taken, let the OS assign a free one.
+/// The probe-then-release has a tiny TOCTOU window, but the loser is the same
+/// "port already in use" crash we have today — and only when a third process
+/// grabs the port in the same instant.
+fn pick_backend_port() -> u16 {
+    use std::net::TcpListener;
+    if TcpListener::bind(("127.0.0.1", 8000)).is_ok() {
+        return 8000;
+    }
+    let port = TcpListener::bind(("127.0.0.1", 0))
+        .and_then(|l| l.local_addr())
+        .map(|a| a.port())
+        .expect("no free loopback port available");
+    eprintln!("[tauri] port 8000 is taken — backend will use {port}");
+    port
 }
 
 /// 32 random bytes, hex-encoded. Reads /dev/urandom directly — fine for this
@@ -47,11 +75,25 @@ fn generate_token() -> String {
 /// unexpected exit is logged, emitted to the webview (`backend-terminated`)
 /// and answered with one automatic respawn attempt.
 fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell::Error> {
-    let (mut rx, child) = app
+    let port = app.state::<BackendPort>().0;
+    let mut cmd = app
         .shell()
         .sidecar("pmomentum-backend")?
         .env("PMOMENTUM_AUTH_TOKEN", token)
-        .spawn()?;
+        .env("PMOMENTUM_PORT", port.to_string());
+    if port != 8000 {
+        // Keep the OAuth callback on the port the backend actually serves.
+        // Only overridden off the default so an explicit user-level
+        // GOOGLE_REDIRECT_URI env var still wins in the common case. Note:
+        // a custom "Web application" OAuth client must have this exact URI
+        // registered in the Google console; "Desktop app" clients accept any
+        // loopback port.
+        cmd = cmd.env(
+            "GOOGLE_REDIRECT_URI",
+            format!("http://localhost:{port}/api/v1/integrations/google/callback"),
+        );
+    }
+    let (mut rx, child) = cmd.spawn()?;
     let pid = child.pid();
     *app.state::<BackendPid>().0.lock().unwrap() = pid;
     *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
@@ -119,19 +161,30 @@ fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell:
 /// or the worker orphans (keeping port 8000 bound after the app quits).
 fn terminate_backend(pid: u32) {
     use std::process::Command;
+    use std::thread::sleep;
+    use std::time::Duration;
     let p = pid.to_string();
-    // Children first (the uvicorn worker), then the bootloader itself.
+    // Polite first: SIGTERM lets uvicorn finish in-flight DB writes and close
+    // the SQLite file cleanly (the PyInstaller bootloader forwards SIGTERM to
+    // its Python child, but signal the child directly too in case the app is
+    // still mid-bootstrap). Children first, then the bootloader.
+    let _ = Command::new("/usr/bin/pkill").args(["-TERM", "-P", &p]).status();
+    let _ = Command::new("/bin/kill").args(["-TERM", &p]).status();
+    // Short grace, then make sure nothing keeps the port bound. SIGKILL on an
+    // already-exited PID is a harmless ESRCH.
+    sleep(Duration::from_millis(1500));
     let _ = Command::new("/usr/bin/pkill").args(["-KILL", "-P", &p]).status();
-    let _ = Command::new("/bin/kill").args(["-9", &p]).status();
+    let _ = Command::new("/bin/kill").args(["-KILL", &p]).status();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let token = generate_token();
+    let port = pick_backend_port();
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_backend_token])
+        .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port])
         .setup(move |app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -146,6 +199,7 @@ pub fn run() {
             app.manage(BackendPid(Mutex::new(0)));
             app.manage(BackendProcess(Mutex::new(None)));
             app.manage(AuthToken(token.clone()));
+            app.manage(BackendPort(port));
 
             spawn_backend(app.handle(), &token)?;
 

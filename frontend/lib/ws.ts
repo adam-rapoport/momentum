@@ -1,10 +1,8 @@
 "use client";
 import { api } from "./api";
-import { getBackendToken } from "./desktop";
+import { getBackendToken, getWsBase } from "./desktop";
 import { useChatStore } from "./store";
 import type { WsInbound, WsOutbound } from "./types";
-
-const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE ?? "ws://localhost:8000";
 
 class WsClient {
   private ws: WebSocket | null = null;
@@ -38,22 +36,22 @@ class WsClient {
     this.connecting = true;
     // Browser WebSocket clients can't set headers, so the desktop shell's
     // per-launch auth token travels as a query param (null in web dev — the
-    // backend then skips the check). Token fetch is async but cached after
-    // the first call.
-    getBackendToken().then((token) => {
+    // backend then skips the check), and the base URL follows whichever port
+    // the shell chose. Both fetches are async but cached after the first call.
+    Promise.all([getBackendToken(), getWsBase()]).then(([token, base]) => {
       this.connecting = false;
       if (this.explicitClose) return;
       if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
         return;
       }
-      this.open(token);
+      this.open(base, token);
     });
   }
 
-  private open(token: string | null): void {
+  private open(base: string, token: string | null): void {
     const url = token
-      ? `${WS_BASE}/ws?token=${encodeURIComponent(token)}`
-      : `${WS_BASE}/ws`;
+      ? `${base}/ws?token=${encodeURIComponent(token)}`
+      : `${base}/ws`;
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
