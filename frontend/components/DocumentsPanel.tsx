@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { ExternalLink } from "@/components/ExternalLink";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
 import type { DocumentArtifact } from "@/lib/types";
@@ -130,15 +131,13 @@ export function DocumentsPanel() {
                         </div>
                       </div>
                       {d.url ? (
-                        <a
+                        <ExternalLink
                           href={d.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="shrink-0 inline-flex items-center gap-0.5 rounded bg-white ring-1 ring-inset ring-neutral-200 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700 hover:bg-neutral-100"
                           title="Open in Google Docs"
                         >
                           Open ↗
-                        </a>
+                        </ExternalLink>
                       ) : (
                         <span
                           className="shrink-0 text-[10px] text-neutral-400 font-mono"
