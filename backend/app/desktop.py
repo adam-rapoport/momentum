@@ -46,6 +46,17 @@ def _selfcheck() -> int:
     non-zero exit code on any failure. Useful as a smoke test of every build —
     catches PyInstaller omitting a data dir or a native dep before we ship.
     """
+    import shutil
+    import tempfile
+
+    # The migration check boots the app's config against a throwaway SQLite
+    # file. The env var must be set BEFORE the first `app.*` import in this
+    # process (app.config builds its settings singleton at import time, and
+    # an os.environ value beats any .env file).
+    tmpdir = Path(tempfile.mkdtemp(prefix="pmomentum-selfcheck-"))
+    selfcheck_db = tmpdir / "selfcheck.db"
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{selfcheck_db.as_posix()}"
+
     ok = True
 
     def check(name: str, fn) -> None:
@@ -79,10 +90,45 @@ def _selfcheck() -> int:
 
         assert list(_SKILLS_DIR.glob("*/SKILL.md")), f"no SKILL.md under {_SKILLS_DIR}"
 
-    check("cryptography Fernet round-trip", _crypto)
-    check("trafilatura import + extract", _trafilatura)
-    check("bundled prompts/static readable", _prompts)
-    check("bundled skills readable", _skills)
+    def _migrations() -> None:
+        # Runs the real startup migration path (alembic Python API, bundled
+        # alembic/ scripts) against the temp DB set up above. Catches a build
+        # that omitted the migration scripts or an alembic/SQLAlchemy module.
+        from app.main import _run_migrations
+
+        _run_migrations()
+        assert selfcheck_db.exists() and selfcheck_db.stat().st_size > 0, (
+            f"migrations ran but produced no DB at {selfcheck_db}"
+        )
+
+    def _google_genai_sdk() -> None:
+        from google import genai
+        from google.genai import types
+
+        assert genai.Client is not None and types.GenerateContentConfig is not None
+
+    def _openai_sdk() -> None:
+        import openai
+
+        assert openai.AsyncOpenAI is not None
+
+    def _google_api_client() -> None:
+        import googleapiclient.discovery
+        from google.oauth2.credentials import Credentials
+
+        assert googleapiclient.discovery.build is not None and Credentials is not None
+
+    try:
+        check("cryptography Fernet round-trip", _crypto)
+        check("trafilatura import + extract", _trafilatura)
+        check("bundled prompts/static readable", _prompts)
+        check("bundled skills readable", _skills)
+        check("alembic migrations against temp SQLite", _migrations)
+        check("google-genai SDK importable", _google_genai_sdk)
+        check("openai SDK importable", _openai_sdk)
+        check("google-api-python-client + oauth importable", _google_api_client)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
     print("selfcheck:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

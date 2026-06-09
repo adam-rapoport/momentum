@@ -1,39 +1,55 @@
 # pMomentum
 
-[![Backend tests](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml/badge.svg)](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml)
+[![CI](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml/badge.svg)](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml)
 
-An AI assistant for product management work — drafts PRDs, stakeholder updates,
-and meeting prep docs through guided skill workflows, with persistent memory
-across sessions and Google Docs integration for deliverables.
+An AI agent for product management work, packaged as a **macOS desktop app**.
+It drafts PRDs, stakeholder updates, meeting prep, release notes and more
+through guided skill workflows (slash commands), with persistent memory across
+sessions, web search, and Google Docs / Gmail / Calendar integration — using
+whichever LLM provider you have a key for.
 
 Built as an MVP by a solo non-technical PM with Claude Code as the pair
 programmer. Still in active development.
 
+## The desktop app (the main way to run it)
+
+```bash
+./build-desktop.sh
+```
+
+builds a self-contained `.dmg` — a Tauri 2 shell bundling the Next.js UI and
+the Python backend frozen into a sidecar binary. No Python, Node, or database
+service needed on the machine that runs it. See **[INSTALL.md](INSTALL.md)**
+for the build/install walkthrough (including the architecture caveat: the
+build targets the arch of the Mac it runs on — no cross-compiling).
+
+On first launch the app walks you through an onboarding wizard, stores your
+API keys encrypted on your Mac, and keeps all data in
+`~/Library/Application Support/pMomentum/`.
+
 ## Stack
 
-- **Backend:** FastAPI (Python 3.12) + SQLAlchemy + asyncpg + Redis
-- **Frontend:** Next.js 15 + TypeScript + Tailwind + Zustand
-- **LLM providers:** Groq (`llama-4-scout` default) for casual chat and
-  tool-heavy turns, Google AI Studio (`gemma-4-31b-it`) for drafting turns.
-  Routing is per-turn based on slash commands and active skill state.
-- **Services:** Postgres 16 + Redis via Homebrew (not Docker yet)
-- **Integrations:** Google Docs (OAuth), Tavily (web search)
+- **Backend:** FastAPI (Python 3.12) + SQLAlchemy on **SQLite** — fully
+  self-contained, no Postgres or Redis to install. The schema migrates itself
+  (Alembic) and seeds a default workspace on startup. The local API is
+  protected by a per-launch shared token plus Host/Origin checks, so other
+  processes and websites on the machine can't drive the agent.
+- **Frontend:** Next.js 15 (static export) + TypeScript + Tailwind + Zustand,
+  rendered in the Tauri webview (or a browser during development).
+- **LLM providers:** Groq, Google AI Studio (Gemini/Gemma), and OpenAI. Keys
+  are **optional at startup** — enter any subset in the onboarding wizard or
+  Settings; they're stored in a Fernet-encrypted vault. Routing is per-turn:
+  fast model for casual/tool-heavy turns, a heavier model for drafting.
+- **Integrations:** Google Docs / Gmail / Calendar (OAuth — see
+  [docs/google-connect-setup.md](docs/google-connect-setup.md)), Tavily or
+  Perplexity for web search.
+- **Desktop shell:** Tauri 2 (Rust) spawning the backend as a PyInstaller
+  one-file sidecar on `localhost:8000`.
 
-## Prerequisites
+## Developing (web mode)
 
-- macOS (other platforms untested)
-- Python 3.12+
-- Node.js 18+
-- Homebrew with `postgresql@16` and `redis` services
-- API keys for:
-  - [Groq](https://console.groq.com/keys) — required
-  - [Google AI Studio](https://aistudio.google.com/app/apikey) — required for heavy-model drafting
-  - [Tavily](https://tavily.com/) — required for WebSearch tool
-  - Google Cloud OAuth credentials — required for Google Docs integration
-
-## Setup
-
-### 1. Clone and install dependencies
+Prerequisites: macOS or Linux, Python 3.12+, Node.js 18+. No database service
+— SQLite is created automatically.
 
 ```bash
 git clone https://github.com/adam-rapoport/pmomentum.git
@@ -43,44 +59,17 @@ cd pmomentum
 cd backend
 python3.12 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
+cp .env.example .env   # optional — the app boots with no .env at all
 
 # Frontend
 cd ../frontend
-npm install
+npm ci
 ```
 
-### 2. Start services
+Then run both, in two terminals:
 
 ```bash
-brew services start postgresql@16
-brew services start redis
-createdb pmomentum
-```
-
-### 3. Configure environment
-
-```bash
-cd backend
-cp .env.example .env
-# Edit .env and fill in your API keys + a Fernet key:
-.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Paste the output as CREDENTIAL_VAULT_KEY in .env
-```
-
-### 4. Run database migrations and seed
-
-```bash
-# From backend/
-.venv/bin/alembic upgrade head
-.venv/bin/python -m scripts.seed
-```
-
-### 5. Start the app
-
-Two terminals:
-
-```bash
-# Backend
+# Backend — migrations + seeding run automatically on startup
 cd backend
 .venv/bin/uvicorn app.main:app --reload
 # → http://localhost:8000
@@ -91,20 +80,31 @@ npm run dev
 # → http://localhost:3000 (or 3001 if 3000 is taken)
 ```
 
-Open whichever port Next picked in the browser.
+Open the frontend URL in a browser. With no `.env`, the app starts on the
+onboarding wizard — paste an API key for at least one provider there.
 
 ## Verify it works
 
 ```bash
 # From backend/
-.venv/bin/pytest
-# → 52 passed in ~3 seconds
+GROQ_API_KEY=x GOOGLE_AI_API_KEY=x OPENAI_API_KEY=x .venv/bin/pytest -q
+# → 188 passed in a few seconds
+.venv/bin/ruff check .
+
+# From frontend/
+npm run lint && npm run typecheck && npm run build
 ```
+
+(The placeholder keys only satisfy config at import time — no test calls a
+real provider.) CI runs the same checks on every PR: the backend suite against
+SQLite, SQLite-with-`DATA_DIR` (desktop-mode config), and Postgres, plus the
+frontend lint/typecheck/build, plus an advisory macOS job that freezes the
+sidecar and runs its `--selfcheck`.
 
 Then in the UI, try:
 
 - `what do you know about Sarah?` — tests memory recall
-- `/write-prd <feature idea>` — kicks off the PRD workflow (routes to Gemma 4)
+- `/write-prd <feature idea>` — kicks off the PRD workflow (routes to the heavy model)
 - `/stakeholder-update weekly rollup` — drafting workflow
 - `/meeting-prep Thursday planning` — agenda builder
 
@@ -112,26 +112,28 @@ Then in the UI, try:
 
 ```
 pmomentum/
-├── backend/           # FastAPI app
+├── build-desktop.sh        # one-command macOS desktop build (see INSTALL.md)
+├── backend/                # FastAPI app
 │   ├── app/
-│   │   ├── api/       # HTTP + WebSocket endpoints
-│   │   ├── core/      # Session engine, tools, memory, skills, LLM clients
-│   │   ├── models/    # SQLAlchemy tables
-│   │   └── skills/    # SKILL.md files (one dir per skill)
-│   ├── alembic/       # DB migrations
-│   ├── scripts/       # Manual smoke tests and seed
-│   └── tests/         # pytest suite
-└── frontend/          # Next.js app
-    ├── app/           # App-router pages
-    ├── components/    # React components
-    └── lib/           # API client, WS client, Zustand store, types
+│   │   ├── api/            # HTTP + WebSocket endpoints
+│   │   ├── core/           # Session engine, tools, memory, skills, LLM clients
+│   │   ├── models/         # SQLAlchemy tables
+│   │   ├── prompts/        # Static system-prompt sections
+│   │   ├── skills/         # SKILL.md workflows (one dir per skill)
+│   │   ├── desktop.py      # Desktop entrypoint + frozen-build --selfcheck
+│   │   └── security.py     # Local-API token/Origin/Host enforcement
+│   ├── alembic/            # DB migrations (applied automatically on startup)
+│   ├── pmomentum.spec      # PyInstaller spec for the sidecar binary
+│   ├── requirements-desktop.lock  # pinned deps for reproducible desktop builds
+│   ├── scripts/            # Manual smoke tests, seed, lockfile regen
+│   └── tests/              # pytest suite (188 tests)
+├── frontend/               # Next.js app (static export for the desktop shell)
+│   ├── app/                # App-router pages (chat, onboarding, settings)
+│   ├── components/         # React components
+│   ├── lib/                # API client, WS client, Zustand store, types
+│   └── src-tauri/          # Tauri 2 desktop shell (Rust)
+└── docs/                   # Setup guides + code-review/revamp plan
 ```
-
-## Design docs
-
-The full product spec, architecture, and MVP implementation plan live outside
-this repo in the parent workspace. If you're cloning this to contribute, ask
-the owner for those docs — they're the why behind the code.
 
 ## Development notes
 
@@ -143,8 +145,11 @@ the owner for those docs — they're the why behind the code.
 - **Adding a new tool:** register in `backend/app/core/tools/` and add
   a handler. The session engine discovers tools automatically.
 - **Adding a new LLM provider:** create a client module alongside
-  `google_client.py` / `groq_client.py`, update the dispatcher in
-  `app/core/llm.py`, add pricing in `app/core/cost_tracker.py`.
+  `groq_client.py` / `google_client.py` / `openai_client.py`, update the
+  dispatcher in `app/core/llm.py`, register models + pricing in
+  `app/core/model_registry.py` and `app/core/cost_tracker.py`.
+- **Changing backend dependencies:** edit `backend/pyproject.toml`, then run
+  `backend/scripts/regen-desktop-lock.sh` so desktop builds stay pinned.
 
 ## License
 
