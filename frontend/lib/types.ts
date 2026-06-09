@@ -83,6 +83,9 @@ export interface Message {
   role: "user" | "assistant" | "tool" | "system";
   content: ContentBlock[];
   created_at: string;
+  /** Client-only: set on an optimistic local message whose send failed, so the
+   * UI can mark it and offer a retry. Never present on backend messages. */
+  send_failed?: boolean;
 }
 
 export interface SessionDetail extends Session {

@@ -10,18 +10,47 @@ import type {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Every request gets a deadline. Without one, a wedged backend leaves the
+// promise pending forever — and anything awaiting it (the stream.done
+// refetch, the boot poll, a panel load) hangs with it. 15s is generous for
+// localhost; uploads get longer (the backend runs LLM extraction on them).
+const DEFAULT_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+function timeoutError(err: unknown, timeoutMs: number): Error | null {
+  if (
+    err instanceof DOMException &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  ) {
+    return new Error(
+      `The backend didn't respond within ${Math.round(timeoutMs / 1000)} seconds. It may still be starting, or busy — please try again.`,
+    );
+  }
+  return null;
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   // Desktop builds authenticate every API call with the shell's per-launch
   // token; in web dev this resolves to null and no header is sent.
   const token = await getBackendToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "X-PMomentum-Token": token } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-PMomentum-Token": token } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    throw timeoutError(err, timeoutMs) ?? err;
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     // FastAPI returns errors as {"detail": "..."} — surface that human-readable
@@ -118,10 +147,19 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     // Note: do NOT set Content-Type — the browser sets the multipart boundary.
-    const res = await fetch(`${API_BASE}/api/v1/onboarding/documents`, {
-      method: "POST",
-      body: form,
-    });
+    // The auth header still applies (this endpoint is not token-exempt).
+    const token = await getBackendToken();
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/v1/onboarding/documents`, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        headers: token ? { "X-PMomentum-Token": token } : {},
+      });
+    } catch (err) {
+      throw timeoutError(err, UPLOAD_TIMEOUT_MS) ?? err;
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ""}`);
