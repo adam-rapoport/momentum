@@ -69,6 +69,9 @@ interface ChatState {
    * `cancelled` true records that the user stopped the turn.
    */
   finalizeStream: (sessionId: string, totalCost?: string, cancelled?: boolean) => void;
+  /** Seed/refresh the header cost from a fetched session record, so reopening
+   * a session shows its accumulated cost before any new turn completes. */
+  setTotalCost: (sessionId: string, totalCost: string) => void;
 
   setAwaitingReview: (sessionId: string, review: AwaitingReview) => void;
   clearAwaitingReview: (sessionId: string) => void;
@@ -234,6 +237,11 @@ export const useChatStore = create<ChatState>((set) => ({
       stoppedBySession: cancelled
         ? { ...state.stoppedBySession, [sessionId]: true }
         : state.stoppedBySession,
+    })),
+
+  setTotalCost: (sessionId, totalCost) =>
+    set((state) => ({
+      totalCostBySession: { ...state.totalCostBySession, [sessionId]: totalCost },
     })),
 
   setAwaitingReview: (sessionId, review) =>
