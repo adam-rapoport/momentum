@@ -12,6 +12,7 @@ Gmail send stubbed), and the loop mechanics of `scripts/try_tool_loop.py`.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from decimal import Decimal
 from types import SimpleNamespace
@@ -731,21 +732,24 @@ async def test_restart_cancels_staged_action(db, seeded, kv, monkeypatch):
 # ---------- (e) cancel mid-stream ----------
 
 
-async def test_cancel_mid_stream_breaks_loop_and_discards_partial_text(
+async def test_cancel_mid_stream_persists_partial_text_with_marker(
     db, seeded, kv, monkeypatch
 ):
-    """Pin current cancel semantics (Phase 1 plan item 6 will change them):
-    the flag is only checked on text chunks; the chunk that observes it is
-    dropped, the provider stream is abandoned, the partial assistant text is
-    NOT persisted, and the turn's usage/cost are discarded (StreamResult never
-    consumed). A DoneEvent with cancelled=True still closes the turn."""
+    """Phase 1 cancel semantics (plan item 6): the chunk that observes the
+    flag is dropped, the provider stream is closed, and the partial assistant
+    text IS persisted with an interruption marker so a reload doesn't lose
+    what the user saw. A DoneEvent with cancelled=True closes the turn."""
     session = await _make_session(db, seeded)
+    stream_closed = {"value": False}
 
     async def _stub(messages, model=None, tools=None, api_key=None):
-        yield StreamChunk(text="partial ")
-        await kv.set(_cancel_key(session.id), "1", ex=60)
-        yield StreamChunk(text="answer")
-        yield _result(text="partial answer", input_tokens=99, output_tokens=99)
+        try:
+            yield StreamChunk(text="partial ")
+            await kv.set(_cancel_key(session.id), "1", ex=60)
+            yield StreamChunk(text="answer")
+            yield _result(text="partial answer", input_tokens=99, output_tokens=99)
+        finally:
+            stream_closed["value"] = True
 
     monkeypatch.setattr(session_engine, "stream_message", _stub)
 
@@ -756,14 +760,223 @@ async def test_cancel_mid_stream_breaks_loop_and_discards_partial_text(
     assert events[0].text == "partial "
     done = events[-1]
     assert done.cancelled is True
+    # The StreamResult was never received (cancel broke out first), so this
+    # turn's usage is genuinely unknown — zero, not 99.
     assert done.input_tokens == 0 and done.output_tokens == 0
 
-    # The user message persisted, the partial assistant text did not.
+    # The provider stream was explicitly closed, not abandoned.
+    assert stream_closed["value"] is True
+
+    # User message AND the partial assistant text persisted, with a marker.
     messages = await _messages_for(db, session.id)
-    assert [m.role for m in messages] == ["user"]
+    assert [m.role for m in messages] == ["user", "assistant"]
+    text = messages[1].content[0]["text"]
+    assert text.startswith("partial ")
+    assert "interrupted" in text.lower()
 
     # The cancel key is cleaned up at the end of the turn.
     assert not await kv.exists(_cancel_key(session.id))
+
+
+async def test_cancel_records_usage_when_stream_result_already_received(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Cancel observed at the top of the next loop iteration (set while the
+    batch's tools ran): the completed iteration's StreamResult usage/cost is
+    recorded, not discarded (finding A10)."""
+    session = await _make_session(db, seeded)
+
+    async def _cancelling_handler(args: dict) -> str:
+        await kv.set(_cancel_key(session.id), "1", ex=60)
+        return "done"
+
+    monkeypatch.setattr(echo_tool, "handler", _cancelling_handler)
+    stub = _scripted_stream(
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(id="c1", name="TestEcho", arguments_json="{}")
+                ],
+                input_tokens=25,
+                output_tokens=5,
+                cost_usd=Decimal("0.004"),
+            )
+        ],
+        # Scripted second iteration must never run — cancel breaks first.
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "go")
+
+    # One model call only; the cancel was seen before the second.
+    assert len(stub.calls) == 1
+    done = events[-1]
+    assert isinstance(done, DoneEvent)
+    assert done.cancelled is True
+    assert done.input_tokens == 25
+    assert done.cost_usd == Decimal("0.004")
+    await db.refresh(session)
+    assert session.total_input_tokens == 25
+
+
+async def test_cancel_before_tool_execution_skips_but_pairs_results(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Cancel observed before a tool in the batch runs: the tool is skipped,
+    but a synthetic '[Cancelled]' tool_result is still emitted AND persisted
+    for it — a tool_use without a paired tool_result would make the rebuilt
+    provider history invalid forever."""
+    session = await _make_session(db, seeded)
+    ran: list[str] = []
+
+    async def _first_handler(args: dict) -> str:
+        ran.append(args["value"])
+        # Simulate the user pressing Stop while tool #1 runs.
+        await kv.set(_cancel_key(session.id), "1", ex=60)
+        return "first done"
+
+    monkeypatch.setattr(echo_tool, "handler", _first_handler)
+    stub = _scripted_stream(
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(id="c1", name="TestEcho", arguments_json='{"value": "one"}'),
+                    ToolCall(id="c2", name="TestEcho", arguments_json='{"value": "two"}'),
+                ]
+            )
+        ],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "run both")
+
+    # Tool #1 ran; tool #2 was skipped.
+    assert ran == ["one"]
+    results = [e for e in events if isinstance(e, ToolResultEvent)]
+    assert [r.call_id for r in results] == ["c1", "c2"]
+    assert results[0].output == "first done"
+    assert results[1].is_error is True
+    assert "[Cancelled]" in results[1].output
+    assert isinstance(events[-1], DoneEvent)
+    assert events[-1].cancelled is True
+
+    # Both tool_results persisted — pairing with the tool_use blocks intact.
+    messages = await _messages_for(db, session.id)
+    tool_msgs = [m for m in messages if m.role == "tool"]
+    assert [m.content[0]["tool_use_id"] for m in tool_msgs] == ["c1", "c2"]
+    assert "[Cancelled]" in tool_msgs[1].content[0]["output"]
+
+
+async def test_cancel_discards_action_staged_earlier_in_batch(
+    db, seeded, kv, monkeypatch
+):
+    """A SendEmail staged before the user hit Stop must not survive the
+    cancel as a dangling pending_action — and its '[Pending approval]' tool
+    result is rewritten to a definitive cancelled state."""
+    session = await _make_session(db, seeded)
+
+    stub = _scripted_stream([_result(tool_calls=[_SEND_EMAIL_CALL])])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    # Stage via the real SendEmail tool, then cancel before the pause check.
+    real_execute = session_engine.execute_tool
+
+    async def _execute_then_cancel(name, args):
+        output = await real_execute(name, args)
+        await kv.set(_cancel_key(session.id), "1", ex=60)
+        return output
+
+    monkeypatch.setattr(session_engine, "execute_tool", _execute_then_cancel)
+
+    events = await _run_turn(db, kv, session.id, "email alice")
+
+    # No pause — the turn ends cancelled instead.
+    assert not any(isinstance(e, AwaitingReviewEvent) for e in events)
+    assert isinstance(events[-1], DoneEvent) and events[-1].cancelled is True
+
+    await db.refresh(session)
+    assert session.status == "active"
+    assert not session_engine.get_pending_action(session)
+
+    tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
+    assert "[STAGED → CANCELLED]" in tool_msgs[0].content[0]["output"]
+    assert "[Pending approval]" not in tool_msgs[0].content[0]["output"]
+
+
+async def test_cleanup_runs_on_provider_exception(db, seeded, kv, monkeypatch):
+    """finding A9: the tool contextvar and the cancel key must be cleaned up
+    even when the provider stream raises mid-turn."""
+    from app.core.tools import _current_context
+
+    session = await _make_session(db, seeded)
+
+    async def _exploding(messages, model=None, tools=None, api_key=None):
+        if False:  # pragma: no cover — async generator marker
+            yield
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(session_engine, "stream_message", _exploding)
+    # A stale cancel flag from a previous stop attempt.
+    await kv.set(_cancel_key(session.id), "1", ex=60)
+
+    with pytest.raises(RuntimeError, match="provider down"):
+        await _run_turn(db, kv, session.id, "boom")
+
+    assert _current_context.get() is None  # contextvar reset
+    assert not await kv.exists(_cancel_key(session.id))  # cancel key deleted
+
+
+# ---------- (e2) per-session serialization ----------
+
+
+async def test_concurrent_turns_for_one_session_serialize(
+    db, seeded, kv, monkeypatch, test_engine
+):
+    """Belt-and-braces lock (finding A3): two concurrent process_message
+    calls for the same session must run one after the other — interleaving
+    would corrupt turn_count and seq."""
+    from sqlalchemy.ext.asyncio import AsyncSession as SA_AsyncSession
+
+    session = await _make_session(db, seeded)
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    order: list[str] = []
+
+    async def _stub(messages, model=None, tools=None, api_key=None):
+        if not first_started.is_set():
+            first_started.set()
+            order.append("first:start")
+            await release_first.wait()
+            order.append("first:end")
+            yield _result(text="one")
+        else:
+            order.append("second:start")
+            yield _result(text="two")
+
+    monkeypatch.setattr(session_engine, "stream_message", _stub)
+
+    async def _turn(label: str):
+        # Each concurrent turn needs its own DB session, like real WS tasks.
+        async with SA_AsyncSession(test_engine, expire_on_commit=False) as turn_db:
+            return await _run_turn(turn_db, kv, session.id, label)
+
+    t1 = asyncio.create_task(_turn("first"))
+    await first_started.wait()
+    t2 = asyncio.create_task(_turn("second"))
+    # Give t2 a chance to (incorrectly) start streaming while t1 is parked.
+    await asyncio.sleep(0.05)
+    assert "second:start" not in order
+    release_first.set()
+    await asyncio.gather(t1, t2)
+
+    assert order == ["first:start", "first:end", "second:start"]
+
+    # turn_count advanced exactly twice; seq strictly monotonic.
+    await db.refresh(session)
+    assert session.turn_count == 2
+    messages = await _messages_for(db, session.id)
+    seqs = [m.seq for m in messages]
+    assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
 
 
 # ---------- (f) commit failure ----------

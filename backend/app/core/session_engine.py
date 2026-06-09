@@ -6,6 +6,7 @@ placeholder — the real PM prompt lands in Chunk 5 of Sprint 2.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -91,6 +92,15 @@ def _split_concatenated_json_args(raw: str) -> list[dict] | None:
     return results if len(results) >= 2 else None
 
 
+class ApprovalPendingError(Exception):
+    """Raised (before any persistence) when the session is paused on a staged
+    side-effecting action and the user's reply isn't approve/revise/restart.
+    The websocket layer maps this to an APPROVAL_REQUIRED error event — we
+    refuse to run a model turn that could fire side effects while the
+    approval bar is up (finding A6).
+    """
+
+
 class CommitFailedError(RuntimeError):
     """Raised when a turn-scoped DB commit fails. Carries the stage label so
     the websocket layer can report where the turn broke (persisting the user
@@ -124,6 +134,22 @@ async def _safe_commit(db: AsyncSession, session_id: UUID, stage: str) -> None:
 
 def _cancel_key(session_id: UUID) -> str:
     return f"session:{session_id}:cancel"
+
+
+# Per-session turn locks (finding A3). The websocket layer already rejects a
+# second message for a busy session with TURN_IN_PROGRESS; this lock is the
+# belt-and-braces guarantee that two concurrent process_message calls (e.g.
+# from a future REST caller) can never interleave turn_count/seq assignment.
+# Entries are never evicted — a Lock is ~100 bytes and this is a single-user
+# desktop app, so growth is bounded by the user's session count.
+_session_turn_locks: dict[UUID, asyncio.Lock] = {}
+
+
+def _turn_lock(session_id: UUID) -> asyncio.Lock:
+    lock = _session_turn_locks.get(session_id)
+    if lock is None:
+        lock = _session_turn_locks.setdefault(session_id, asyncio.Lock())
+    return lock
 
 
 @dataclass
@@ -534,6 +560,32 @@ async def process_message(
 ) -> AsyncIterator[
     TextEvent | ToolStartEvent | ToolResultEvent | AwaitingReviewEvent | DoneEvent
 ]:
+    """Run one turn, serialized per session (see _turn_lock). Thin wrapper so
+    the lock covers the inner generator's whole lifetime, including the
+    cleanup in its finally block when the consumer aclose()s us."""
+    async with _turn_lock(session_id):
+        agen = _process_message_locked(
+            db=db, kv=kv, session_id=session_id, user_text=user_text
+        )
+        try:
+            async for event in agen:
+                yield event
+        finally:
+            # Deterministic close: a consumer that bails early (disconnect,
+            # task cancel) must run the inner generator's finally NOW, while
+            # we still hold the lock — not whenever GC finalizes it.
+            await agen.aclose()
+
+
+async def _process_message_locked(
+    *,
+    db: AsyncSession,
+    kv: LocalKVStore,
+    session_id: UUID,
+    user_text: str,
+) -> AsyncIterator[
+    TextEvent | ToolStartEvent | ToolResultEvent | AwaitingReviewEvent | DoneEvent
+]:
     session = await db.scalar(select(Session).where(Session.id == session_id))
     if session is None:
         raise ValueError(f"session {session_id} not found")
@@ -652,276 +704,357 @@ async def process_message(
     total_output_tokens = 0
     total_cost_usd = Decimal("0")
     cancelled = False
+    # Assistant text streamed before a mid-stream cancel. Persisted (with an
+    # interruption marker) at the end of the turn so a reload doesn't lose
+    # text the user already saw (finding A9/A10).
+    cancelled_partial_text = ""
 
-    for iteration in range(MAX_TOOL_ITERATIONS):
-        assistant_chunks: list[str] = []
-        stream_result: StreamResult | None = None
+    # try/finally so the tool contextvar and the cancel flag are ALWAYS
+    # cleaned up — on provider errors, commit failures, and the consumer
+    # closing us mid-stream alike (finding A9: they used to leak on any
+    # exception).
+    try:
+        for iteration in range(MAX_TOOL_ITERATIONS):
+            # Cancel check at the top of every iteration (finding A2): a flag
+            # set while the previous batch's tools were running must stop the
+            # loop before we pay for another model call.
+            if await kv.exists(_cancel_key(session_id)):
+                cancelled = True
+                break
 
-        async for event in stream_message(
-            llm_messages, model=turn_model, tools=tool_specs, api_key=turn_api_key
-        ):
-            if isinstance(event, StreamChunk):
-                if await kv.exists(_cancel_key(session_id)):
-                    cancelled = True
-                    break
-                assistant_chunks.append(event.text)
-                yield TextEvent(text=event.text)
-            elif isinstance(event, StreamResult):
-                stream_result = event
+            assistant_chunks: list[str] = []
+            stream_result: StreamResult | None = None
 
-        if cancelled or stream_result is None:
-            break
-
-        total_input_tokens += stream_result.input_tokens
-        total_output_tokens += stream_result.output_tokens
-        total_cost_usd += stream_result.cost_usd
-
-        assistant_text = "".join(assistant_chunks)
-
-        # Parse each tool call's JSON arguments up front. On parse failure we
-        # still record the tool_use block (so the transcript is honest about
-        # what the model emitted) but we'll feed an error back to the model
-        # as the tool_result.
-        # `multi_args` is populated only when Gemini concatenates several
-        # parallel calls into one tool_call with `{..}{..}` arguments; in
-        # that case we run the tool once per parsed object at execute time.
-        parsed_calls: list[tuple[str, str, dict, str | None, list[dict] | None]] = []
-        for tc in stream_result.tool_calls:
-            raw_args = tc.arguments_json or ""
-            multi_args: list[dict] | None = None
+            stream = stream_message(
+                llm_messages, model=turn_model, tools=tool_specs, api_key=turn_api_key
+            )
             try:
-                parsed = json.loads(raw_args) if raw_args else {}
-                parse_error: str | None = None
-            except json.JSONDecodeError as e:
-                salvaged = _split_concatenated_json_args(raw_args)
-                if salvaged:
-                    logger.info(
-                        "salvaged %d concatenated JSON arg blobs for tool %s",
-                        len(salvaged), tc.name,
-                    )
-                    multi_args = salvaged
-                    parsed = salvaged[0]
-                    parse_error = None
-                else:
-                    parsed = {}
-                    parse_error = f"invalid JSON arguments: {e}. Raw: {raw_args!r}"
-            if not isinstance(parsed, dict):
-                parsed = {}
-            parsed_calls.append((tc.id, tc.name, parsed, parse_error, multi_args))
+                async for event in stream:
+                    if isinstance(event, StreamChunk):
+                        if await kv.exists(_cancel_key(session_id)):
+                            cancelled = True
+                            break
+                        assistant_chunks.append(event.text)
+                        yield TextEvent(text=event.text)
+                    elif isinstance(event, StreamResult):
+                        stream_result = event
+            finally:
+                # Close the provider stream explicitly: on cancel we bail out
+                # mid-iteration and must not leave a dangling HTTP stream
+                # (no-op when the stream ran to exhaustion).
+                await stream.aclose()
 
-        # Persist the assistant message (text + tool_use blocks)
-        content_blocks: list[dict] = []
-        if assistant_text:
-            content_blocks.append({"type": "text", "text": assistant_text})
-        for call_id, name, parsed, _err, _multi in parsed_calls:
-            content_blocks.append(
-                {"type": "tool_use", "id": call_id, "name": name, "input": parsed}
-            )
+            # Record usage/cost as soon as a StreamResult exists — even on a
+            # cancelled iteration (finding A10): the tokens were still spent.
+            if stream_result is not None:
+                total_input_tokens += stream_result.input_tokens
+                total_output_tokens += stream_result.output_tokens
+                total_cost_usd += stream_result.cost_usd
 
-        if content_blocks:
-            assistant_message = Message(
-                id=uuid4(),
-                session_id=session_id,
-                turn_id=turn_id,
-                seq=_take_seq(),
-                role="assistant",
-                content=content_blocks,
-            )
-            db.add(assistant_message)
+            if cancelled or stream_result is None:
+                cancelled_partial_text = "".join(assistant_chunks)
+                break
 
-        # Append assistant message to the LLM history for the next turn
-        assistant_entry: dict[str, Any] = {"role": "assistant"}
-        assistant_entry["content"] = assistant_text or None
-        if parsed_calls:
-            assistant_entry["tool_calls"] = [
-                {
-                    "id": call_id,
-                    "type": "function",
-                    "function": {"name": name, "arguments": json.dumps(parsed)},
-                }
-                for call_id, name, parsed, _err, _multi in parsed_calls
-            ]
-        llm_messages.append(assistant_entry)
+            assistant_text = "".join(assistant_chunks)
 
-        # No tool calls → we're done for this turn
-        if not parsed_calls:
-            await _safe_commit(db, session_id, stage="persist_assistant_text")
-            break
-
-        # Track whether AwaitReview was called successfully — if so we pause
-        # after executing the full batch instead of looping back to the model.
-        await_review_args: dict | None = None
-
-        # Execute each tool, stream start/result events, persist results
-        for call_id, name, parsed, parse_error, multi_args in parsed_calls:
-            yield ToolStartEvent(call_id=call_id, name=name, input=parsed)
-
-            if parse_error is not None:
-                output = f"Error: {parse_error}"
-                is_error = True
-            elif multi_args is not None:
-                # Gemini concatenated N parallel calls into one. Run the
-                # tool once per parsed blob and merge outputs so the model
-                # sees all results keyed back to the single tool_call_id.
-                parts: list[str] = []
-                any_error = False
-                for i, args in enumerate(multi_args, start=1):
-                    if not isinstance(args, dict):
-                        args = {}
-                    o = await execute_tool(name, args)
-                    if o.startswith("Error"):
-                        any_error = True
-                    parts.append(
-                        f"[{name} call {i}/{len(multi_args)} — args: "
-                        f"{json.dumps(args)}]\n{o}"
-                    )
-                output = "\n\n---\n\n".join(parts)
-                is_error = any_error
-            else:
-                output = await execute_tool(name, parsed)
-                is_error = output.startswith("Error")
-
-            yield ToolResultEvent(
-                call_id=call_id, name=name, output=output, is_error=is_error
-            )
-
-            tool_message = Message(
-                id=uuid4(),
-                session_id=session_id,
-                turn_id=turn_id,
-                seq=_take_seq(),
-                role="tool",
-                content=[
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": call_id,
-                        "tool_name": name,
-                        "output": output,
-                        "is_error": is_error,
-                    }
-                ],
-            )
-            db.add(tool_message)
-
-            llm_messages.append(
-                {"role": "tool", "tool_call_id": call_id, "content": output}
-            )
-
-            if name == "AwaitReview" and not is_error:
-                await_review_args = parsed
-
-        await _safe_commit(db, session_id, stage="persist_tool_results")
-
-        # Pause cases (in priority order):
-        #
-        # 1. A staged pending_action (SendEmail / CreateCalendarEvent
-        #    with attendees) — pause regardless of skill state. The
-        #    user clicks Approve in the UI to actually execute the
-        #    side effect.
-        # 2. AwaitReview during an active skill — existing skill
-        #    deliverable flow.
-        #
-        # Plain AwaitReview without an active skill is intentionally
-        # NOT a pause trigger (Scout occasionally calls it spuriously
-        # in casual chat).
-        pending_action = get_pending_action(session)
-        if pending_action is not None:
-            preview = pending_action.get("preview") or {}
-            kind = pending_action.get("kind") or ""
-            summary = _summarize_pending_action(kind, preview)
-
-            session.status = "awaiting_review"
-            session.total_input_tokens += total_input_tokens
-            session.total_output_tokens += total_output_tokens
-            session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
-            await _safe_commit(db, session_id, stage="pause_for_action")
-
-            yield AwaitingReviewEvent(
-                kind=kind,
-                deliverable_kind=kind,
-                document_id=None,
-                summary_for_user=summary,
-                url=None,
-                model=turn_model,
-                pending_action=pending_action,
-            )
-            await kv.delete(_cancel_key(session_id))
-            reset_context(ctx_token)
-            return
-
-        # A successful AwaitReview call ends the turn: the skill is signalling
-        # it has a deliverable ready for review. We transition the session
-        # into awaiting_review status, stash the pending deliverable, emit a
-        # pause event, and return — no DoneEvent until the user replies.
-        #
-        # Guard: only pause when a skill is active. Casual chat that somehow
-        # calls AwaitReview (shouldn't happen per SKILL.md instructions, but
-        # Scout is imperfect) should NOT trap the user in an approval bar.
-        if await_review_args is not None and (session.session_metadata or {}).get("active_skill"):
-            document_id = (await_review_args.get("document_id") or None)
-            # Look up the Google Docs URL if the deliverable is a Google doc,
-            # so the approval bar can show a one-click "Open in Google Docs"
-            # link rather than making the user expand the tool card.
-            doc_url: str | None = None
-            if document_id:
+            # Parse each tool call's JSON arguments up front. On parse failure we
+            # still record the tool_use block (so the transcript is honest about
+            # what the model emitted) but we'll feed an error back to the model
+            # as the tool_result.
+            # `multi_args` is populated only when Gemini concatenates several
+            # parallel calls into one tool_call with `{..}{..}` arguments; in
+            # that case we run the tool once per parsed object at execute time.
+            parsed_calls: list[tuple[str, str, dict, str | None, list[dict] | None]] = []
+            for tc in stream_result.tool_calls:
+                raw_args = tc.arguments_json or ""
+                multi_args: list[dict] | None = None
                 try:
-                    doc_url = await docs_router.get_document_url(
-                        db, session.user_id, document_id
+                    parsed = json.loads(raw_args) if raw_args else {}
+                    parse_error: str | None = None
+                except json.JSONDecodeError as e:
+                    salvaged = _split_concatenated_json_args(raw_args)
+                    if salvaged:
+                        logger.info(
+                            "salvaged %d concatenated JSON arg blobs for tool %s",
+                            len(salvaged), tc.name,
+                        )
+                        multi_args = salvaged
+                        parsed = salvaged[0]
+                        parse_error = None
+                    else:
+                        parsed = {}
+                        parse_error = f"invalid JSON arguments: {e}. Raw: {raw_args!r}"
+                if not isinstance(parsed, dict):
+                    parsed = {}
+                parsed_calls.append((tc.id, tc.name, parsed, parse_error, multi_args))
+
+            # Persist the assistant message (text + tool_use blocks)
+            content_blocks: list[dict] = []
+            if assistant_text:
+                content_blocks.append({"type": "text", "text": assistant_text})
+            for call_id, name, parsed, _err, _multi in parsed_calls:
+                content_blocks.append(
+                    {"type": "tool_use", "id": call_id, "name": name, "input": parsed}
+                )
+
+            if content_blocks:
+                assistant_message = Message(
+                    id=uuid4(),
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    seq=_take_seq(),
+                    role="assistant",
+                    content=content_blocks,
+                )
+                db.add(assistant_message)
+
+            # Append assistant message to the LLM history for the next turn
+            assistant_entry: dict[str, Any] = {"role": "assistant"}
+            assistant_entry["content"] = assistant_text or None
+            if parsed_calls:
+                assistant_entry["tool_calls"] = [
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {"name": name, "arguments": json.dumps(parsed)},
+                    }
+                    for call_id, name, parsed, _err, _multi in parsed_calls
+                ]
+            llm_messages.append(assistant_entry)
+
+            # No tool calls → we're done for this turn
+            if not parsed_calls:
+                await _safe_commit(db, session_id, stage="persist_assistant_text")
+                break
+
+            # Track whether AwaitReview was called successfully — if so we pause
+            # after executing the full batch instead of looping back to the model.
+            await_review_args: dict | None = None
+
+            # Execute each tool, stream start/result events, persist results
+            for call_id, name, parsed, parse_error, multi_args in parsed_calls:
+                # Cancel check before each tool execution (finding A2). We
+                # still emit + persist a result for this and every remaining
+                # call: the assistant message with their tool_use blocks is
+                # already persisted, and a tool_use without a paired
+                # tool_result makes the rebuilt provider history invalid.
+                if not cancelled and await kv.exists(_cancel_key(session_id)):
+                    cancelled = True
+
+                yield ToolStartEvent(call_id=call_id, name=name, input=parsed)
+
+                if cancelled:
+                    output = (
+                        "[Cancelled] The user stopped this turn before this "
+                        "tool ran. It did NOT execute."
                     )
-                except Exception:  # noqa: BLE001 — non-fatal, link is a nice-to-have
-                    logger.exception("failed to resolve document url for %s", document_id)
-                    doc_url = None
+                    is_error = True
+                elif parse_error is not None:
+                    output = f"Error: {parse_error}"
+                    is_error = True
+                elif multi_args is not None:
+                    # Gemini concatenated N parallel calls into one. Run the
+                    # tool once per parsed blob and merge outputs so the model
+                    # sees all results keyed back to the single tool_call_id.
+                    parts: list[str] = []
+                    any_error = False
+                    for i, args in enumerate(multi_args, start=1):
+                        if not isinstance(args, dict):
+                            args = {}
+                        o = await execute_tool(name, args)
+                        if o.startswith("Error"):
+                            any_error = True
+                        parts.append(
+                            f"[{name} call {i}/{len(multi_args)} — args: "
+                            f"{json.dumps(args)}]\n{o}"
+                        )
+                    output = "\n\n---\n\n".join(parts)
+                    is_error = any_error
+                else:
+                    output = await execute_tool(name, parsed)
+                    is_error = output.startswith("Error")
 
-            deliverable = {
-                "deliverable_kind": str(await_review_args.get("deliverable_kind") or ""),
-                "document_id": document_id,
-                "summary_for_user": str(await_review_args.get("summary_for_user") or ""),
-                "url": doc_url,
-            }
-            meta = dict(session.session_metadata or {})
-            meta["pending_deliverable"] = deliverable
-            session.session_metadata = meta
-            session.status = "awaiting_review"
+                yield ToolResultEvent(
+                    call_id=call_id, name=name, output=output, is_error=is_error
+                )
 
-            session.total_input_tokens += total_input_tokens
-            session.total_output_tokens += total_output_tokens
-            session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
-            await _safe_commit(db, session_id, stage="pause_for_review")
+                tool_message = Message(
+                    id=uuid4(),
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    seq=_take_seq(),
+                    role="tool",
+                    content=[
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": call_id,
+                            "tool_name": name,
+                            "output": output,
+                            "is_error": is_error,
+                        }
+                    ],
+                )
+                db.add(tool_message)
 
-            yield AwaitingReviewEvent(
-                kind="deliverable",
-                deliverable_kind=deliverable["deliverable_kind"],
-                document_id=deliverable["document_id"],
-                summary_for_user=deliverable["summary_for_user"],
-                url=doc_url,
-                model=turn_model,
-                pending_action=None,
+                llm_messages.append(
+                    {"role": "tool", "tool_call_id": call_id, "content": output}
+                )
+
+                if name == "AwaitReview" and not is_error:
+                    await_review_args = parsed
+
+            await _safe_commit(db, session_id, stage="persist_tool_results")
+
+            # One more check after the batch: a cancel that arrived while the
+            # LAST tool ran would otherwise be ignored by a pause path below
+            # (which returns before the next top-of-loop check).
+            if not cancelled and await kv.exists(_cancel_key(session_id)):
+                cancelled = True
+
+            if cancelled:
+                # A side effect staged earlier in this batch must not survive
+                # a stop — the user explicitly halted the turn. Rewrite its
+                # "[Pending approval]" tool result so the model can't act on
+                # a stale staged state next turn.
+                if clear_pending_action(session) is not None:
+                    await _rewrite_staged_tool_result(
+                        db, session_id,
+                        "[STAGED → CANCELLED] The user stopped this turn; the "
+                        "staged action was discarded. Nothing was sent.",
+                    )
+                    await _safe_commit(
+                        db, session_id, stage="discard_staged_on_cancel"
+                    )
+                break
+
+            # Pause cases (in priority order):
+            #
+            # 1. A staged pending_action (SendEmail / CreateCalendarEvent
+            #    with attendees) — pause regardless of skill state. The
+            #    user clicks Approve in the UI to actually execute the
+            #    side effect.
+            # 2. AwaitReview during an active skill — existing skill
+            #    deliverable flow.
+            #
+            # Plain AwaitReview without an active skill is intentionally
+            # NOT a pause trigger (Scout occasionally calls it spuriously
+            # in casual chat).
+            pending_action = get_pending_action(session)
+            if pending_action is not None:
+                preview = pending_action.get("preview") or {}
+                kind = pending_action.get("kind") or ""
+                summary = _summarize_pending_action(kind, preview)
+
+                session.status = "awaiting_review"
+                session.total_input_tokens += total_input_tokens
+                session.total_output_tokens += total_output_tokens
+                session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
+                await _safe_commit(db, session_id, stage="pause_for_action")
+
+                yield AwaitingReviewEvent(
+                    kind=kind,
+                    deliverable_kind=kind,
+                    document_id=None,
+                    summary_for_user=summary,
+                    url=None,
+                    model=turn_model,
+                    pending_action=pending_action,
+                )
+                return
+
+            # A successful AwaitReview call ends the turn: the skill is signalling
+            # it has a deliverable ready for review. We transition the session
+            # into awaiting_review status, stash the pending deliverable, emit a
+            # pause event, and return — no DoneEvent until the user replies.
+            #
+            # Guard: only pause when a skill is active. Casual chat that somehow
+            # calls AwaitReview (shouldn't happen per SKILL.md instructions, but
+            # Scout is imperfect) should NOT trap the user in an approval bar.
+            if await_review_args is not None and (session.session_metadata or {}).get("active_skill"):
+                document_id = (await_review_args.get("document_id") or None)
+                # Look up the Google Docs URL if the deliverable is a Google doc,
+                # so the approval bar can show a one-click "Open in Google Docs"
+                # link rather than making the user expand the tool card.
+                doc_url: str | None = None
+                if document_id:
+                    try:
+                        doc_url = await docs_router.get_document_url(
+                            db, session.user_id, document_id
+                        )
+                    except Exception:  # noqa: BLE001 — non-fatal, link is a nice-to-have
+                        logger.exception("failed to resolve document url for %s", document_id)
+                        doc_url = None
+
+                deliverable = {
+                    "deliverable_kind": str(await_review_args.get("deliverable_kind") or ""),
+                    "document_id": document_id,
+                    "summary_for_user": str(await_review_args.get("summary_for_user") or ""),
+                    "url": doc_url,
+                }
+                meta = dict(session.session_metadata or {})
+                meta["pending_deliverable"] = deliverable
+                session.session_metadata = meta
+                session.status = "awaiting_review"
+
+                session.total_input_tokens += total_input_tokens
+                session.total_output_tokens += total_output_tokens
+                session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
+                await _safe_commit(db, session_id, stage="pause_for_review")
+
+                yield AwaitingReviewEvent(
+                    kind="deliverable",
+                    deliverable_kind=deliverable["deliverable_kind"],
+                    document_id=deliverable["document_id"],
+                    summary_for_user=deliverable["summary_for_user"],
+                    url=doc_url,
+                    model=turn_model,
+                    pending_action=None,
+                )
+                return
+            # loop continues — give the model another turn to respond to tool results
+        else:
+            logger.warning(
+                "session %s hit MAX_TOOL_ITERATIONS (%d)", session_id, MAX_TOOL_ITERATIONS
             )
-            await kv.delete(_cancel_key(session_id))
-            reset_context(ctx_token)
-            return
-        # loop continues — give the model another turn to respond to tool results
-    else:
-        logger.warning(
-            "session %s hit MAX_TOOL_ITERATIONS (%d)", session_id, MAX_TOOL_ITERATIONS
+
+        # On cancel, persist whatever the model streamed before the stop with
+        # an explicit interruption marker — a reload must not lose text the
+        # user already saw, and later turns' history should show the cutoff.
+        if cancelled and cancelled_partial_text:
+            db.add(
+                Message(
+                    id=uuid4(),
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    seq=_take_seq(),
+                    role="assistant",
+                    content=[
+                        {
+                            "type": "text",
+                            "text": cancelled_partial_text
+                            + "\n\n_[Response interrupted — stopped by the user.]_",
+                        }
+                    ],
+                )
+            )
+
+        session.total_input_tokens += total_input_tokens
+        session.total_output_tokens += total_output_tokens
+        session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
+
+        await _safe_commit(db, session_id, stage="finalize_turn")
+
+        yield DoneEvent(
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            cost_usd=total_cost_usd,
+            total_cost_usd=session.total_cost_usd,
+            cancelled=cancelled,
+            model=turn_model,
         )
-
-    session.total_input_tokens += total_input_tokens
-    session.total_output_tokens += total_output_tokens
-    session.total_cost_usd = (session.total_cost_usd or Decimal("0")) + total_cost_usd
-
-    await _safe_commit(db, session_id, stage="finalize_turn")
-    await kv.delete(_cancel_key(session_id))
-    reset_context(ctx_token)
-
-    yield DoneEvent(
-        input_tokens=total_input_tokens,
-        output_tokens=total_output_tokens,
-        cost_usd=total_cost_usd,
-        total_cost_usd=session.total_cost_usd,
-        cancelled=cancelled,
-        model=turn_model,
-    )
+    finally:
+        reset_context(ctx_token)
+        await kv.delete(_cancel_key(session_id))
 
 
 async def cancel_session(kv: LocalKVStore, session_id: UUID) -> None:

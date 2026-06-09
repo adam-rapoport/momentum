@@ -153,6 +153,79 @@ def test_socket_survives_across_turns(client):
                 assert ws.receive_json()["text"] == "ok"
 
 
+def test_second_message_for_busy_session_rejected_with_turn_in_progress(client):
+    """Phase 1 (A1/A3): turns run as tasks so the read loop keeps receiving;
+    a second session.message while one is in flight is rejected with
+    TURN_IN_PROGRESS instead of queueing or interleaving."""
+    import asyncio
+
+    async def _slow(**_kwargs):
+        yield TextEvent(text="started")
+        # Park until the connection is torn down (cancel) — long enough that
+        # the second message definitely arrives mid-turn.
+        await asyncio.sleep(30)
+        yield TextEvent(text="never sent")  # pragma: no cover
+
+    with patch("app.api.websocket.process_message", new=_slow):
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {"type": "session.message", "session_id": SESSION_ID, "content": "one"}
+            )
+            assert ws.receive_json()["text"] == "started"
+
+            ws.send_json(
+                {"type": "session.message", "session_id": SESSION_ID, "content": "two"}
+            )
+            frame = ws.receive_json()
+            assert frame["type"] == "error"
+            assert frame["code"] == "TURN_IN_PROGRESS"
+            assert frame["session_id"] == SESSION_ID
+        # Closing the socket cancels the parked turn task (read-loop cleanup);
+        # if it didn't, the TestClient context exit would hang here.
+
+
+def test_cancel_frame_received_while_turn_streams(client):
+    """The whole point of task-based turns: a session.cancel sent mid-turn is
+    read and applied immediately, not after the turn finishes."""
+    import asyncio
+
+    from app.core.session_engine import _cancel_key
+    from app.dependencies import kv_store
+
+    cancelled_seen = {"value": False}
+
+    async def _waits_for_cancel(*, session_id, kv, **_kwargs):
+        yield TextEvent(text="streaming")
+        for _ in range(200):  # ~2s budget — fails loudly rather than hanging
+            if await kv.exists(_cancel_key(session_id)):
+                cancelled_seen["value"] = True
+                break
+            await asyncio.sleep(0.01)
+        yield DoneEvent(
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=Decimal("0"),
+            total_cost_usd=Decimal("0"),
+            cancelled=cancelled_seen["value"],
+            model="test-model",
+        )
+
+    with patch("app.api.websocket.process_message", new=_waits_for_cancel):
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {"type": "session.message", "session_id": SESSION_ID, "content": "go"}
+            )
+            assert ws.receive_json()["text"] == "streaming"
+            ws.send_json({"type": "session.cancel", "session_id": SESSION_ID})
+            done = ws.receive_json()
+
+    assert cancelled_seen["value"] is True
+    assert done["type"] == "stream.done"
+    assert done["metadata"]["cancelled"] is True
+    # Cleanup parity with the real engine: drop the flag we set.
+    client.portal.call(kv_store.delete, _cancel_key(SESSION_ID))
+
+
 # ---------- error codes ----------
 
 
