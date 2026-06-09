@@ -588,9 +588,12 @@ async def test_send_email_stages_action_and_pauses(db, seeded, kv, monkeypatch):
 
     await db.refresh(session)
     assert session.status == "awaiting_review"
-    action = session.session_metadata["pending_action"]
-    assert action["kind"] == "send_email"
-    assert action["params"]["subject"] == "Launch update"
+    actions = session.session_metadata["pending_actions"]
+    assert len(actions) == 1
+    assert actions[0]["kind"] == "send_email"
+    assert actions[0]["params"]["subject"] == "Launch update"
+    # The staging tool_call's id is recorded for targeted result rewriting.
+    assert actions[0]["call_id"] == "call_send"
 
     # The staged tool result is in the DB with the pending marker.
     messages = await _messages_for(db, session.id)
@@ -621,7 +624,7 @@ async def test_approve_executes_with_two_phase_commit(db, seeded, kv, monkeypatc
 
     await db.refresh(session)
     assert session.status == "active"
-    assert "pending_action" not in session.session_metadata
+    assert session_engine.get_pending_action(session) is None
 
     # The staged "[Pending approval]" tool result was rewritten to a
     # definitive end state so the model can't re-act on a stale pending marker.
@@ -656,7 +659,7 @@ async def test_reapprove_of_executing_action_refuses_resend(db, seeded, kv, monk
 
     await db.refresh(session)
     assert session.status == "active"
-    assert "pending_action" not in session.session_metadata
+    assert session_engine.get_pending_action(session) is None
 
     tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
     assert "[STAGED → UNKNOWN]" in tool_msgs[0].content[0]["output"]
@@ -680,7 +683,7 @@ async def test_approve_failure_clears_pause_and_reports(db, seeded, kv, monkeypa
     assert isinstance(events[-1], DoneEvent)
     await db.refresh(session)
     assert session.status == "active"
-    assert "pending_action" not in session.session_metadata
+    assert session_engine.get_pending_action(session) is None
 
     tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
     assert "[STAGED → FAILED]" in tool_msgs[0].content[0]["output"]
@@ -700,7 +703,7 @@ async def test_revise_clears_staged_action_without_sending(db, seeded, kv, monke
     execute.assert_not_awaited()
     await db.refresh(session)
     assert session.status == "active"
-    assert "pending_action" not in session.session_metadata
+    assert session_engine.get_pending_action(session) is None
 
     tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
     assert "[STAGED → REVISED]" in tool_msgs[0].content[0]["output"]
@@ -723,10 +726,159 @@ async def test_restart_cancels_staged_action(db, seeded, kv, monkeypatch):
     execute.assert_not_awaited()
     await db.refresh(session)
     assert session.status == "active"
-    assert "pending_action" not in session.session_metadata
+    assert session_engine.get_pending_action(session) is None
 
     tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
     assert "[STAGED → CANCELLED]" in tool_msgs[0].content[0]["output"]
+
+
+# ---------- (d2) multiple staged actions + paused-turn guardrails ----------
+
+
+_SEND_EMAIL_CALL_2 = ToolCall(
+    id="call_send_2",
+    name="SendEmail",
+    arguments_json=json.dumps(
+        {
+            "to": ["bob@example.com"],
+            "subject": "Retro notes",
+            "body_markdown": "Notes attached.",
+        }
+    ),
+)
+
+
+async def test_two_staged_actions_pause_once_per_action(db, seeded, kv, monkeypatch):
+    """Finding A4: two SendEmail calls in one batch must BOTH stage (the old
+    singular slot silently dropped one). The session pauses on the first;
+    approving it executes it, rewrites only ITS tool result (call_id match),
+    and re-pauses on the second; approving that resumes a model turn carrying
+    both outcome notes."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        [_result(tool_calls=[_SEND_EMAIL_CALL, _SEND_EMAIL_CALL_2])]
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+    events = await _run_turn(db, kv, session.id, "email alice and bob")
+
+    pause = events[-1]
+    assert isinstance(pause, AwaitingReviewEvent)
+    assert pause.pending_action["preview"]["to"] == ["alice@example.com"]
+
+    await db.refresh(session)
+    actions = session.session_metadata["pending_actions"]
+    assert [a["call_id"] for a in actions] == ["call_send", "call_send_2"]
+
+    # Approve #1: executes it, re-pauses on #2 — NO model call, no DoneEvent.
+    execute = AsyncMock(return_value="Email sent to alice@example.com.")
+    monkeypatch.setattr(session_engine, "execute_pending_action", execute)
+    stub2 = _scripted_stream()  # blows up if the model were called
+    monkeypatch.setattr(session_engine, "stream_message", stub2)
+    events2 = await _run_turn(db, kv, session.id, "/approve")
+
+    execute.assert_awaited_once()
+    assert stub2.calls == []
+    pause2 = events2[-1]
+    assert isinstance(pause2, AwaitingReviewEvent)
+    assert pause2.pending_action["preview"]["to"] == ["bob@example.com"]
+    assert not any(isinstance(e, DoneEvent) for e in events2)
+
+    await db.refresh(session)
+    assert session.status == "awaiting_review"
+
+    # Only the FIRST action's tool result was rewritten (call_id match) —
+    # the second is still pending.
+    tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
+    outputs = {m.content[0]["tool_use_id"]: m.content[0]["output"] for m in tool_msgs}
+    assert "[STAGED → APPROVED & EXECUTED]" in outputs["call_send"]
+    assert "[Pending approval]" in outputs["call_send_2"]
+
+    # Approve #2: executes, resumes a model turn carrying BOTH outcome notes
+    # (the first one was parked in queued_resume_notes while we re-paused).
+    execute2 = AsyncMock(return_value="Email sent to bob@example.com.")
+    monkeypatch.setattr(session_engine, "execute_pending_action", execute2)
+    stub3 = _scripted_stream(
+        [StreamChunk(text="Both sent."), _result(text="Both sent.")]
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub3)
+    events3 = await _run_turn(db, kv, session.id, "/approve")
+
+    execute2.assert_awaited_once()
+    assert isinstance(events3[-1], DoneEvent)
+    await db.refresh(session)
+    assert session.status == "active"
+    assert session_engine.get_pending_action(session) is None
+    assert "queued_resume_notes" not in session.session_metadata
+
+    note = stub3.calls[0]["messages"][-1]
+    assert note["role"] == "system"
+    assert "alice@example.com" in note["content"]
+    assert "bob@example.com" in note["content"]
+
+    tool_msgs = [m for m in await _messages_for(db, session.id) if m.role == "tool"]
+    outputs = {m.content[0]["tool_use_id"]: m.content[0]["output"] for m in tool_msgs}
+    assert "[STAGED → APPROVED & EXECUTED]" in outputs["call_send_2"]
+
+
+async def test_free_text_during_staged_action_short_circuits(
+    db, seeded, kv, monkeypatch
+):
+    """Finding A6: with a staged side effect, a free-text reply must NOT run
+    a model turn (which could restage or fire send-side tools). The engine
+    raises ApprovalPendingError before persisting anything; the pause and the
+    staged action survive untouched."""
+    session, _ = await _stage_email(db, seeded, kv, monkeypatch)
+    stub = _scripted_stream()  # blows up if the model were called
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+    execute = AsyncMock(return_value="should never run")
+    monkeypatch.setattr(session_engine, "execute_pending_action", execute)
+
+    before = len(await _messages_for(db, session.id))
+    with pytest.raises(session_engine.ApprovalPendingError):
+        await _run_turn(db, kv, session.id, "actually can you also cc carol?")
+
+    execute.assert_not_awaited()
+    assert stub.calls == []
+    # Nothing persisted; pause intact.
+    assert len(await _messages_for(db, session.id)) == before
+    await db.refresh(session)
+    assert session.status == "awaiting_review"
+    assert session_engine.get_pending_action(session) is not None
+
+
+async def test_legacy_singular_pending_action_still_resolves(
+    db, seeded, kv, monkeypatch
+):
+    """Sessions paused before the Phase 1 list migration carry the singular
+    `pending_action` key — approve (incl. the lenient phrasing) must still
+    find, execute, and clear it."""
+    session = await _make_session(
+        db,
+        seeded,
+        status="awaiting_review",
+        session_metadata={
+            "pending_action": {
+                "kind": "send_email",
+                "tool_name": "SendEmail",
+                "params": {"to": ["a@x.com"], "subject": "Hi", "body_markdown": "B"},
+                "preview": {"to": ["a@x.com"], "subject": "Hi", "body_snippet": "B"},
+                "staged_at": "2026-01-01T00:00:00+00:00",
+            }
+        },
+    )
+    execute = AsyncMock(return_value="Email sent to a@x.com.")
+    monkeypatch.setattr(session_engine, "execute_pending_action", execute)
+    stub = _scripted_stream([_result(text="Sent!")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "yes, send it!")
+
+    execute.assert_awaited_once()
+    assert isinstance(events[-1], DoneEvent)
+    await db.refresh(session)
+    assert session.status == "active"
+    assert session_engine.get_pending_action(session) is None
+    assert "pending_action" not in session.session_metadata
 
 
 # ---------- (e) cancel mid-stream ----------

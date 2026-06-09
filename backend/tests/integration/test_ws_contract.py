@@ -283,6 +283,26 @@ def test_db_error_on_commit_failure(client):
     assert "disk full" not in frame["message"]
 
 
+def test_approval_required_error_code(client):
+    """Phase 1 item 8 (A6): free text while a side effect is staged maps to
+    APPROVAL_REQUIRED so the frontend can re-show the approval bar."""
+    from app.core.session_engine import ApprovalPendingError
+
+    exc = ApprovalPendingError(
+        "This session is waiting for your decision on a staged action."
+    )
+    with patch("app.api.websocket.process_message", new=_raising_process_message(exc)):
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json(
+                {"type": "session.message", "session_id": SESSION_ID, "content": "hm"}
+            )
+            frame = ws.receive_json()
+    assert frame["type"] == "error"
+    assert frame["code"] == "APPROVAL_REQUIRED"
+    assert frame["session_id"] == SESSION_ID
+    assert "staged action" in frame["message"]
+
+
 def test_internal_error_on_unexpected_crash(client):
     exc = RuntimeError("kaboom")
     with patch("app.api.websocket.process_message", new=_raising_process_message(exc)):

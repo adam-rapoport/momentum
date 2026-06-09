@@ -225,8 +225,29 @@ def _summarize_pending_action(kind: str, preview: dict) -> str:
         )
     return "Action staged for approval"
 
-_APPROVE_WORDS = {"/approve", "approve", "approved", "looks good", "lgtm"}
-_RESTART_WORDS = {"/restart", "restart", "start over", "cancel"}
+# Exact-phrase word lists for review replies, matched after normalization
+# (lowercase, trailing punctuation stripped, commas/apostrophes removed —
+# so "Yes, send it!" and "don't" classify). Kept deliberately small and
+# unambiguous: anything not listed is free text and leaves the pause in
+# place rather than risking a misfired send or a dropped draft.
+_APPROVE_WORDS = {
+    "/approve", "approve", "approved", "looks good", "lgtm",
+    "yes", "yes send it", "send it", "go ahead", "yes go ahead",
+}
+_RESTART_WORDS = {
+    "/restart", "restart", "start over", "cancel",
+    "no", "dont", "do not", "stop",
+    "dont send", "do not send", "dont send it", "do not send it",
+    "no dont", "never mind", "nevermind",
+}
+
+
+def _normalize_review_reply(text: str) -> str:
+    """Fold a review reply into the canonical form the word lists use."""
+    lower = text.strip().lower()
+    lower = lower.replace("’", "").replace("'", "").replace(",", " ")
+    lower = lower.rstrip(".!?…")
+    return " ".join(lower.split())
 
 
 def _classify_review_response(text: str) -> str | None:
@@ -234,16 +255,18 @@ def _classify_review_response(text: str) -> str | None:
 
     Returns one of 'approve', 'revise', 'restart', or None (free text —
     leave the pause in place). We lean strict on approve/restart (slash or
-    exact phrase) and require an explicit `/revise` prefix for revisions.
+    exact phrase from the lists above) and require an explicit `/revise`
+    prefix for revisions.
     """
     stripped = text.strip()
     lower = stripped.lower()
     if not stripped:
         return None
 
-    if lower in _APPROVE_WORDS or lower.startswith("/approve "):
+    normalized = _normalize_review_reply(stripped)
+    if normalized in _APPROVE_WORDS or lower.startswith("/approve "):
         return "approve"
-    if lower in _RESTART_WORDS or lower.startswith("/restart "):
+    if normalized in _RESTART_WORDS or lower.startswith("/restart "):
         return "restart"
     if lower == "/revise" or lower.startswith("/revise ") or lower.startswith("/revise\n"):
         return "revise"
@@ -336,6 +359,7 @@ async def _resolve_pending_action(
                 f"[STAGED → UNKNOWN] A previous approval of this "
                 f"{kind.replace('_', ' ')} was interrupted mid-execution; it may "
                 f"or may not have completed. Do not re-send without verifying.",
+                action=action,
             )
             await _safe_commit(db, session.id, stage="resolve_interrupted_action")
             return (
@@ -360,6 +384,7 @@ async def _resolve_pending_action(
                 db, session.id,
                 f"[STAGED → FAILED] Execution of the staged {kind.replace('_', ' ')} "
                 f"failed: {e}. The action did NOT complete.",
+                action=action,
             )
             await _safe_commit(db, session.id, stage="record_action_failure")
             return (
@@ -380,6 +405,7 @@ async def _resolve_pending_action(
             f"[STAGED → APPROVED & EXECUTED] {success_summary} "
             f"This is the final result. The action is COMPLETE. Do not call "
             f"{tool_name} again.",
+            action=action,
         )
         # Persist the executed state immediately — if anything later in the
         # turn fails, the cleared action and the definitive tool_result must
@@ -405,6 +431,7 @@ async def _resolve_pending_action(
             db, session.id,
             f"[STAGED → REVISED] The user requested changes; the staged "
             f"{kind.replace('_', ' ')} was discarded.",
+            action=action,
         )
         return (
             f"[SYSTEM] The user wants changes to the staged {kind.replace('_', ' ')}: "
@@ -420,6 +447,7 @@ async def _resolve_pending_action(
         db, session.id,
         f"[STAGED → CANCELLED] The user cancelled the staged "
         f"{kind.replace('_', ' ')}. Nothing was sent.",
+        action=action,
     )
     return (
         f"[SYSTEM] The user cancelled the staged {kind.replace('_', ' ')}. "
@@ -427,13 +455,37 @@ async def _resolve_pending_action(
     )
 
 
+def _block_matches_action(block: dict, action: dict | None) -> bool:
+    """Does this "[Pending approval]" tool_result belong to `action`?
+
+    With two actions staged in one batch (parallel SendEmail calls) the
+    rewrite must target the SPECIFIC action being resolved, not whichever
+    pending marker is found first (finding A4). Preferred match is the
+    tool_call id recorded at stage time; legacy actions (no call_id) fall
+    back to the tool name; action=None matches any pending marker (used by
+    direct callers that predate per-action matching)."""
+    if action is None:
+        return True
+    call_id = action.get("call_id")
+    if call_id:
+        return block.get("tool_use_id") == call_id
+    tool_name = action.get("tool_name")
+    if tool_name:
+        return block.get("tool_name") == tool_name
+    return True
+
+
 async def _rewrite_staged_tool_result(
-    db: AsyncSession, session_id: UUID, replacement_output: str
+    db: AsyncSession,
+    session_id: UUID,
+    replacement_output: str,
+    action: dict | None = None,
 ) -> bool:
     """Find the most recent tool_result block that contains the "[Pending
-    approval]" marker for this session and replace its output text. Used
-    after approve/revise/restart to give the model a definitive end-state
-    in its tool history (not a stale "Pending" message it might re-act on)."""
+    approval]" marker for this session (and belongs to `action`, when given)
+    and replace its output text. Used after approve/revise/restart to give
+    the model a definitive end-state in its tool history (not a stale
+    "Pending" message it might re-act on)."""
     stmt = (
         select(Message)
         .where(Message.session_id == session_id, Message.role == "tool")
@@ -449,6 +501,7 @@ async def _rewrite_staged_tool_result(
                 isinstance(block, dict)
                 and block.get("type") == "tool_result"
                 and "[Pending approval]" in (block.get("output") or "")
+                and _block_matches_action(block, action)
             ):
                 new_block = dict(block)
                 new_block["output"] = replacement_output
@@ -600,13 +653,47 @@ async def _process_message_locked(
     # recognised, clear pause state and queue a synthetic system note that
     # nudges the model toward the right resume behavior. Free-form replies
     # leave the pause in place — the user must use the approval buttons.
+    #
+    # If MORE actions remain staged after resolving one (parallel sends in
+    # one batch), we re-pause on the next one instead of resuming a model
+    # turn: `next_staged_action` short-circuits below, right after the user
+    # message is persisted.
     resume_note: str | None = None
+    next_staged_action: dict | None = None
     if session.status == "awaiting_review":
         intent = _classify_review_response(user_text)
+        if intent is None and get_pending_action(session) is not None:
+            # Paused on a staged SIDE EFFECT and the reply isn't a
+            # recognisable resolution: refuse to run a model turn that could
+            # fire side-effecting tools while the approval bar is up
+            # (finding A6). Deliverable pauses (no staged action) keep the
+            # old behavior — a free-text turn runs with the pause intact.
+            raise ApprovalPendingError(
+                "This session is waiting for your decision on a staged "
+                "action. Use the approval bar (Approve / Make changes / "
+                "Cancel), or reply /approve, /revise <changes>, or /restart."
+            )
         if intent is not None:
             resume_note = await _apply_review_resolution(
                 db, session, intent, user_text
             )
+            next_staged_action = get_pending_action(session)
+            meta = dict(session.session_metadata or {})
+            queued_notes = list(meta.get("queued_resume_notes") or [])
+            if next_staged_action is not None:
+                # Stay paused for the next staged action. The resolution note
+                # can't reach the model yet (no model call this turn), so park
+                # it; it's delivered with the final resume.
+                session.status = "awaiting_review"
+                queued_notes.append(resume_note)
+                meta["queued_resume_notes"] = queued_notes
+                session.session_metadata = meta
+                resume_note = None
+            elif queued_notes:
+                # Last action resolved — deliver the parked notes too.
+                meta.pop("queued_resume_notes", None)
+                session.session_metadata = meta
+                resume_note = "\n\n".join([*queued_notes, resume_note])
 
     # Skill detection runs before we load the system prompt so the active
     # skill (if any) shows up as Section 15. Rules (full logic in
@@ -690,6 +777,24 @@ async def _process_message_locked(
     await _safe_commit(db, session_id, stage="persist_user_message")
 
     await kv.delete(_cancel_key(session_id))
+
+    # Re-pause: the resolved action wasn't the last one staged. Emit the
+    # approval event for the next queued action and end the turn — no model
+    # call until the whole queue is resolved.
+    if next_staged_action is not None:
+        next_kind = next_staged_action.get("kind") or ""
+        yield AwaitingReviewEvent(
+            kind=next_kind,
+            deliverable_kind=next_kind,
+            document_id=None,
+            summary_for_user=_summarize_pending_action(
+                next_kind, next_staged_action.get("preview") or {}
+            ),
+            url=None,
+            model=turn_model,
+            pending_action=next_staged_action,
+        )
+        return
 
     tool_ctx = ToolContext(
         db=db,
@@ -842,6 +947,9 @@ async def _process_message_locked(
                     cancelled = True
 
                 yield ToolStartEvent(call_id=call_id, name=name, input=parsed)
+                # Staging tools read this so their pending_action records
+                # which tool_result to rewrite at resolution time.
+                tool_ctx.current_call_id = call_id
 
                 if cancelled:
                     output = (
@@ -912,16 +1020,20 @@ async def _process_message_locked(
                 cancelled = True
 
             if cancelled:
-                # A side effect staged earlier in this batch must not survive
-                # a stop — the user explicitly halted the turn. Rewrite its
-                # "[Pending approval]" tool result so the model can't act on
-                # a stale staged state next turn.
-                if clear_pending_action(session) is not None:
+                # Side effects staged earlier in this batch must not survive
+                # a stop — the user explicitly halted the turn. Rewrite each
+                # one's "[Pending approval]" tool result so the model can't
+                # act on a stale staged state next turn.
+                discarded_any = False
+                while (discarded := clear_pending_action(session)) is not None:
                     await _rewrite_staged_tool_result(
                         db, session_id,
                         "[STAGED → CANCELLED] The user stopped this turn; the "
                         "staged action was discarded. Nothing was sent.",
+                        action=discarded,
                     )
+                    discarded_any = True
+                if discarded_any:
                     await _safe_commit(
                         db, session_id, stage="discard_staged_on_cancel"
                     )

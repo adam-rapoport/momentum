@@ -213,6 +213,7 @@ async def _send_email(input_data: dict) -> str:
                 "subject": subject,
                 "body_snippet": body_snippet,
             },
+            call_id=ctx.current_call_id,
         )
     except ValueError as e:
         return f"Error: {e}"

@@ -33,6 +33,11 @@ class ToolContext:
     session_id: UUID
     project_id: UUID
     user_id: UUID
+    # The tool_call id currently being executed — updated by the session
+    # engine before each execute_tool call. Lets staging tools (SendEmail,
+    # CreateCalendarEvent) record which tool_result belongs to their staged
+    # pending_action, so approval can rewrite exactly that result.
+    current_call_id: str | None = None
 
 
 _current_context: ContextVar["ToolContext | None"] = ContextVar(
