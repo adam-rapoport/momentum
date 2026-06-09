@@ -21,6 +21,7 @@ const NAV: { key: Pane; label: string }[] = [
 export function SettingsApp() {
   const [pane, setPane] = useState<Pane>("models");
   const [connections, setConnections] = useState<ConnMap>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
   const search = useSearchParams();
   const googleFlag = search.get("google");
 
@@ -31,8 +32,13 @@ export function SettingsApp() {
         const map: ConnMap = {};
         for (const c of r.connections) map[c.provider] = c;
         setConnections(map);
+        setLoadError(null);
       })
-      .catch(() => undefined);
+      .catch((e) => {
+        // Don't swallow this: against a dead backend everything would render
+        // as "Not connected", which looks like the user's keys vanished.
+        setLoadError(e instanceof Error ? e.message : String(e));
+      });
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -89,6 +95,20 @@ export function SettingsApp() {
       {/* content */}
       <main className="flex-1 overflow-y-auto px-12 py-8 min-w-0">
         <div className="max-w-3xl mx-auto">
+          {loadError && (
+            <div className="mb-5">
+              <Banner kind="danger" title="Couldn't load your connections">
+                {loadError}{" "}
+                <button
+                  type="button"
+                  onClick={refresh}
+                  className="underline font-medium"
+                >
+                  Retry
+                </button>
+              </Banner>
+            </div>
+          )}
           {banner && (
             <div className="mb-5">
               <Banner kind={banner.kind}>{banner.msg}</Banner>

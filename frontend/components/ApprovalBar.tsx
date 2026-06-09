@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ExternalLink } from "./ExternalLink";
 import type {
   AwaitingReview,
   CreateEventPreview,
@@ -128,15 +129,13 @@ function DeliverablePreview({ review }: { review: AwaitingReview }) {
       )}
       {review.url && (
         <div className="mt-2">
-          <a
+          <ExternalLink
             href={review.url}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md bg-white ring-1 ring-inset ring-indigo-300 text-indigo-700 text-sm font-medium px-3 py-1.5 hover:bg-indigo-100"
           >
             Open in Google Docs
             <span aria-hidden="true">↗</span>
-          </a>
+          </ExternalLink>
         </div>
       )}
     </div>

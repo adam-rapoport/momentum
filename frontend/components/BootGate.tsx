@@ -18,9 +18,14 @@ import { api } from "@/lib/api";
 // even when a key is already present.
 
 const POLL_INTERVAL_MS = 500;
-const MAX_ATTEMPTS = 120; // ~60s before giving up
+const STALLED_AFTER_ATTEMPTS = 40; // ~20s: switch to the "taking longer" copy
+const STALLED_POLL_INTERVAL_MS = 2000;
 
-type Phase = "loading" | "ready" | "error";
+// "stalled" means the backend still hasn't answered after a while. We never
+// stop polling (a slow first-run PyInstaller unpack + migration can blow any
+// fixed ceiling) — the copy just changes and a manual "Try again" resets the
+// fast poll cadence.
+type Phase = "loading" | "ready" | "stalled";
 
 export function BootGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -47,11 +52,12 @@ export function BootGate({ children }: { children: React.ReactNode }) {
       } catch {
         if (cancelled) return;
         attempts += 1;
-        if (attempts >= MAX_ATTEMPTS) {
-          setPhase("error");
-          return;
+        if (attempts >= STALLED_AFTER_ATTEMPTS) {
+          setPhase("stalled");
+          timer = setTimeout(poll, STALLED_POLL_INTERVAL_MS);
+        } else {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
-        timer = setTimeout(poll, POLL_INTERVAL_MS);
       }
     }
 
@@ -81,10 +87,16 @@ function BootScreen({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
     >
       <div className="text-lg font-semibold tracking-tight">pMomentum</div>
 
-      {phase === "error" ? (
+      <div
+        className="h-6 w-6 animate-spin rounded-full border-2 border-transparent"
+        style={{ borderTopColor: "var(--accent)", borderRightColor: "var(--accent)" }}
+        aria-hidden
+      />
+      {phase === "stalled" ? (
         <>
-          <div style={{ color: "var(--text-muted)" }} className="text-sm">
-            Couldn&apos;t reach the backend. It may still be starting up.
+          <div style={{ color: "var(--text-muted)" }} className="text-sm text-center max-w-sm">
+            Still starting… this is taking longer than usual. We&apos;ll keep
+            trying — or restart the app if it never comes up.
           </div>
           <button
             type="button"
@@ -96,16 +108,9 @@ function BootScreen({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
           </button>
         </>
       ) : (
-        <>
-          <div
-            className="h-6 w-6 animate-spin rounded-full border-2 border-transparent"
-            style={{ borderTopColor: "var(--accent)", borderRightColor: "var(--accent)" }}
-            aria-hidden
-          />
-          <div style={{ color: "var(--text-muted)" }} className="text-sm">
-            Starting pMomentum…
-          </div>
-        </>
+        <div style={{ color: "var(--text-muted)" }} className="text-sm">
+          Starting pMomentum…
+        </div>
       )}
     </div>
   );

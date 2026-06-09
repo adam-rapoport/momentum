@@ -27,6 +27,8 @@ type DisplayItem =
       role: "user" | "assistant";
       text: string;
       key: string;
+      messageId: string;
+      sendFailed: boolean;
     }
   | {
       kind: "tool";
@@ -59,6 +61,8 @@ function messagesToItems(messages: Message[]): DisplayItem[] {
           role: m.role === "user" ? "user" : "assistant",
           text: b.text,
           key,
+          messageId: m.id,
+          sendFailed: !!m.send_failed,
         });
       } else if (b.type === "tool_use") {
         const r = results.get(b.id);
@@ -89,8 +93,10 @@ export function ChatView({ sessionId }: Props) {
     (s) => s.awaitingReviewBySession[sessionId],
   );
   const lastError = useChatStore((s) => s.lastErrorBySession[sessionId]);
+  const stopped = useChatStore((s) => s.stoppedBySession[sessionId]) ?? false;
   const setMessages = useChatStore((s) => s.setMessages);
   const appendUserMessage = useChatStore((s) => s.appendUserMessage);
+  const removeMessage = useChatStore((s) => s.removeMessage);
   const startStreaming = useChatStore((s) => s.startStreaming);
   const upsertSession = useChatStore((s) => s.upsertSession);
   const setAwaitingReview = useChatStore((s) => s.setAwaitingReview);
@@ -170,6 +176,13 @@ export function ChatView({ sessionId }: Props) {
     getWsClient().send({ type: "session.cancel", session_id: sessionId });
   }
 
+  /** Re-send a message whose original send never reached the backend: drop
+   * the failed optimistic bubble, then send the same content fresh. */
+  function handleRetry(messageId: string, text: string) {
+    removeMessage(sessionId, messageId);
+    handleSend(text);
+  }
+
   function handleApprove() {
     clearAwaitingReview(sessionId);
     handleSend("/approve");
@@ -200,6 +213,25 @@ export function ChatView({ sessionId }: Props) {
 
           {items.map((item) => {
             if (item.kind === "text") {
+              if (item.sendFailed) {
+                return (
+                  <div key={item.key}>
+                    <div className="opacity-60">
+                      <MessageBubble role={item.role} text={item.text} />
+                    </div>
+                    <div className="flex justify-end items-center gap-2 mt-1 text-xs text-red-600">
+                      <span>Not sent</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRetry(item.messageId, item.text)}
+                        className="rounded px-2 py-0.5 font-medium ring-1 ring-inset ring-red-300 bg-white hover:bg-red-50"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <MessageBubble
                   key={item.key}
@@ -233,6 +265,14 @@ export function ChatView({ sessionId }: Props) {
             />
           ))}
 
+          {stopped && !isStreaming && (
+            <div className="flex justify-start">
+              <div className="text-xs text-neutral-400 px-1 py-0.5">
+                ■ Stopped by you
+              </div>
+            </div>
+          )}
+
           {waitingForFirstToken && (
             <div className="flex justify-start">
               <div className="bg-white border border-neutral-200 rounded-lg px-4 py-2.5 text-sm text-neutral-500">
@@ -253,6 +293,10 @@ export function ChatView({ sessionId }: Props) {
                   ? "A tool failed"
                   : lastError.code === "DB_ERROR"
                   ? "Couldn't save this turn"
+                  : lastError.code === "WS_DISCONNECTED"
+                  ? "Connection dropped"
+                  : lastError.code === "WS_UNAVAILABLE"
+                  ? "Couldn't reach the backend"
                   : "Something went wrong"
               }
               onDismiss={() => clearLastError(sessionId)}

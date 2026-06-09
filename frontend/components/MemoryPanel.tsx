@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ExternalLink } from "@/components/ExternalLink";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
 import type {
@@ -9,6 +10,10 @@ import type {
   MemoryRecordSummary,
   MemoryType,
 } from "@/lib/types";
+
+// Links inside memory bodies must open via the OS browser in the desktop
+// webview (plain anchors are dead there).
+const MD_COMPONENTS: Components = { a: ExternalLink };
 
 const TYPE_LABELS: Record<MemoryType, string> = {
   stakeholder: "Stakeholders",
@@ -258,7 +263,10 @@ export function MemoryPanel() {
                   </div>
                 )}
                 <div className="markdown-body text-xs">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={MD_COMPONENTS}
+                  >
                     {detail.body}
                   </ReactMarkdown>
                 </div>

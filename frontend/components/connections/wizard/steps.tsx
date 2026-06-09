@@ -37,11 +37,15 @@ export function ModelPickStep({
   state,
   setState,
   error,
+  configured,
 }: {
   tier: Tier;
   state: ModelStepState;
   setState: (s: ModelStepState) => void;
   error?: string | null;
+  /** True when the selected provider already has a stored key — the step can
+   * be advanced with the key field left blank. */
+  configured?: boolean;
 }) {
   const providers = providersForTier(tier);
   const chosen: ProviderMeta | null = state.providerId ? PROVIDERS[state.providerId] : null;
@@ -74,6 +78,14 @@ export function ModelPickStep({
           style={{ background: "var(--bg-canvas)", borderColor: "var(--border)" }}
           className="mt-2 p-4 border rounded-xl"
         >
+          {configured && (
+            <div className="mb-3.5">
+              <Banner kind="success" title={`${chosen.name} is already connected`}>
+                Leave the field blank to keep using your saved key, or paste a
+                new one to replace it.
+              </Banner>
+            </div>
+          )}
           <KeyInput
             provider={chosen}
             value={state.key}
@@ -98,11 +110,13 @@ export function DoneStep({
   heavyName,
   onFinish,
   finishing,
+  error,
 }: {
   lightName: string | null;
   heavyName: string | null;
   onFinish: () => void;
   finishing: boolean;
+  error?: string | null;
 }) {
   return (
     <div className="text-center py-3">
@@ -127,8 +141,17 @@ export function DoneStep({
         <SummaryLine label="Heavy model" value={heavyName} />
       </div>
 
+      {error && (
+        <div className="text-left max-w-md mx-auto mb-5">
+          <Banner kind="danger" title="Couldn't finish setup">
+            {error} — your keys and preferences are saved; only the final
+            &quot;done&quot; flag failed to record. Try again.
+          </Banner>
+        </div>
+      )}
+
       <button className="btn large primary" onClick={onFinish} disabled={finishing}>
-        {finishing ? "Finishing…" : "Start chatting →"}
+        {finishing ? "Finishing…" : error ? "Try again →" : "Start chatting →"}
       </button>
     </div>
   );

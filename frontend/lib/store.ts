@@ -24,6 +24,15 @@ interface ChatState {
   awaitingReviewBySession: Record<string, AwaitingReview>;
   lastErrorBySession: Record<string, SessionError>;
   lastModelBySession: Record<string, string>;
+  // Monotonic per-session turn counter, bumped every time a new turn starts
+  // streaming. Async work that finishes late (the getSession refetch after
+  // stream.done / stream.awaiting_review, the reconnect resync) captures the
+  // epoch when it starts and drops its result if a newer turn began since —
+  // otherwise a slow refetch from turn N clobbers turn N+1's live state.
+  turnEpochBySession: Record<string, number>;
+  // True when the most recent turn ended because the user hit Cancel. Cleared
+  // when the next turn starts. Drives the small "stopped" note in the chat.
+  stoppedBySession: Record<string, boolean>;
   memories: MemoryRecordSummary[];
   memoriesLoadedAt: number;
   documents: DocumentArtifact[];
@@ -40,6 +49,9 @@ interface ChatState {
 
   setMessages: (sessionId: string, messages: Message[]) => void;
   appendUserMessage: (sessionId: string, content: string) => void;
+  /** Mark the newest optimistic (local-*) user message as failed-to-send. */
+  markSendFailed: (sessionId: string) => void;
+  removeMessage: (sessionId: string, messageId: string) => void;
 
   startStreaming: (sessionId: string) => void;
   appendStreamChunk: (sessionId: string, text: string) => void;
@@ -51,7 +63,12 @@ interface ChatState {
     sessionId: string,
     args: { call_id: string; output: string; is_error: boolean },
   ) => void;
-  finalizeStream: (sessionId: string, totalCost: string, cancelled: boolean) => void;
+  /**
+   * End the live-streaming state for a turn. `totalCost` undefined preserves
+   * the previously displayed cost (error paths must not reset it to $0);
+   * `cancelled` true records that the user stopped the turn.
+   */
+  finalizeStream: (sessionId: string, totalCost?: string, cancelled?: boolean) => void;
 
   setAwaitingReview: (sessionId: string, review: AwaitingReview) => void;
   clearAwaitingReview: (sessionId: string) => void;
@@ -78,6 +95,8 @@ export const useChatStore = create<ChatState>((set) => ({
   awaitingReviewBySession: {},
   lastErrorBySession: {},
   lastModelBySession: {},
+  turnEpochBySession: {},
+  stoppedBySession: {},
   memories: [],
   memoriesLoadedAt: 0,
   documents: [],
@@ -104,7 +123,9 @@ export const useChatStore = create<ChatState>((set) => ({
       const prev = state.messagesBySession[sessionId] ?? [];
       const lastTurn = prev.length ? prev[prev.length - 1].turn_id : 0;
       const newUser: Message = {
-        id: `local-${Date.now()}`,
+        // randomUUID, not Date.now(): two sends in the same millisecond
+        // (e.g. a retry racing a queued flush) must not collide on key.
+        id: `local-${crypto.randomUUID()}`,
         turn_id: lastTurn + 1,
         role: "user",
         content: [{ type: "text", text: content }],
@@ -118,11 +139,46 @@ export const useChatStore = create<ChatState>((set) => ({
       };
     }),
 
+  markSendFailed: (sessionId) =>
+    set((state) => {
+      const prev = state.messagesBySession[sessionId] ?? [];
+      // Find the newest optimistic user message that hasn't failed yet.
+      let idx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const m = prev[i];
+        if (m.role === "user" && m.id.startsWith("local-") && !m.send_failed) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx === -1) return state;
+      const next = [...prev];
+      next[idx] = { ...next[idx], send_failed: true };
+      return {
+        messagesBySession: { ...state.messagesBySession, [sessionId]: next },
+      };
+    }),
+
+  removeMessage: (sessionId, messageId) =>
+    set((state) => {
+      const prev = state.messagesBySession[sessionId] ?? [];
+      const next = prev.filter((m) => m.id !== messageId);
+      if (next.length === prev.length) return state;
+      return {
+        messagesBySession: { ...state.messagesBySession, [sessionId]: next },
+      };
+    }),
+
   startStreaming: (sessionId) =>
     set((state) => ({
       streamingBySession: { ...state.streamingBySession, [sessionId]: "" },
       isStreamingBySession: { ...state.isStreamingBySession, [sessionId]: true },
       liveToolCallsBySession: { ...state.liveToolCallsBySession, [sessionId]: [] },
+      turnEpochBySession: {
+        ...state.turnEpochBySession,
+        [sessionId]: (state.turnEpochBySession[sessionId] ?? 0) + 1,
+      },
+      stoppedBySession: { ...state.stoppedBySession, [sessionId]: false },
     })),
 
   appendStreamChunk: (sessionId, text) =>
@@ -164,12 +220,20 @@ export const useChatStore = create<ChatState>((set) => ({
   // here — instead, ChatView refetches session detail so the authoritative
   // content (tool_use + tool_result blocks with real IDs) replaces the
   // live view. This keeps tool pairing consistent.
-  finalizeStream: (sessionId, totalCost) =>
+  finalizeStream: (sessionId, totalCost, cancelled) =>
     set((state) => ({
       streamingBySession: { ...state.streamingBySession, [sessionId]: "" },
       isStreamingBySession: { ...state.isStreamingBySession, [sessionId]: false },
       liveToolCallsBySession: { ...state.liveToolCallsBySession, [sessionId]: [] },
-      totalCostBySession: { ...state.totalCostBySession, [sessionId]: totalCost },
+      // Error/cancel paths pass no cost — keep showing the last known value
+      // instead of resetting the header to $0.
+      totalCostBySession:
+        totalCost === undefined
+          ? state.totalCostBySession
+          : { ...state.totalCostBySession, [sessionId]: totalCost },
+      stoppedBySession: cancelled
+        ? { ...state.stoppedBySession, [sessionId]: true }
+        : state.stoppedBySession,
     })),
 
   setAwaitingReview: (sessionId, review) =>

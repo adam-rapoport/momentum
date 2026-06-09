@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, type KeyProvider } from "@/lib/api";
 import { extractDetail } from "@/lib/errors";
 import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
 import { Wordmark } from "../Brand";
@@ -44,8 +44,34 @@ export function OnboardingWizard() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+  // Which providers already have a stored/env key (e.g. a "Restart wizard"
+  // re-run, or a key configured via Settings). Those steps are advanceable
+  // without re-pasting the key — see canAdvance/saveModel.
+  const [configured, setConfigured] = useState<Partial<Record<KeyProvider, boolean>>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listConnections()
+      .then((r) => {
+        if (cancelled) return;
+        const map: Partial<Record<KeyProvider, boolean>> = {};
+        for (const c of r.connections) map[c.provider] = c.configured;
+        setConfigured(map);
+      })
+      .catch(() => undefined); // treated as "nothing configured"
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const step = STEPS[idx];
+
+  function isConfigured(state: ModelStepState): boolean {
+    if (!state.providerId) return false;
+    return !!configured[PROVIDERS[state.providerId].credProvider];
+  }
 
   function back() {
     setError(null);
@@ -60,7 +86,14 @@ export function OnboardingWizard() {
     setSaving(true);
     setError(null);
     try {
-      await api.setConnection(provider.credProvider, state.key.trim());
+      // A provider that's already connected (restart-wizard path, or a key
+      // added via Settings) is advanceable with an empty key field — keep the
+      // stored key and just record the model preference.
+      if (state.key.trim()) {
+        await api.setConnection(provider.credProvider, state.key.trim());
+      } else if (!isConfigured(state)) {
+        return false;
+      }
       await api.setModelPreferences(
         tier === "light" ? { light_model: model } : { heavy_model: model },
       );
@@ -129,17 +162,33 @@ export function OnboardingWizard() {
 
   async function finish() {
     setFinishing(true);
+    setFinishError(null);
     try {
       await api.completeOnboarding();
-    } catch {
-      /* non-fatal; gating is key-based */
+    } catch (e) {
+      // BootGate routes on completed_at: navigating to /chat with the flag
+      // unset just bounces straight back here (the "onboarding ping-pong").
+      // Surface the failure and let the user retry instead.
+      setFinishError(extractDetail(e));
+      setFinishing(false);
+      return;
     }
     router.replace("/chat");
   }
 
   const canAdvance = () => {
-    if (step.key === "light") return validateKeyFormat(PROVIDERS[light.providerId ?? ""], light.key).state === "valid";
-    if (step.key === "heavy") return validateKeyFormat(PROVIDERS[heavy.providerId ?? ""], heavy.key).state === "valid";
+    if (step.key === "light") {
+      return (
+        validateKeyFormat(PROVIDERS[light.providerId ?? ""], light.key).state === "valid" ||
+        (isConfigured(light) && !light.key.trim())
+      );
+    }
+    if (step.key === "heavy") {
+      return (
+        validateKeyFormat(PROVIDERS[heavy.providerId ?? ""], heavy.key).state === "valid" ||
+        (isConfigured(heavy) && !heavy.key.trim())
+      );
+    }
     return true;
   };
 
@@ -163,10 +212,22 @@ export function OnboardingWizard() {
         <div className="flex-1">
           {step.key === "welcome" && <WelcomeStep onNext={() => setIdx(1)} />}
           {step.key === "light" && (
-            <ModelPickStep tier="light" state={light} setState={setLight} error={error} />
+            <ModelPickStep
+              tier="light"
+              state={light}
+              setState={setLight}
+              error={error}
+              configured={isConfigured(light)}
+            />
           )}
           {step.key === "heavy" && (
-            <ModelPickStep tier="heavy" state={heavy} setState={setHeavy} error={error} />
+            <ModelPickStep
+              tier="heavy"
+              state={heavy}
+              setState={setHeavy}
+              error={error}
+              configured={isConfigured(heavy)}
+            />
           )}
           {step.key === "gtky" && (
             <GtkyStep state={gtky} setState={setGtky} uploads={uploads} setUploads={setUploads} />
@@ -177,6 +238,7 @@ export function OnboardingWizard() {
               heavyName={heavy.providerId ? PROVIDERS[heavy.providerId].name : null}
               onFinish={finish}
               finishing={finishing}
+              error={finishError}
             />
           )}
         </div>

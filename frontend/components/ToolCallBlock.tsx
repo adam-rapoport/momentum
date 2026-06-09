@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ExternalLink } from "./ExternalLink";
 
 interface Props {
   name: string;
@@ -99,16 +100,14 @@ export function ToolCallBlock({ name, input, output, isError, status }: Props) {
           )}
         </button>
         {docUrl && (
-          <a
+          <ExternalLink
             href={docUrl}
-            target="_blank"
-            rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="shrink-0 inline-flex items-center gap-1 rounded bg-white/80 ring-1 ring-inset ring-current/30 px-1.5 py-0.5 text-[10px] font-sans font-medium hover:bg-white"
             title="Open in Google Docs"
           >
             Open ↗
-          </a>
+          </ExternalLink>
         )}
         <span className="shrink-0 text-[10px] uppercase tracking-wide">
           {label}
