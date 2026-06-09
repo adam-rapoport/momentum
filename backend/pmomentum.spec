@@ -17,7 +17,7 @@ bundled layout must mirror the source layout:
   - app/prompts/    → app.core.system_prompt._STATIC_DIR
   - app/skills/     → app.core.skills._SKILLS_DIR
 """
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 hiddenimports = []
 # uvicorn imports its protocol/loop implementations dynamically by string.
@@ -25,9 +25,17 @@ hiddenimports += collect_submodules("uvicorn")
 # SQLAlchemy loads the dialect by name; aiosqlite is our default driver.
 hiddenimports += collect_submodules("aiosqlite")
 hiddenimports += collect_submodules("sqlalchemy.dialects.sqlite")
-# Google SDKs (auth, oauth2, genai, api client) are namespace packages whose
-# submodules aren't all statically reachable.
-hiddenimports += collect_submodules("google")
+# Google SDKs live in the `google` namespace package, so not every submodule is
+# statically reachable. Collect ONLY the subpackages the app actually imports
+# (verified against backend imports: google.oauth2.credentials in the
+# integrations, google.genai in google_genai_client, google.auth transitively)
+# — a bare collect_submodules("google") would also sweep in google.cloud,
+# google.protobuf, google.logging etc. that nothing uses. google.api_core is
+# statically imported by googleapiclient.discovery, so PyInstaller's analysis
+# follows it on its own.
+hiddenimports += collect_submodules("google.auth")
+hiddenimports += collect_submodules("google.oauth2")
+hiddenimports += collect_submodules("google.genai")
 hiddenimports += collect_submodules("googleapiclient")
 # Our own package, so dynamically-referenced modules (tools, model clients,
 # skills loader) are all present in the frozen app.
@@ -44,6 +52,13 @@ datas = [
 datas += collect_data_files("trafilatura")
 datas += collect_data_files("justext")
 datas += collect_data_files("courlan")
+# Dist metadata for the Google SDKs so importlib.metadata.version() resolves
+# inside the frozen app. Verified 2026-06: both packages hardcode __version__
+# in version.py (no crash without this), but google.api_core's dependency
+# checks consult dist metadata at runtime and fall back to "unknown" when it's
+# missing — copying it (a few KB) keeps that path honest.
+datas += copy_metadata("google-api-python-client")
+datas += copy_metadata("google-genai")
 
 a = Analysis(
     ["app/desktop.py"],
