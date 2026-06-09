@@ -1128,6 +1128,65 @@ async def _process_message_locked(
             logger.warning(
                 "session %s hit MAX_TOOL_ITERATIONS (%d)", session_id, MAX_TOOL_ITERATIONS
             )
+            # Finding A11: don't end the turn in silence. One final model
+            # call WITHOUT tools so the user gets a wrap-up instead of a
+            # dead stop. tools=None means the model physically cannot loop
+            # further — this is capped at exactly one extra call. Best
+            # effort: a provider failure here must not torch the (already
+            # committed) tool work, so errors are logged and swallowed.
+            llm_messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "[SYSTEM] You have hit the tool-call limit for this "
+                        "turn and no more tools are available. Wrap up now: "
+                        "summarize in a few sentences what you accomplished "
+                        "and what remains to be done, and tell the user to "
+                        "send a follow-up message to continue."
+                    ),
+                }
+            )
+            wrap_chunks: list[str] = []
+            wrap_result: StreamResult | None = None
+            wrap_stream = stream_message(
+                llm_messages, model=turn_model, tools=None, api_key=turn_api_key
+            )
+            try:
+                async for event in wrap_stream:
+                    if isinstance(event, StreamChunk):
+                        if await kv.exists(_cancel_key(session_id)):
+                            cancelled = True
+                            break
+                        wrap_chunks.append(event.text)
+                        yield TextEvent(text=event.text)
+                    elif isinstance(event, StreamResult):
+                        wrap_result = event
+            except Exception:  # noqa: BLE001 — wrap-up is best-effort
+                logger.exception(
+                    "wrap-up call after MAX_TOOL_ITERATIONS failed for %s",
+                    session_id,
+                )
+            finally:
+                await wrap_stream.aclose()
+            if wrap_result is not None:
+                total_input_tokens += wrap_result.input_tokens
+                total_output_tokens += wrap_result.output_tokens
+                total_cost_usd += wrap_result.cost_usd
+            wrap_text = "".join(wrap_chunks)
+            if cancelled:
+                # Reuse the cancel path's partial-text persistence below.
+                cancelled_partial_text = wrap_text
+            elif wrap_text:
+                db.add(
+                    Message(
+                        id=uuid4(),
+                        session_id=session_id,
+                        turn_id=turn_id,
+                        seq=_take_seq(),
+                        role="assistant",
+                        content=[{"type": "text", "text": wrap_text}],
+                    )
+                )
 
         # On cancel, persist whatever the model streamed before the stop with
         # an explicit interruption marker — a reload must not lose text the

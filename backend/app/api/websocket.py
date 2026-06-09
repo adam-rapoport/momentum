@@ -43,6 +43,11 @@ from app.security import origin_allowed, token_valid
 
 logger = logging.getLogger(__name__)
 
+try:  # google-genai ships in the default install, but stay import-safe
+    from google.genai import errors as genai_errors
+except ImportError:  # pragma: no cover
+    genai_errors = None  # type: ignore[assignment]
+
 # Substrings in a provider APIError message that mean "the model emitted
 # malformed tool calls" (as opposed to a network / auth / rate-limit issue).
 # Groq surfaces these as tool_use_failed; Google surfaces them differently
@@ -53,7 +58,99 @@ _TOOL_CALL_FAILURE_HINTS = (
     "tool_use_failed",
 )
 
+# Message-level hints for classifying provider errors that arrive as a bare
+# APIError (the Google OpenAI-compat endpoint surfaces its native statuses
+# this way through the openai SDK). Type/status-code checks run first; these
+# are the fallback.
+_AUTH_HINTS = (
+    "invalid api key",
+    "invalid_api_key",
+    "incorrect api key",
+    "api key not valid",
+    "unauthorized",
+    "permission denied",
+)
+_RATE_LIMIT_HINTS = (
+    "rate limit",
+    "rate_limit",
+    "resource_exhausted",
+    "quota",
+)
+_CONTEXT_TOO_LONG_HINTS = (
+    "context_length_exceeded",
+    "maximum context length",
+    "context window",
+    "too many tokens",
+    "input token count",
+    "request too large",
+)
+
 router = APIRouter()
+
+
+def _model_error_frame(e: BaseException, session_id: UUID) -> dict | None:
+    """Map a provider/SDK error to an actionable WS error frame, or None when
+    `e` isn't a model-provider error (caller falls through to INTERNAL_ERROR).
+
+    Codes (additive to the frontend contract): MODEL_AUTH_ERROR,
+    MODEL_RATE_LIMITED, MODEL_CONTEXT_TOO_LONG, plus the pre-existing
+    MODEL_TOOL_CALL_FAILED and MODEL_API_ERROR fallback.
+    """
+    sid = str(session_id)
+    msg = str(e).lower()
+
+    def frame(code: str, message: str) -> dict:
+        return {"type": "error", "code": code, "message": message, "session_id": sid}
+
+    # Provider clients raise RuntimeError("<PROVIDER>_API_KEY is not
+    # configured — ...") when a turn routes to a provider with no key. The
+    # message already names the provider and points at Settings — pass it on.
+    if isinstance(e, RuntimeError) and "not configured" in msg:
+        return frame("MODEL_AUTH_ERROR", str(e))
+
+    is_openai_err = isinstance(e, OpenAIAPIError)
+    is_genai_err = genai_errors is not None and isinstance(e, genai_errors.APIError)
+    if not (is_openai_err or is_genai_err):
+        return None
+
+    if any(hint in msg for hint in _TOOL_CALL_FAILURE_HINTS):
+        return frame(
+            "MODEL_TOOL_CALL_FAILED",
+            "The model produced a malformed tool call and the LLM "
+            "provider rejected the response. This happens occasionally, "
+            "especially during long skill workflows. Please retry "
+            "your last message — it usually works on the second try.",
+        )
+
+    # openai SDK errors carry status_code; google-genai's APIError carries
+    # `code` (the HTTP status).
+    status = getattr(e, "status_code", None) or getattr(e, "code", None)
+    if status in (401, 403) or any(hint in msg for hint in _AUTH_HINTS):
+        return frame(
+            "MODEL_AUTH_ERROR",
+            "The model provider rejected your API key (or none is set). "
+            "Open Settings → Connections and check the key for this "
+            f"provider. Provider said: {e}",
+        )
+    if status == 429 or any(hint in msg for hint in _RATE_LIMIT_HINTS):
+        return frame(
+            "MODEL_RATE_LIMITED",
+            "The model provider is rate-limiting requests (free-tier quota "
+            "or too many requests in a row). Wait a moment and retry, or "
+            "switch this model slot to another configured provider in "
+            "Settings.",
+        )
+    if any(hint in msg for hint in _CONTEXT_TOO_LONG_HINTS):
+        return frame(
+            "MODEL_CONTEXT_TOO_LONG",
+            "This conversation is too long for the model's context window. "
+            "Retry your message, or start a new session if it keeps "
+            "happening.",
+        )
+    return frame(
+        "MODEL_API_ERROR",
+        f"The model service returned an error: {e}. Try again in a moment.",
+    )
 
 # One in-flight turn task per session, process-wide. Keyed by session_id so a
 # second `session.message` for a busy session (even from another connection)
@@ -302,42 +399,14 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
                 "session_id": str(session_id),
             },
         )
-    except OpenAIAPIError as e:
-        # Groq rejected the model's output — almost always because the model
-        # emitted malformed tool_calls on this sampling. Recoverable: tell
-        # the user to retry, don't scare them with a stack trace.
-        msg = str(e).lower()
-        is_tool_failure = any(hint in msg for hint in _TOOL_CALL_FAILURE_HINTS)
-        logger.warning("LLM API error for session %s: %s", session_id, e)
-        if is_tool_failure:
-            await _send(
-                ws,
-                {
-                    "type": "error",
-                    "code": "MODEL_TOOL_CALL_FAILED",
-                    "message": (
-                        "The model produced a malformed tool call and the LLM "
-                        "provider rejected the response. This happens occasionally, "
-                        "especially during long skill workflows. Please retry "
-                        "your last message — it usually works on the second try."
-                    ),
-                    "session_id": str(session_id),
-                },
-            )
-        else:
-            await _send(
-                ws,
-                {
-                    "type": "error",
-                    "code": "MODEL_API_ERROR",
-                    "message": (
-                        f"The model service returned an error: {e}. "
-                        "Try again in a moment."
-                    ),
-                    "session_id": str(session_id),
-                },
-            )
     except Exception as e:
+        # Provider/model errors (any of the three SDKs, or a missing key)
+        # map to actionable codes; everything else is an internal crash.
+        frame = _model_error_frame(e, session_id)
+        if frame is not None:
+            logger.warning("LLM API error for session %s: %s", session_id, e)
+            await _send(ws, frame)
+            return
         logger.exception("error processing message for session %s", session_id)
         # Unexpected crash — report it. No-op if Sentry isn't configured.
         sentry_sdk.capture_exception(e)

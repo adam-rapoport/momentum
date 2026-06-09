@@ -1252,17 +1252,29 @@ def test_history_ignores_non_dict_and_unknown_blocks():
 # ---------- (h) MAX_TOOL_ITERATIONS exhaustion ----------
 
 
-async def test_tool_loop_stops_at_max_iterations(
+async def test_tool_loop_stops_at_max_iterations_then_wraps_up(
     db, seeded, kv, monkeypatch, echo_tool, caplog
 ):
     """A model that always calls tools is cut off after MAX_TOOL_ITERATIONS.
-    The DoneEvent still closes the turn — but note (finding A11, Phase 1 plan
-    item 9): the exhaustion is silent to the user, no explanatory text."""
+    Phase 1 item 9 (finding A11): the exhaustion is no longer silent — one
+    final model call WITHOUT tools produces a wrap-up for the user, capped at
+    exactly one extra call."""
     session = await _make_session(db, seeded)
     counter = {"n": 0}
+    tools_seen: list = []
 
     async def _always_tools(messages, model=None, tools=None, api_key=None):
         counter["n"] += 1
+        tools_seen.append(tools)
+        if tools is None:
+            # The wrap-up call — no tools offered, so the model can only talk.
+            yield StreamChunk(text="Ran out of tool budget; here's where we are.")
+            yield _result(
+                text="Ran out of tool budget; here's where we are.",
+                input_tokens=10,
+                output_tokens=1,
+            )
+            return
         yield _result(
             tool_calls=[
                 ToolCall(
@@ -1280,16 +1292,51 @@ async def test_tool_loop_stops_at_max_iterations(
     with caplog.at_level("WARNING"):
         events = await _run_turn(db, kv, session.id, "loop forever")
 
-    assert counter["n"] == MAX_TOOL_ITERATIONS
+    # MAX tool iterations + exactly one tools=None wrap-up call.
+    assert counter["n"] == MAX_TOOL_ITERATIONS + 1
+    assert tools_seen[-1] is None
+    assert all(t is not None for t in tools_seen[:-1])
     starts = [e for e in events if isinstance(e, ToolStartEvent)]
     assert len(starts) == MAX_TOOL_ITERATIONS
+    # The wrap-up text reached the user, and the DoneEvent closes the turn
+    # with the wrap-up call's usage included.
+    texts = [e for e in events if isinstance(e, TextEvent)]
+    assert texts and "tool budget" in texts[-1].text
     assert isinstance(events[-1], DoneEvent)
-    assert events[-1].input_tokens == 10 * MAX_TOOL_ITERATIONS
+    assert events[-1].input_tokens == 10 * (MAX_TOOL_ITERATIONS + 1)
     assert any("MAX_TOOL_ITERATIONS" in r.message for r in caplog.records)
 
     # Every iteration persisted its assistant tool_use + tool result, with
-    # strictly increasing seq throughout.
+    # strictly increasing seq throughout; the wrap-up text persisted too.
     messages = await _messages_for(db, session.id)
     seqs = [m.seq for m in messages]
     assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
+    assert len([m for m in messages if m.role == "tool"]) == MAX_TOOL_ITERATIONS
+    assert messages[-1].role == "assistant"
+    assert "tool budget" in messages[-1].content[0]["text"]
+
+
+async def test_wrap_up_failure_still_closes_turn(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """The wrap-up call is best-effort: a provider error there must not
+    destroy the already-committed tool work — the turn still gets a
+    DoneEvent."""
+    session = await _make_session(db, seeded)
+
+    async def _tools_then_crash(messages, model=None, tools=None, api_key=None):
+        if tools is None:
+            raise RuntimeError("provider down")
+        yield _result(
+            tool_calls=[
+                ToolCall(id="c1", name="TestEcho", arguments_json='{"value": "x"}')
+            ]
+        )
+
+    monkeypatch.setattr(session_engine, "stream_message", _tools_then_crash)
+
+    events = await _run_turn(db, kv, session.id, "loop forever")
+
+    assert isinstance(events[-1], DoneEvent)
+    messages = await _messages_for(db, session.id)
     assert len([m for m in messages if m.role == "tool"]) == MAX_TOOL_ITERATIONS
