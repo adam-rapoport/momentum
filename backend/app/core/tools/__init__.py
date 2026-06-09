@@ -7,12 +7,13 @@ then `execute_tool()` to run a chosen tool.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -64,6 +65,19 @@ def get_context() -> "ToolContext":
     return ctx
 
 
+# Per-category execution budgets (seconds), applied by execute_tool unless a
+# tool sets its own `timeout_seconds`. Categories not listed get the default:
+# local-only work (memory/pm/utility/communication/workflow) should never
+# take long; network categories get more headroom.
+DEFAULT_TOOL_TIMEOUT_SECONDS = 15.0
+CATEGORY_TIMEOUT_SECONDS: dict[str, float] = {
+    "research": 60.0,   # web search / page fetch
+    "gmail": 60.0,      # Google API round-trips
+    "calendar": 60.0,   # Google API round-trips
+    "documents": 30.0,  # Google Docs / local document ops
+}
+
+
 @dataclass
 class Tool:
     name: str
@@ -73,6 +87,17 @@ class Tool:
     is_read_only: bool = True
     is_externally_visible: bool = False
     category: str = "utility"
+    # Per-tool override for the execution budget; None -> category default
+    # (see CATEGORY_TIMEOUT_SECONDS above).
+    timeout_seconds: float | None = None
+
+    @property
+    def effective_timeout_seconds(self) -> float:
+        if self.timeout_seconds is not None:
+            return self.timeout_seconds
+        return CATEGORY_TIMEOUT_SECONDS.get(
+            self.category, DEFAULT_TOOL_TIMEOUT_SECONDS
+        )
 
 
 REGISTRY: dict[str, Tool] = {}
@@ -110,6 +135,14 @@ async def execute_tool(name: str, input_data: dict | str) -> str:
 
     Errors are converted to strings rather than raised — we want the LLM
     to see the error and potentially recover (e.g., fix its args and retry).
+    Each call runs under a category time budget (finding A23) so one wedged
+    Google/network call can't hang the whole turn; a timeout comes back as
+    an Error string and the turn keeps going.
+
+    NOTE (Phase 3 candidate): the error protocol is still string-typed —
+    callers detect failure via `output.startswith("Error")`. A structured
+    (ok, output) result was considered for Phase 1 but deferred to keep the
+    diff contained; see plan item 11.
     """
     tool = REGISTRY.get(name)
     if tool is None:
@@ -126,8 +159,16 @@ async def execute_tool(name: str, input_data: dict | str) -> str:
     if not isinstance(parsed, dict):
         parsed = {}
 
+    budget = tool.effective_timeout_seconds
     try:
-        return await tool.handler(parsed)
+        return await asyncio.wait_for(tool.handler(parsed), timeout=budget)
+    except TimeoutError:
+        logger.warning("tool %s timed out after %.0fs", name, budget)
+        return (
+            f"Error: {name} timed out after {budget:.0f}s. The operation was "
+            f"aborted; it may be a slow network or service. You can retry or "
+            f"proceed without it."
+        )
     except Exception as e:  # noqa: BLE001 — deliberate: surface errors to the model
         logger.exception("tool %s failed", name)
         return f"Error executing {name}: {e}"
