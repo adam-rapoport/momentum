@@ -216,12 +216,3 @@ async def test_non_gemma_google_models_pass_through_unstripped(monkeypatch):
     result = events[-1]
     assert result.text == "<thought>not stripped for gemini</thought>ok"
 
-
-def test_groq_client_reexports_shared_types():
-    # The harness (and any older caller) imports the stream types from
-    # groq_client; they must be the SAME objects as app.core.llm_types.
-    from app.core import groq_client, llm_types
-
-    assert groq_client.StreamChunk is llm_types.StreamChunk
-    assert groq_client.StreamResult is llm_types.StreamResult
-    assert groq_client.ToolCall is llm_types.ToolCall

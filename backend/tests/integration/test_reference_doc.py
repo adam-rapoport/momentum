@@ -14,7 +14,7 @@ from fastapi import UploadFile
 
 from app.api import onboarding
 from app.config import settings
-from app.core.groq_client import StreamResult
+from app.core.llm_types import StreamResult
 from app.core.memory import extract as extract_mod
 from app.core.memory.extract import extract_memories_from_document
 from app.core.memory.store import list_memories

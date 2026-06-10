@@ -11,7 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
-from app.core.groq_client import StreamChunk, StreamResult, stream_message
+from app.core.groq_client import stream_message
+from app.core.llm_types import StreamChunk, StreamResult
 
 
 async def main() -> None:

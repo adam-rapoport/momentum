@@ -16,7 +16,7 @@ import pytest
 from google.genai import errors as genai_errors
 
 from app.core import llm
-from app.core.groq_client import StreamChunk, StreamResult
+from app.core.llm_types import StreamChunk, StreamResult
 
 
 def _status_error(cls, status: int, message: str):

@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core import model_registry, session_engine
-from app.core.groq_client import StreamChunk, StreamResult, ToolCall
+from app.core.llm_types import StreamChunk, StreamResult, ToolCall
 from app.core.local_store import LocalKVStore
 from app.core.session_engine import (
     AwaitingReviewEvent,

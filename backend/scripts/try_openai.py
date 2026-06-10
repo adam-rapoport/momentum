@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
-from app.core.groq_client import StreamChunk, StreamResult
+from app.core.llm_types import StreamChunk, StreamResult
 from app.core.openai_client import stream_message
 
 DEFAULT_MODEL = "gpt-4o-mini"

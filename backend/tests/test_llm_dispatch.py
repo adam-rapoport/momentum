@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from app.core import llm, model_registry
-from app.core.groq_client import StreamResult
+from app.core.llm_types import StreamResult
 
 
 @pytest.fixture

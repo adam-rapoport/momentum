@@ -3,21 +3,14 @@ implementation (app.core.openai_compat) at Groq.
 
 Groq serves the OpenAI Chat Completions API at https://api.groq.com/openai/v1.
 Using the official `openai` SDK with a custom `base_url` is the documented path.
-
-StreamChunk / StreamResult / ToolCall historically lived here; they moved to
-`app.core.llm_types` (finding A31) and are re-exported below so existing
-imports — including the test harness — keep working.
+The streaming dataclasses live in `app.core.llm_types`.
 """
 from collections.abc import AsyncIterator
 
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.core.llm_types import (  # noqa: F401 — re-exported for compatibility
-    StreamChunk,
-    StreamResult,
-    ToolCall,
-)
+from app.core.llm_types import StreamChunk, StreamResult
 from app.core.openai_compat import stream_chat
 
 # Clients are cached by API key so that per-user keys (from the Connections
