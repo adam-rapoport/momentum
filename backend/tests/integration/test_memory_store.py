@@ -155,6 +155,68 @@ async def test_save_memory_same_slug_updates_in_place(db, seeded):
     assert "new content" in body
 
 
+async def test_slug_collision_suffixes_instead_of_overwriting(db, seeded):
+    """Phase 3 item 24 (A28): two DIFFERENT titles that slugify identically
+    must coexist (-2, -3 …), not silently overwrite each other."""
+    project = seeded["project"]
+    a = await save_memory(
+        db=db, project=project, mem_type="decision",
+        title="Q3 plan!", content="first memory",
+    )
+    b = await save_memory(
+        db=db, project=project, mem_type="decision",
+        title="Q3 plan?", content="second memory",
+    )
+    c = await save_memory(
+        db=db, project=project, mem_type="decision",
+        title="Q3 plan…", content="third memory",
+    )
+    await db.commit()
+
+    assert a.slug == "q3-plan"
+    assert b.slug == "q3-plan-2"
+    assert c.slug == "q3-plan-3"
+    stored = await list_memories(db=db, project=project, mem_type="decision")
+    assert len(stored) == 3
+    # Each file kept its own content.
+    _, body_a = read_memory_file(a)
+    _, body_b = read_memory_file(b)
+    assert "first memory" in body_a
+    assert "second memory" in body_b
+
+    # Re-saving the suffixed title is still an in-place update, not -4.
+    b2 = await save_memory(
+        db=db, project=project, mem_type="decision",
+        title="Q3 plan?", content="second memory, revised",
+    )
+    await db.commit()
+    assert b2.id == b.id
+    assert b2.slug == "q3-plan-2"
+    assert len(await list_memories(db=db, project=project, mem_type="decision")) == 3
+
+
+async def test_failed_flush_writes_no_file(db, seeded, monkeypatch):
+    """Phase 3 item 24 (A28): the markdown file is written only after the DB
+    flush succeeds, so a DB failure can't leave an orphaned file (SQLite
+    doesn't enforce column lengths, so the failure is injected)."""
+    project = seeded["project"]
+    mem_dir = project_memory_dir(project)  # before rollback expires `project`
+
+    async def _failing_flush(*args, **kwargs):
+        raise RuntimeError("injected flush failure")
+
+    monkeypatch.setattr(db, "flush", _failing_flush)
+    with pytest.raises(RuntimeError, match="injected flush failure"):
+        await save_memory(
+            db=db, project=project, mem_type="decision",
+            title="Doomed memory", content="never written",
+        )
+    monkeypatch.undo()
+    await db.rollback()
+    leftovers = list(mem_dir.glob("decision_*.md")) if mem_dir.exists() else []
+    assert leftovers == []
+
+
 async def test_save_memory_rejects_invalid_type(db, seeded):
     with pytest.raises(ValueError):
         await save_memory(
