@@ -20,10 +20,17 @@ class ToolCall:
     """A tool call requested by the LLM. `arguments_json` is a raw JSON string
     as emitted by the model — we leave parsing to the caller so we don't
     choke a whole stream on one bad call.
+
+    `thought_signature` (base64 string) is Gemini-specific: the native
+    google-genai SDK attaches an opaque signature to each function call that
+    MUST be replayed when the call appears in later request history. The
+    session engine persists it inside the tool_use content block so it
+    round-trips through Message.content; non-Google providers ignore it.
     """
     id: str
     name: str
     arguments_json: str
+    thought_signature: str | None = None
 
 
 @dataclass

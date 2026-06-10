@@ -574,16 +574,21 @@ def _history_to_llm_messages(history: list[Message]) -> list[dict]:
                 if b.get("type") == "text":
                     text_parts.append(b.get("text", ""))
                 elif b.get("type") == "tool_use":
-                    tool_calls.append(
-                        {
-                            "id": b.get("id", ""),
-                            "type": "function",
-                            "function": {
-                                "name": b.get("name", ""),
-                                "arguments": json.dumps(b.get("input") or {}),
-                            },
-                        }
-                    )
+                    call = {
+                        "id": b.get("id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": b.get("name", ""),
+                            "arguments": json.dumps(b.get("input") or {}),
+                        },
+                    }
+                    # Gemini (native SDK) requires its opaque thought_signature
+                    # replayed on historical calls; persisted with the block
+                    # (item 19). google_genai_client reads this key; the
+                    # OpenAI-compat clients strip it before the wire.
+                    if b.get("thought_signature"):
+                        call["thought_signature"] = b["thought_signature"]
+                    tool_calls.append(call)
             entry: dict[str, Any] = {"role": "assistant"}
             entry["content"] = "".join(text_parts) or None
             if tool_calls:
@@ -988,7 +993,11 @@ async def _process_message_locked(
             # `multi_args` is populated only when Gemini concatenates several
             # parallel calls into one tool_call with `{..}{..}` arguments; in
             # that case we run the tool once per parsed object at execute time.
-            parsed_calls: list[tuple[str, str, dict, str | None, list[dict] | None]] = []
+            # `signature` is the Gemini thought_signature (base64, item 19) —
+            # persisted with the tool_use block so it replays across restarts.
+            parsed_calls: list[
+                tuple[str, str, dict, str | None, list[dict] | None, str | None]
+            ] = []
             for tc in stream_result.tool_calls:
                 raw_args = tc.arguments_json or ""
                 multi_args: list[dict] | None = None
@@ -1010,16 +1019,20 @@ async def _process_message_locked(
                         parse_error = f"invalid JSON arguments: {e}. Raw: {raw_args!r}"
                 if not isinstance(parsed, dict):
                     parsed = {}
-                parsed_calls.append((tc.id, tc.name, parsed, parse_error, multi_args))
+                parsed_calls.append(
+                    (tc.id, tc.name, parsed, parse_error, multi_args,
+                     getattr(tc, "thought_signature", None))
+                )
 
             # Persist the assistant message (text + tool_use blocks)
             content_blocks: list[dict] = []
             if assistant_text:
                 content_blocks.append({"type": "text", "text": assistant_text})
-            for call_id, name, parsed, _err, _multi in parsed_calls:
-                content_blocks.append(
-                    {"type": "tool_use", "id": call_id, "name": name, "input": parsed}
-                )
+            for call_id, name, parsed, _err, _multi, signature in parsed_calls:
+                block = {"type": "tool_use", "id": call_id, "name": name, "input": parsed}
+                if signature:
+                    block["thought_signature"] = signature
+                content_blocks.append(block)
 
             if content_blocks:
                 assistant_message = Message(
@@ -1042,8 +1055,11 @@ async def _process_message_locked(
                         "id": call_id,
                         "type": "function",
                         "function": {"name": name, "arguments": json.dumps(parsed)},
+                        # The same-turn follow-up request must also carry the
+                        # Gemini thought_signature (item 19).
+                        **({"thought_signature": signature} if signature else {}),
                     }
-                    for call_id, name, parsed, _err, _multi in parsed_calls
+                    for call_id, name, parsed, _err, _multi, signature in parsed_calls
                 ]
             llm_messages.append(assistant_entry)
 
@@ -1057,7 +1073,7 @@ async def _process_message_locked(
             await_review_args: dict | None = None
 
             # Execute each tool, stream start/result events, persist results
-            for call_id, name, parsed, parse_error, multi_args in parsed_calls:
+            for call_id, name, parsed, parse_error, multi_args, _sig in parsed_calls:
                 # Cancel check before each tool execution (finding A2). We
                 # still emit + persist a result for this and every remaining
                 # call: the assistant message with their tool_use blocks is

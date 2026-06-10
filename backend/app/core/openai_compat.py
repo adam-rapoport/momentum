@@ -22,6 +22,33 @@ from app.core.cost_tracker import calculate_cost_usd
 from app.core.llm_types import StreamChunk, StreamResult, ToolCall
 
 
+def _strip_thought_signatures(messages: list[dict]) -> list[dict]:
+    """Drop the Gemini-only `thought_signature` key from assistant tool_calls.
+
+    The session engine threads it through OpenAI-format history so the native
+    google-genai client can replay it (item 19); it is NOT part of the Chat
+    Completions wire format and a strict provider could 400 on it (reachable
+    when the user switches a session from a Gemini 3.x model to any
+    OpenAI-compat one). Copies only what it touches.
+    """
+    cleaned = None
+    for i, msg in enumerate(messages):
+        if msg.get("role") != "assistant":
+            continue
+        if not any("thought_signature" in tc for tc in msg.get("tool_calls") or []):
+            continue
+        if cleaned is None:
+            cleaned = list(messages)
+        cleaned[i] = {
+            **msg,
+            "tool_calls": [
+                {k: v for k, v in tc.items() if k != "thought_signature"}
+                for tc in msg["tool_calls"]
+            ],
+        }
+    return cleaned if cleaned is not None else messages
+
+
 async def stream_chat(
     client: AsyncOpenAI,
     messages: list[dict],
@@ -36,7 +63,7 @@ async def stream_chat(
     """
     request_kwargs: dict = {
         "model": model,
-        "messages": messages,
+        "messages": _strip_thought_signatures(messages),
         "stream": True,
         "stream_options": {"include_usage": True},
     }

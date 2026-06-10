@@ -310,6 +310,57 @@ async def test_tool_call_turn_events_persistence_and_followup(
     assert second[-1] == {"role": "tool", "tool_call_id": "call_1", "content": "echo:ping"}
 
 
+async def test_thought_signature_persists_and_replays_in_history(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Phase 3 item 19 (A13): a Gemini thought_signature on a ToolCall must be
+    persisted in the tool_use content block and threaded back through both the
+    same-turn follow-up request and a later turn's rebuilt history."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(
+                        id="call_sig",
+                        name="TestEcho",
+                        arguments_json='{"value": "x"}',
+                        thought_signature="b64-opaque-sig",
+                    )
+                ]
+            )
+        ],
+        [_result(text="done")],
+        [_result(text="next turn")],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    await _run_turn(db, kv, session.id, "call the tool")
+
+    # Persisted with the tool_use block (round-trips through Message.content).
+    messages = await _messages_for(db, session.id)
+    assert messages[1].content == [
+        {
+            "type": "tool_use",
+            "id": "call_sig",
+            "name": "TestEcho",
+            "input": {"value": "x"},
+            "thought_signature": "b64-opaque-sig",
+        }
+    ]
+
+    # Same-turn follow-up request carried it.
+    same_turn = stub.calls[1]["messages"]
+    assert same_turn[-2]["tool_calls"][0]["thought_signature"] == "b64-opaque-sig"
+
+    # A later turn's history (rebuilt from the DB) carries it too — this is
+    # what the old process-local cache lost on every sidecar restart.
+    await _run_turn(db, kv, session.id, "follow up")
+    rebuilt = stub.calls[2]["messages"]
+    assistant_with_call = next(m for m in rebuilt if m.get("tool_calls"))
+    assert assistant_with_call["tool_calls"][0]["thought_signature"] == "b64-opaque-sig"
+
+
 async def test_malformed_tool_arguments_fed_back_as_error(
     db, seeded, kv, monkeypatch, echo_tool
 ):

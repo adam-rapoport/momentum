@@ -130,6 +130,36 @@ async def test_none_usage_fields_default_to_zero():
     assert result.cost_usd == Decimal("0")
 
 
+async def test_thought_signatures_stripped_from_outbound_messages():
+    # The Gemini-only key threaded through history (item 19) must never hit an
+    # OpenAI-compat wire — strict providers could 400 on it.
+    client = _FakeClient([_chunk(finish_reason="stop")])
+    messages = [
+        {"role": "user", "content": "hi"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "t", "arguments": "{}"},
+                    "thought_signature": "b64sig",
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "c1", "content": "ok"},
+    ]
+    events = [
+        e async for e in openai_compat.stream_chat(client, messages, model="m")
+    ]
+    assert events  # stream ran
+    sent = client.kwargs["messages"]
+    assert "thought_signature" not in sent[1]["tool_calls"][0]
+    # The original tool_call dict (engine state) is NOT mutated.
+    assert messages[1]["tool_calls"][0]["thought_signature"] == "b64sig"
+
+
 async def test_tools_forwarded_with_auto_tool_choice():
     client = _FakeClient([_chunk(finish_reason="stop")])
     tools = [{"type": "function", "function": {"name": "t", "parameters": {}}}]
