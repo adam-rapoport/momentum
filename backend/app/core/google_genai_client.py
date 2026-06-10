@@ -34,7 +34,7 @@ from collections.abc import AsyncIterator
 
 from app.config import settings
 from app.core.cost_tracker import calculate_cost_usd
-from app.core.groq_client import StreamChunk, StreamResult, ToolCall
+from app.core.llm_types import StreamChunk, StreamResult, ToolCall
 
 logger = logging.getLogger(__name__)
 

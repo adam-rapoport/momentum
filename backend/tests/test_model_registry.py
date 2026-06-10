@@ -105,6 +105,46 @@ def test_get_model_returns_none_for_unknown_id():
     assert get_model("not-a-real-model-id") is None
 
 
+# ---- Phase 3 item 18: the registry as the single source of provider truth --
+
+
+def test_infer_provider_uses_registry_entry_first(monkeypatch):
+    # An entry whose id contradicts the prefix heuristic proves the registry
+    # wins: "gpt-…" would heuristically map to openai, but the entry says groq.
+    entry = model_registry.ModelEntry(
+        id="gpt-hosted-on-groq",
+        provider="groq",
+        display_name="x",
+        role="light",
+    )
+    monkeypatch.setattr(
+        model_registry, "REGISTRY", (*model_registry.REGISTRY, entry)
+    )
+    assert model_registry.infer_provider("gpt-hosted-on-groq") == "groq"
+
+
+def test_infer_provider_prefix_heuristics_for_unknown_ids():
+    assert model_registry.get_model("gemini-99-imaginary") is None
+    assert model_registry.infer_provider("gemini-99-imaginary") == "google"
+    assert model_registry.infer_provider("gemma-99-imaginary") == "google"
+    assert model_registry.infer_provider("gpt-99-imaginary") == "openai"
+    assert model_registry.infer_provider("o3-imaginary") == "openai"
+    assert model_registry.infer_provider("totally-unknown") == "groq"
+
+
+def test_provider_available_honors_configured_set():
+    assert model_registry.provider_available("openai", {"openai"})
+    assert not model_registry.provider_available("groq", {"openai"})
+
+
+def test_provider_available_falls_back_to_env_check(monkeypatch):
+    monkeypatch.setattr(
+        model_registry, "_provider_available", lambda p: p == "groq"
+    )
+    assert model_registry.provider_available("groq")
+    assert not model_registry.provider_available("google")
+
+
 def test_provider_filter_drops_models_when_provider_unconfigured(monkeypatch):
     # Simulate Google not being configured: only Groq entries should remain.
     monkeypatch.setattr(

@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core import credentials, model_registry
 from app.core.documents import router as docs_router
-from app.core.groq_client import StreamChunk, StreamResult
 from app.core.llm import stream_message
+from app.core.llm_types import StreamChunk, StreamResult
 from app.core.model_router import parse_deep_flag, select_model
 from app.core.pending_actions import (
     clear_pending_action,

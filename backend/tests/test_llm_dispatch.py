@@ -80,6 +80,16 @@ async def test_unknown_gemini_model_falls_back_to_compat(record_clients):
     assert record_clients[0][0] == "google_compat"
 
 
+async def test_unknown_gpt_model_falls_back_to_openai(record_clients):
+    # Phase 3 item 18: the prefix heuristics now live in the registry and
+    # cover OpenAI ids too — an unregistered gpt-* env override must go to
+    # OpenAI (whose key credentials.py resolves for it), not Groq.
+    model = "gpt-99-imaginary"
+    assert model_registry.get_model(model) is None
+    await _drain(model)
+    assert record_clients[0][0] == "openai"
+
+
 async def test_unknown_other_model_falls_back_to_groq(record_clients):
     model = "some-unregistered-model-xyz"
     assert model_registry.get_model(model) is None

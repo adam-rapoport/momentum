@@ -8,7 +8,14 @@ from __future__ import annotations
 import pytest
 
 from app.config import settings
-from app.core.model_router import HEAVY_SLASH_COMMANDS, parse_deep_flag, select_model
+from app.core import model_registry
+from app.core.model_router import (
+    HEAVY_SLASH_COMMANDS,
+    NoProviderConfiguredError,
+    parse_deep_flag,
+    select_model,
+)
+from app.core.skills import load_skills
 
 
 @pytest.fixture
@@ -138,6 +145,52 @@ def test_empty_preference_dict_uses_env_defaults(default_model, heavy_model):
 def test_preference_with_empty_string_is_ignored(default_model):
     prefs = {"light_model": ""}
     assert select_model("hi", {}, user_preferences=prefs) == default_model
+
+
+# ---- Phase 3 item 18: availability-aware fallback (A16/C6) ------------------
+
+
+def test_heavy_slash_commands_derived_from_skills_registry():
+    # Finding A19: the heavy-command set must BE the skills registry's slash
+    # commands, not a hand-maintained copy that can drift.
+    assert HEAVY_SLASH_COMMANDS == frozenset(
+        s.slash_command for s in load_skills().values()
+    )
+    assert len(HEAVY_SLASH_COMMANDS) >= 10
+
+
+def test_fallback_picks_available_model_when_env_default_provider_has_no_key():
+    # OpenAI-only setup: the env defaults point at Groq/Google models whose
+    # providers have no key. The router must fall back to a model the user
+    # can actually run instead of failing with "GROQ_API_KEY is not
+    # configured" (finding A16/C6).
+    openai_ids = {m.id for m in model_registry.REGISTRY if m.provider == "openai"}
+    light = select_model("hi", {}, configured_providers={"openai"})
+    heavy = select_model("/write-prd topic", {}, configured_providers={"openai"})
+    assert light in openai_ids
+    assert heavy in openai_ids
+
+
+def test_env_default_still_wins_when_its_provider_is_configured(default_model):
+    assert (
+        select_model("hi", {}, configured_providers={"groq", "google", "openai"})
+        == default_model
+    )
+
+
+def test_no_provider_configured_raises_clear_error():
+    with pytest.raises(NoProviderConfiguredError, match="No LLM provider"):
+        select_model("hi", {}, configured_providers=set())
+    with pytest.raises(NoProviderConfiguredError):
+        select_model("/write-prd topic", {}, configured_providers=set())
+
+
+def test_stale_preference_with_partial_providers_falls_back_to_available():
+    # A user whose stored preference points at a Google model but who now only
+    # has an OpenAI key must get an OpenAI model, not a turn failure.
+    prefs = {"light_model": "gemini-3.5-flash"}
+    chosen = select_model("hi", {}, user_preferences=prefs, configured_providers={"openai"})
+    assert model_registry.get_model(chosen).provider == "openai"
 
 
 # ---- Sprint 7 K1: /deep escape-hatch flag ----------------------------------

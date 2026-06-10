@@ -1,25 +1,34 @@
-"""Thin wrapper around Google AI Studio's OpenAI-compatible endpoint.
+"""Thin configuration shim pointing the shared OpenAI-compat streaming
+implementation (app.core.openai_compat) at Google AI Studio.
 
 Google exposes Gemini + Gemma models at
 https://generativelanguage.googleapis.com/v1beta/openai/ which speaks the
 OpenAI Chat Completions API. We reuse the `openai` SDK with a custom
 `base_url` — same pattern as `groq_client.py`.
 
-Kept as a separate module (rather than folded into `groq_client`) so that
-provider-specific quirks (e.g. Google's handling of `stream_options` or
-usage reporting) can be patched without risking the Groq path.
+Two Google-specific quirks live here, as wrappers around the shared stream:
+  - Gemma emits chain-of-thought wrapped in `<thought>...</thought>` tags
+    directly in its text stream; `_ThoughtStripper` removes them in-flight.
+  - Mid-stream truncations (finish_reason=length / content_filter) are
+    silent on the wire; we log them to diagnose skill-flow breaks.
+
+NOTE: we deliberately do NOT set `parallel_tool_calls: False` on requests.
+The OpenAI-compat shim still merges Gemini's parallel calls into
+concatenated JSON regardless of that flag, and setting it seems to cause
+truncated mid-stream terminations on follow-up turns. The session engine
+has a salvage path in `_split_concatenated_json_args` that handles the
+concatenation-on-parse case instead.
 """
 from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
-from decimal import Decimal
 
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.core.cost_tracker import calculate_cost_usd
-from app.core.groq_client import StreamChunk, StreamResult, ToolCall
+from app.core.llm_types import StreamChunk, StreamResult
+from app.core.openai_compat import stream_chat
 
 logger = logging.getLogger(__name__)
 
@@ -116,104 +125,49 @@ async def stream_message(
     api_key: str | None = None,
 ) -> AsyncIterator[StreamChunk | StreamResult]:
     """Stream a chat completion from Google AI Studio. Same contract as
-    `groq_client.stream_message` — yields StreamChunks for text deltas,
-    then a StreamResult with text, tool calls, usage, and cost.
+    `groq_client.stream_message` — the shared loop, wrapped with the Gemma
+    thought-stripper and abnormal-finish logging (see module docstring).
     """
-    client = get_client(api_key)
-
-    request_kwargs: dict = {
-        "model": model,
-        "messages": messages,
-        "stream": True,
-        "stream_options": {"include_usage": True},
-    }
-    if tools:
-        request_kwargs["tools"] = tools
-        request_kwargs["tool_choice"] = "auto"
-    # NOTE: we deliberately do NOT set `parallel_tool_calls: False` here.
-    # The OpenAI-compat shim still merges Gemini's parallel calls into
-    # concatenated JSON regardless of that flag, and setting it seems to
-    # cause truncated mid-stream terminations on follow-up turns. The
-    # session engine has a salvage path in `_split_concatenated_json_args`
-    # that handles the concatenation-on-parse case instead.
-
-    stream = await client.chat.completions.create(**request_kwargs)
-
-    collected_text: list[str] = []
-    tool_calls_by_index: dict[int, dict] = {}
-    input_tokens = 0
-    output_tokens = 0
-    finish_reason: str | None = None
     # Only Gemma emits visible <thought> blocks; skip the overhead for other
     # Google models (Gemini).
     stripper = _ThoughtStripper() if model.startswith("gemma-") else None
+    # Text that actually passed the stripper — StreamResult.text must match
+    # what the caller saw, not the raw stream with thought blocks in it.
+    filtered_text: list[str] = []
 
-    async for chunk in stream:
-        if chunk.choices:
-            choice = chunk.choices[0]
-            delta = choice.delta
-            if delta and delta.content:
-                content = delta.content
-                if stripper is not None:
-                    content = stripper.feed(content)
-                if content:
-                    collected_text.append(content)
-                    yield StreamChunk(text=content)
-            if delta and getattr(delta, "tool_calls", None):
-                for tc_delta in delta.tool_calls:
-                    idx = tc_delta.index
-                    slot = tool_calls_by_index.setdefault(
-                        idx, {"id": None, "name": None, "arguments": ""}
-                    )
-                    if tc_delta.id:
-                        slot["id"] = tc_delta.id
-                    fn = getattr(tc_delta, "function", None)
-                    if fn:
-                        if fn.name:
-                            slot["name"] = fn.name
-                        if fn.arguments:
-                            slot["arguments"] += fn.arguments
-            if choice.finish_reason:
-                finish_reason = choice.finish_reason
-        # Google reports usage in the final chunk (same as Groq/OpenAI when
-        # stream_options.include_usage is set). Guard the attribute access
-        # in case a provider-side change stops sending it.
-        if getattr(chunk, "usage", None):
-            input_tokens = chunk.usage.prompt_tokens or 0
-            output_tokens = chunk.usage.completion_tokens or 0
+    inner = stream_chat(get_client(api_key), messages, model=model, tools=tools)
+    try:
+        async for event in inner:
+            if isinstance(event, StreamChunk):
+                if stripper is None:
+                    yield event
+                    continue
+                text = stripper.feed(event.text)
+                if text:
+                    filtered_text.append(text)
+                    yield StreamChunk(text=text)
+                continue
 
-    # Flush any held-back text after the stream ends.
-    if stripper is not None:
-        tail = stripper.flush()
-        if tail:
-            collected_text.append(tail)
-            yield StreamChunk(text=tail)
+            # StreamResult — flush any held-back text first.
+            if stripper is not None:
+                tail = stripper.flush()
+                if tail:
+                    filtered_text.append(tail)
+                    yield StreamChunk(text=tail)
+                event.text = "".join(filtered_text)
 
-    full_text = "".join(collected_text)
-    tool_calls = [
-        ToolCall(
-            id=slot["id"] or "",
-            name=slot["name"] or "",
-            arguments_json=slot["arguments"],
-        )
-        for _, slot in sorted(tool_calls_by_index.items())
-        if slot["name"]  # drop malformed deltas with no name
-    ]
-
-    # Mid-stream truncations (finish_reason=length, content_filter, malformed)
-    # are silent on the wire; log them so we can diagnose skill-flow breaks.
-    if finish_reason not in ("stop", "tool_calls", None):
-        logger.warning(
-            "google stream ended with finish_reason=%s (model=%s, text_len=%d, "
-            "tool_calls=%d)",
-            finish_reason, model, len(full_text), len(tool_calls),
-        )
-
-    yield StreamResult(
-        text=full_text,
-        tool_calls=tool_calls,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost_usd=calculate_cost_usd(model, input_tokens, output_tokens),
-        finish_reason=finish_reason,
-    )
+            # Mid-stream truncations (finish_reason=length, content_filter,
+            # malformed) are silent on the wire; log them so we can diagnose
+            # skill-flow breaks.
+            if event.finish_reason not in ("stop", "tool_calls", None):
+                logger.warning(
+                    "google stream ended with finish_reason=%s (model=%s, "
+                    "text_len=%d, tool_calls=%d)",
+                    event.finish_reason, model, len(event.text),
+                    len(event.tool_calls),
+                )
+            yield event
+    finally:
+        # Deterministic close so a consumer that bails early can't leave a
+        # dangling HTTP stream behind the shared generator.
+        await inner.aclose()

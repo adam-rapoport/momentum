@@ -6,9 +6,10 @@ Routing is driven by the model registry (app.core.model_registry):
   - provider "openai"                        -> OpenAI (api.openai.com)
   - provider "groq"                          -> Groq (our default provider)
 
-When a model isn't in the registry (e.g. a raw env-var override), we fall
-back to the original name-prefix rule: `gemini-*`/`gemma-*` -> Google
-OpenAI-compat, everything else -> Groq.
+When a model isn't in the registry (e.g. a raw env-var override), the
+registry's name-prefix heuristics decide (`model_registry.infer_provider`):
+`gemini-*`/`gemma-*` -> Google OpenAI-compat, `gpt-*`/`o1-*`/... -> OpenAI,
+everything else -> Groq.
 
 Session engine imports `stream_message` from here instead of from any
 specific provider module, so routing decisions stay in one place.
@@ -34,7 +35,7 @@ from app.core import (
     model_registry,
     openai_client,
 )
-from app.core.groq_client import StreamChunk, StreamResult
+from app.core.llm_types import StreamChunk, StreamResult
 
 try:  # google-genai is in the default install, but stay import-safe anyway
     from google.genai import errors as genai_errors
@@ -43,15 +44,9 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-_GOOGLE_PREFIXES = ("gemini-", "gemma-")
-
 # Backoff schedule for transient failures: two retries, ~1s then ~3s.
 # Module-level so tests can shrink it.
 RETRY_DELAYS: tuple[float, ...] = (1.0, 3.0)
-
-
-def is_google_model(model: str) -> bool:
-    return model.startswith(_GOOGLE_PREFIXES)
 
 
 def _is_transient_error(e: BaseException) -> bool:
@@ -78,26 +73,17 @@ async def _dispatch(
     user's stored key for that provider (resolved by app.core.credentials);
     None means use the env-var default."""
     entry = model_registry.get_model(model)
-    if entry is not None:
-        if entry.provider == "google":
-            client = (
-                google_genai_client
-                if entry.client == "genai_sdk"
-                else google_client
-            )
-        elif entry.provider == "openai":
-            client = openai_client
-        else:
-            client = groq_client
-        async for event in client.stream_message(
-            messages, model=model, tools=tools, api_key=api_key
-        ):
-            yield event
-        return
-
-    # Unknown model (raw env override): fall back to the prefix rule.
-    fallback = google_client if is_google_model(model) else groq_client
-    async for event in fallback.stream_message(
+    if entry is not None and entry.provider == "google" and entry.client == "genai_sdk":
+        client = google_genai_client
+    else:
+        # Registry entry first; prefix heuristics only for unknown
+        # (env-override) ids — see model_registry.infer_provider.
+        provider = entry.provider if entry is not None else model_registry.infer_provider(model)
+        client = {
+            "google": google_client,
+            "openai": openai_client,
+        }.get(provider, groq_client)
+    async for event in client.stream_message(
         messages, model=model, tools=tools, api_key=api_key
     ):
         yield event

@@ -29,6 +29,23 @@ def test_llm_provider_for_model_defaults_to_groq():
     assert credentials.llm_provider_for_model("llama-3.1-8b-instant") == "llm:groq"
 
 
+def test_llm_provider_for_model_consults_registry_first(monkeypatch):
+    # Phase 3 item 18 (finding A17): a registry entry beats the prefix
+    # heuristic. An id that LOOKS like OpenAI but is registered on Groq must
+    # resolve to the Groq key.
+    from app.core import model_registry
+
+    entry = model_registry.ModelEntry(
+        id="gpt-hosted-on-groq", provider="groq", display_name="x", role="light"
+    )
+    monkeypatch.setattr(
+        model_registry, "REGISTRY", (*model_registry.REGISTRY, entry)
+    )
+    assert credentials.llm_provider_for_model("gpt-hosted-on-groq") == "llm:groq"
+    # Registry entries with no heuristically-matching prefix work too.
+    assert credentials.llm_provider_for_model("openai/gpt-oss-120b") == "llm:groq"
+
+
 def test_known_providers_namespaced_and_disjoint():
     assert set(credentials.LLM_PROVIDERS) == {"llm:groq", "llm:google_ai", "llm:openai"}
     assert set(credentials.SEARCH_PROVIDERS) == {"search:tavily", "search:perplexity"}

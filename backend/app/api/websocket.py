@@ -26,6 +26,7 @@ from openai import APIError as OpenAIAPIError
 from pydantic import ValidationError
 from starlette.websockets import WebSocketState
 
+from app.core.model_router import NoProviderConfiguredError
 from app.core.session_engine import (
     ApprovalPendingError,
     AwaitingReviewEvent,
@@ -93,14 +94,20 @@ def _model_error_frame(e: BaseException, session_id: UUID) -> dict | None:
     `e` isn't a model-provider error (caller falls through to INTERNAL_ERROR).
 
     Codes (additive to the frontend contract): MODEL_AUTH_ERROR,
-    MODEL_RATE_LIMITED, MODEL_CONTEXT_TOO_LONG, plus the pre-existing
-    MODEL_TOOL_CALL_FAILED and MODEL_API_ERROR fallback.
+    MODEL_RATE_LIMITED, MODEL_CONTEXT_TOO_LONG, NO_PROVIDER_CONFIGURED, plus
+    the pre-existing MODEL_TOOL_CALL_FAILED and MODEL_API_ERROR fallback.
     """
     sid = str(session_id)
     msg = str(e).lower()
 
     def frame(code: str, message: str) -> dict:
         return {"type": "error", "code": code, "message": message, "session_id": sid}
+
+    # The model router found NO provider with a usable key at all — distinct
+    # from a per-provider auth failure: there is nothing to retry, the user
+    # must connect a provider first. The message already points at Settings.
+    if isinstance(e, NoProviderConfiguredError):
+        return frame("NO_PROVIDER_CONFIGURED", str(e))
 
     # Provider clients raise RuntimeError("<PROVIDER>_API_KEY is not
     # configured — ...") when a turn routes to a provider with no key. The
