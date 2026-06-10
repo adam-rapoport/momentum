@@ -1,10 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Uuid, func
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, JSONColumn
+from app.models.base import Base, JSONColumn, UTCDateTime
 
 
 class Message(Base):
@@ -12,7 +12,10 @@ class Message(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     session_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("sessions.id"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     turn_id: Mapped[int] = mapped_column(Integer, nullable=False)
     # Per-session monotonic ordering counter (assigned by the session engine).
@@ -26,7 +29,7 @@ class Message(Base):
     token_count_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_compacted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), nullable=False
     )
 
     session: Mapped["Session"] = relationship(back_populates="messages")  # noqa: F821

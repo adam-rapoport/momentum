@@ -229,7 +229,6 @@ async def seeded(db: AsyncSession) -> dict:
         slug="test-org",
         plan="free",
         settings={},
-        llm_api_keys={},
     )
     db.add(org)
     await db.flush()

@@ -2,10 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Uuid, func
+from sqlalchemy import ForeignKey, Integer, Numeric, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, JSONColumn
+from app.models.base import Base, JSONColumn, UTCDateTime
 
 
 class Session(Base):
@@ -13,13 +13,22 @@ class Session(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     project_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     permission_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    # Updated every turn by the session engine to the provider/model that
+    # actually served it (finding A20) — the defaults only cover rows that
+    # have never run a turn.
     llm_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="groq")
     llm_model: Mapped[str] = mapped_column(
         String(100), nullable=False, default="meta-llama/llama-4-scout-17b-16e-instruct"
@@ -34,10 +43,10 @@ class Session(Base):
         "metadata", JSONColumn, nullable=False, default=dict
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship(back_populates="sessions")  # noqa: F821
