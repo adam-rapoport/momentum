@@ -5,8 +5,15 @@ Prices are per 1 million tokens. Groq rates:
 Google AI Studio rates:
   https://ai.google.dev/gemini-api/docs/pricing
 Confirm current rates in those dashboards before trusting production invoices.
+
+Every model in app.core.model_registry MUST have an entry here (enforced by
+tests/test_cost_tracker.py). Extra entries are fine — they cover retired
+registry models still named in old sessions and raw env-override ids.
 """
+import logging
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 class ModelPricing:
@@ -54,12 +61,22 @@ GROQ_PRICING: dict[str, ModelPricing] = {
 
 _MILLION = Decimal("1000000")
 
+# Models we've already complained about — log once per process, not per turn
+# (finding A21: unknown models used to be a SILENT $0).
+_warned_unknown_models: set[str] = set()
+
 
 def calculate_cost_usd(
     model: str, input_tokens: int, output_tokens: int
 ) -> Decimal:
     pricing = GROQ_PRICING.get(model)
     if pricing is None:
+        if model not in _warned_unknown_models:
+            _warned_unknown_models.add(model)
+            logger.warning(
+                "no pricing entry for model %s — its usage will be recorded "
+                "as $0; add it to cost_tracker.GROQ_PRICING", model,
+            )
         return Decimal("0")
     return (
         pricing.input * Decimal(input_tokens) / _MILLION

@@ -108,6 +108,23 @@ def test_get_context_raises_without_engine():
         get_context()
 
 
+async def test_timecheck_formats_portably():
+    """Phase 3 item 22 (A24): TimeCheck must not use glibc-only %-d/%-I
+    (which crash strftime on Windows) — and the output must still have no
+    zero-padded day or hour."""
+    import re
+
+    out = await execute_tool("TimeCheck", {})
+    assert not out.startswith("Error"), out
+    # e.g. "Wednesday, June 10, 2026 3:42 PM PDT"
+    m = re.match(
+        r"^[A-Z][a-z]+, [A-Z][a-z]+ (\d{1,2}), \d{4} (\d{1,2}):\d{2} [AP]M", out
+    )
+    assert m, out
+    assert not m.group(1).startswith("0")
+    assert not m.group(2).startswith("0")
+
+
 # ---------- per-tool timeouts (Phase 1 item 11, finding A23) ----------
 
 

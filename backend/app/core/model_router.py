@@ -20,20 +20,29 @@ from __future__ import annotations
 import re
 
 from app.config import settings
-from app.core.model_registry import is_model_available
+from app.core.model_registry import (
+    get_available_models,
+    infer_provider,
+    is_model_available,
+    provider_available,
+)
+from app.core.skills import load_skills
 
-HEAVY_SLASH_COMMANDS = {
-    "write-prd",
-    "stakeholder-update",
-    "meeting-prep",
-    "sprint-review",
-    "feedback-synthesis",
-    "release-notes",
-    "competitive-analysis",
-    "user-story",
-    "decision-log",
-    "quarterly-review",
-}
+
+class NoProviderConfiguredError(RuntimeError):
+    """No LLM provider has a usable API key (neither stored nor env), so no
+    model can serve this turn. The websocket layer maps this to a
+    NO_PROVIDER_CONFIGURED error frame pointing the user at Settings.
+    """
+
+
+# Every skill is a heavy-drafting workflow, so its slash command routes the
+# turn to the heavy model. Derived from the skills registry (finding A19) —
+# this used to be a hardcoded copy that could silently drift from
+# app/skills/*/SKILL.md.
+HEAVY_SLASH_COMMANDS = frozenset(
+    skill.slash_command for skill in load_skills().values()
+)
 _SLASH_RE = re.compile(r"^/([a-z][a-z0-9-]*)", re.IGNORECASE)
 
 # `/deep` is an escape hatch: prefixing a message with it forces that one turn
@@ -57,6 +66,32 @@ def parse_deep_flag(user_text: str | None) -> tuple[bool, str]:
     return True, (match.group(1) or "").strip()
 
 
+def _fallback_model(role: str, configured: set[str] | None) -> str:
+    """The model for a slot when the user has no (usable) preference.
+
+    The env-var default wins when its provider has a key — the original
+    behavior. When it doesn't (e.g. an OpenAI-only or Google-only setup,
+    finding A16/C6), fall back to any AVAILABLE registry model — preferring
+    ones suited to the role — instead of hard-failing the turn with
+    "GROQ_API_KEY is not configured". With no provider configured at all,
+    raise loudly so the websocket layer can point the user at Settings.
+    """
+    env_default = settings.groq_model if role == "light" else settings.groq_heavy_model
+    if provider_available(infer_provider(env_default), configured):
+        return env_default
+    candidates = get_available_models(role=role, configured_providers=configured)
+    if not candidates:
+        # No role-appropriate model — any configured model beats an error.
+        candidates = get_available_models(configured_providers=configured)
+    if candidates:
+        return candidates[0].id
+    raise NoProviderConfiguredError(
+        "No LLM provider is configured — pMomentum has no API key to run a "
+        "model with. Open Settings → Connections and connect Groq, Google "
+        "AI, or OpenAI (or set an API key in .env)."
+    )
+
+
 # Any available model can fill either slot — role no longer gates the pick, so
 # we validate only that the model exists and its provider is configured.
 def _resolve_light(prefs: dict | None, configured: set[str] | None) -> str:
@@ -67,7 +102,7 @@ def _resolve_light(prefs: dict | None, configured: set[str] | None) -> str:
         and is_model_available(pref, configured_providers=configured)
     ):
         return pref
-    return settings.groq_model
+    return _fallback_model("light", configured)
 
 
 def _resolve_heavy(prefs: dict | None, configured: set[str] | None) -> str:
@@ -78,7 +113,7 @@ def _resolve_heavy(prefs: dict | None, configured: set[str] | None) -> str:
         and is_model_available(pref, configured_providers=configured)
     ):
         return pref
-    return settings.groq_heavy_model
+    return _fallback_model("heavy", configured)
 
 
 def select_model(

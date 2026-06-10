@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core import model_registry
 from app.core.integrations.vault import (
     VaultDecodeError,
     VaultNotConfigured,
@@ -56,18 +57,17 @@ _REGISTRY_PROVIDER: dict[str, str] = {
     "llm:google_ai": "google",
     "llm:openai": "openai",
 }
-
-_GOOGLE_MODEL_PREFIXES = ("gemini-", "gemma-")
-_OPENAI_MODEL_PREFIXES = ("gpt-", "o1-", "o3-", "o4-", "chatgpt-")
+_CREDENTIAL_PROVIDER = {v: k for k, v in _REGISTRY_PROVIDER.items()}
 
 
 def llm_provider_for_model(model_id: str) -> str:
-    """Map a model ID to the credential provider whose key serves it."""
-    if model_id.startswith(_GOOGLE_MODEL_PREFIXES):
-        return "llm:google_ai"
-    if model_id.startswith(_OPENAI_MODEL_PREFIXES):
-        return "llm:openai"
-    return "llm:groq"
+    """Map a model ID to the credential provider whose key serves it.
+
+    Delegates to the model registry — the single source of provider truth
+    (finding A17). Unknown (raw env-override) ids fall back to the registry's
+    name-prefix heuristics.
+    """
+    return _CREDENTIAL_PROVIDER[model_registry.infer_provider(model_id)]
 
 
 def _env_fallback(provider: str) -> str | None:

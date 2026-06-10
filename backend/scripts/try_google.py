@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
 from app.core.google_client import stream_message
-from app.core.groq_client import StreamChunk, StreamResult
+from app.core.llm_types import StreamChunk, StreamResult
 
 
 FAKE_WRITE_DOC_TOOL = {

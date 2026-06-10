@@ -244,6 +244,37 @@ def test_validation_error_on_malformed_message(client):
         assert frame["code"] == "VALIDATION_ERROR"
 
 
+def test_empty_message_rejected_with_validation_error(client):
+    """Phase 3 item 22 (A29): an empty (post-/deep-strip) message must not
+    reach the engine — it would persist an empty user turn."""
+    with client.websocket_connect("/ws") as ws:
+        for content in ("", "   ", "/deep", "/deep   "):
+            ws.send_json(
+                {"type": "session.message", "session_id": SESSION_ID, "content": content}
+            )
+            frame = ws.receive_json()
+            assert frame["type"] == "error", content
+            assert frame["code"] == "VALIDATION_ERROR", content
+            assert frame["session_id"] == SESSION_ID
+
+
+def test_read_loop_survives_garbage_frames(client):
+    """Phase 3 item 22 (P12): non-JSON and non-object frames answer with
+    VALIDATION_ERROR instead of silently killing the read loop."""
+    with client.websocket_connect("/ws") as ws:
+        ws.send_text("this is not json {")
+        frame = ws.receive_json()
+        assert frame["code"] == "VALIDATION_ERROR"
+
+        ws.send_json([1, 2, 3])  # valid JSON, but not an object
+        frame = ws.receive_json()
+        assert frame["code"] == "VALIDATION_ERROR"
+
+        # The loop is still alive and serving real frames.
+        ws.send_json({"type": "bogus.frame"})
+        assert ws.receive_json()["code"] == "UNKNOWN_MESSAGE_TYPE"
+
+
 def test_unknown_message_type(client):
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "bogus.frame"})

@@ -1,16 +1,56 @@
 """Desktop-mode config resolution tests (plan item 31 / T4).
 
-Covers Settings' DATA_DIR-driven path precedence (pure, no disk) and the
+Covers Settings' DATA_DIR-driven path precedence (pure, no disk), the
 vault-key minting in _load_or_create_vault_key / bootstrap_data_dir
-(tmp_path only — never the real data dir).
+(tmp_path only — never the real data dir), and the keychain preference
+order (item 23 / P3) against a fake keyring backend.
 """
 from __future__ import annotations
 
 import os
 
+import pytest
 from cryptography.fernet import Fernet
 
+from app import config
 from app.config import Settings, _load_or_create_vault_key, bootstrap_data_dir, settings
+
+
+@pytest.fixture(autouse=True)
+def _no_real_keyring(monkeypatch):
+    """Never touch a developer machine's real keychain from the test suite.
+    Tests that want a keychain opt in via `fake_keyring`."""
+    monkeypatch.setattr(config, "_keyring_module", lambda: None)
+
+
+class _FakeKeyring:
+    """In-memory stand-in for the `keyring` module's get/set API."""
+
+    def __init__(self) -> None:
+        self.store: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, account: str) -> str | None:
+        return self.store.get((service, account))
+
+    def set_password(self, service: str, account: str, value: str) -> None:
+        self.store[(service, account)] = value
+
+
+class _BrokenKeyring:
+    """Backend whose every call fails (locked keychain / headless session)."""
+
+    def get_password(self, service: str, account: str) -> str | None:
+        raise RuntimeError("keychain locked")
+
+    def set_password(self, service: str, account: str, value: str) -> None:
+        raise RuntimeError("keychain locked")
+
+
+@pytest.fixture
+def fake_keyring(monkeypatch) -> _FakeKeyring:
+    kr = _FakeKeyring()
+    monkeypatch.setattr(config, "_keyring_module", lambda: kr)
+    return kr
 
 
 def _fresh_settings(monkeypatch, **kwargs) -> Settings:
@@ -91,6 +131,50 @@ def test_vault_key_whitespace_only_file_recovers(tmp_path):
     (tmp_path / "vault.key").write_text("  \n", encoding="utf-8")
     key = _load_or_create_vault_key(tmp_path)
     Fernet(key.encode())
+
+
+# ---------- keychain preference order (item 23 / P3) ----------
+
+
+def test_fresh_key_minted_into_keychain_leaves_no_file(tmp_path, fake_keyring):
+    key = _load_or_create_vault_key(tmp_path)
+    Fernet(key.encode())
+    # Stored under the documented service/account…
+    assert fake_keyring.store[("pMomentum", "vault-key")] == key
+    # …and crucially NO plaintext key file on disk (the point of P3).
+    assert not (tmp_path / "vault.key").exists()
+    # Stable across calls.
+    assert _load_or_create_vault_key(tmp_path) == key
+
+
+def test_existing_file_key_migrates_into_keychain_and_keeps_file(
+    tmp_path, fake_keyring
+):
+    file_key = Fernet.generate_key().decode()
+    (tmp_path / "vault.key").write_text(file_key, encoding="utf-8")
+
+    assert _load_or_create_vault_key(tmp_path) == file_key
+    # Pushed into the keychain (migration)…
+    assert fake_keyring.store[("pMomentum", "vault-key")] == file_key
+    # …but the file stays for rollback to a pre-keychain build.
+    assert (tmp_path / "vault.key").read_text(encoding="utf-8") == file_key
+
+
+def test_keychain_key_wins_over_file(tmp_path, fake_keyring):
+    fake_keyring.store[("pMomentum", "vault-key")] = "keychain-key"
+    (tmp_path / "vault.key").write_text("stale-file-key", encoding="utf-8")
+    assert _load_or_create_vault_key(tmp_path) == "keychain-key"
+
+
+def test_broken_keyring_backend_degrades_to_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "_keyring_module", lambda: _BrokenKeyring())
+    key = _load_or_create_vault_key(tmp_path)
+    Fernet(key.encode())
+    # Fell back to the original file path, perms and all.
+    key_path = tmp_path / "vault.key"
+    assert key_path.read_text(encoding="utf-8").strip() == key
+    assert (key_path.stat().st_mode & 0o777) == 0o600
+    assert _load_or_create_vault_key(tmp_path) == key
 
 
 # ---------- bootstrap_data_dir ----------

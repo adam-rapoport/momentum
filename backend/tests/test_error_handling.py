@@ -155,6 +155,22 @@ async def test_genai_server_error_routes_to_model_api_error():
     assert frame["code"] == "MODEL_API_ERROR"
 
 
+async def test_no_provider_configured_routes_to_dedicated_code():
+    # Phase 3 item 18: the model router raises when NO provider has a key at
+    # all — distinct from a per-provider auth failure (nothing to retry).
+    from app.core.model_router import NoProviderConfiguredError
+
+    frame = await _run_case(
+        NoProviderConfiguredError(
+            "No LLM provider is configured — pMomentum has no API key to run "
+            "a model with. Open Settings → Connections and connect Groq, "
+            "Google AI, or OpenAI (or set an API key in .env)."
+        )
+    )
+    assert frame["code"] == "NO_PROVIDER_CONFIGURED"
+    assert "Settings" in frame["message"]
+
+
 async def test_commit_failed_routes_to_db_error():
     exc = CommitFailedError("persist_user_message", RuntimeError("connection reset"))
     frame = await _run_case(exc)

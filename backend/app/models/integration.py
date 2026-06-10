@@ -7,10 +7,10 @@ tokens are stored encrypted with Fernet — see `app/core/integrations/vault.py`
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, UniqueConstraint, Uuid, func
+from sqlalchemy import ForeignKey, LargeBinary, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, JSONColumn
+from app.models.base import Base, JSONColumn, UTCDateTime
 
 
 class Integration(Base):
@@ -21,7 +21,10 @@ class Integration(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     # connected | disconnected | error
@@ -32,13 +35,13 @@ class Integration(Base):
     scopes: Mapped[list] = mapped_column(JSONColumn, nullable=False, default=list)
     # Free-form provider metadata (Google email, display name, workspace id, …).
     meta: Mapped[dict] = mapped_column("metadata", JSONColumn, nullable=False, default=dict)
-    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     last_refreshed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), onupdate=func.now(), nullable=False
     )

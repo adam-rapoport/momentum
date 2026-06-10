@@ -155,6 +155,42 @@ REGISTRY: tuple[ModelEntry, ...] = (
 )
 
 
+# Name-prefix heuristics for models that are NOT in the registry (raw env-var
+# overrides). The registry entry is always consulted first — these exist only
+# so a user pointing GROQ_MODEL/GROQ_HEAVY_MODEL at an unregistered ID still
+# gets a sensible provider (findings A17/C6).
+_GOOGLE_PREFIXES = ("gemini-", "gemma-")
+_OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-", "chatgpt-")
+
+
+def infer_provider(model_id: str) -> str:
+    """Provider name ("groq" | "google" | "openai") for `model_id`.
+
+    Single source of provider truth: the registry entry decides when one
+    exists; unknown (env-override) ids fall back to the name-prefix
+    heuristics, defaulting to groq — the original behavior.
+    """
+    entry = get_model(model_id)
+    if entry is not None:
+        return entry.provider
+    if model_id.startswith(_GOOGLE_PREFIXES):
+        return "google"
+    if model_id.startswith(_OPENAI_PREFIXES):
+        return "openai"
+    return "groq"
+
+
+def provider_available(
+    provider: str, configured_providers: set[str] | None = None
+) -> bool:
+    """Public availability check for a provider name: the per-user set when
+    given, the env vars otherwise (single-arg call so monkeypatched stand-ins
+    in tests keep working — same convention as get_available_models)."""
+    if configured_providers is not None:
+        return provider in configured_providers
+    return _provider_available(provider)
+
+
 def _provider_available(
     provider: str, configured_providers: set[str] | None = None
 ) -> bool:

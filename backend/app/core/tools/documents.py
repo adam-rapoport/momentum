@@ -168,11 +168,10 @@ async def _list_documents(input_data: dict) -> str:  # noqa: ARG001 — no args
 async def _await_review(input_data: dict) -> str:
     """Sentinel: signals that a skill has produced its final deliverable.
 
-    Chunk A: this handler is a simple pass-through — it just confirms the
-    call and returns a deterministic string. Chunk C wires the session
-    engine to intercept invocations and transition the session into
-    `awaiting_review` status, blocking further model turns until the user
-    responds.
+    The handler itself only validates and confirms — the session engine
+    intercepts successful AwaitReview calls during an active skill,
+    transitions the session into `awaiting_review`, and blocks further model
+    turns until the user approves/revises/restarts from the approval bar.
     """
     deliverable_kind = (input_data.get("deliverable_kind") or "").strip()
     document_id = (input_data.get("document_id") or "").strip() or None
@@ -187,8 +186,9 @@ async def _await_review(input_data: dict) -> str:
     return (
         f"[AwaitReview — {deliverable_kind}{doc_part}]\n"
         f"{summary}\n\n"
-        "(Pause-and-review wiring lands in Chunk C. For now, the agent should stop here; "
-        "the user will reply to confirm, revise, or restart.)"
+        "The deliverable is now registered for the user's review. STOP here — "
+        "produce no further output and call no more tools. The user will "
+        "approve, request changes, or restart from the approval bar."
     )
 
 

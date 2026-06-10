@@ -41,7 +41,6 @@ async def ensure_default_setup(db: AsyncSession) -> None:
             slug=DEFAULT_ORG_SLUG,
             plan="free",
             settings={},
-            llm_api_keys={},
         )
         db.add(org)
         await db.flush()

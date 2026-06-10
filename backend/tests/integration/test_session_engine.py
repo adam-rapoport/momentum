@@ -24,8 +24,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core import session_engine
-from app.core.groq_client import StreamChunk, StreamResult, ToolCall
+from app.core import model_registry, session_engine
+from app.core.llm_types import StreamChunk, StreamResult, ToolCall
 from app.core.local_store import LocalKVStore
 from app.core.session_engine import (
     AwaitingReviewEvent,
@@ -205,6 +205,23 @@ async def test_plain_text_turn_events_and_persistence(db, seeded, kv, monkeypatc
     assert sent[1]["content"] == "hi there"
 
 
+async def test_session_row_records_the_turns_actual_model(
+    db, seeded, kv, monkeypatch
+):
+    """Phase 3 item 20 (A20): sessions.llm_model/llm_provider must track the
+    brain that served the latest turn, not the write-once column defaults."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream([_result(text="ok")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "hello")
+    done = events[-1]
+
+    await db.refresh(session)
+    assert session.llm_model == done.model
+    assert session.llm_provider == model_registry.infer_provider(done.model)
+
+
 async def test_second_turn_includes_history_and_continues_seq(
     db, seeded, kv, monkeypatch
 ):
@@ -308,6 +325,57 @@ async def test_tool_call_turn_events_persistence_and_followup(
     assert second[-2]["tool_calls"][0]["id"] == "call_1"
     assert json.loads(second[-2]["tool_calls"][0]["function"]["arguments"]) == {"value": "ping"}
     assert second[-1] == {"role": "tool", "tool_call_id": "call_1", "content": "echo:ping"}
+
+
+async def test_thought_signature_persists_and_replays_in_history(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Phase 3 item 19 (A13): a Gemini thought_signature on a ToolCall must be
+    persisted in the tool_use content block and threaded back through both the
+    same-turn follow-up request and a later turn's rebuilt history."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(
+                        id="call_sig",
+                        name="TestEcho",
+                        arguments_json='{"value": "x"}',
+                        thought_signature="b64-opaque-sig",
+                    )
+                ]
+            )
+        ],
+        [_result(text="done")],
+        [_result(text="next turn")],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    await _run_turn(db, kv, session.id, "call the tool")
+
+    # Persisted with the tool_use block (round-trips through Message.content).
+    messages = await _messages_for(db, session.id)
+    assert messages[1].content == [
+        {
+            "type": "tool_use",
+            "id": "call_sig",
+            "name": "TestEcho",
+            "input": {"value": "x"},
+            "thought_signature": "b64-opaque-sig",
+        }
+    ]
+
+    # Same-turn follow-up request carried it.
+    same_turn = stub.calls[1]["messages"]
+    assert same_turn[-2]["tool_calls"][0]["thought_signature"] == "b64-opaque-sig"
+
+    # A later turn's history (rebuilt from the DB) carries it too — this is
+    # what the old process-local cache lost on every sidecar restart.
+    await _run_turn(db, kv, session.id, "follow up")
+    rebuilt = stub.calls[2]["messages"]
+    assistant_with_call = next(m for m in rebuilt if m.get("tool_calls"))
+    assert assistant_with_call["tool_calls"][0]["thought_signature"] == "b64-opaque-sig"
 
 
 async def test_malformed_tool_arguments_fed_back_as_error(
