@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { extractDetail } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { Banner, SectionHeader } from "../kit";
 
 export interface GtkyState {
@@ -77,7 +77,7 @@ export function GtkyStep({
         setUploads(next);
       }
     } catch (e) {
-      setError(extractDetail(e));
+      setError(errorMessage(e));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

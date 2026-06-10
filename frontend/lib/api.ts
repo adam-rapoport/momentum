@@ -26,6 +26,18 @@ function timeoutError(err: unknown, timeoutMs: number): Error | null {
   return null;
 }
 
+// FastAPI returns errors as {"detail": "..."} — surface that human-readable
+// message rather than the raw JSON blob.
+function detailFromBody(text: string): string {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed.detail === "string") return parsed.detail;
+  } catch {
+    // not JSON; keep the raw text
+  }
+  return text;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
@@ -51,16 +63,7 @@ async function request<T>(
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    // FastAPI returns errors as {"detail": "..."} — surface that human-readable
-    // message rather than the raw JSON blob.
-    let detail = text;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed.detail === "string") detail = parsed.detail;
-    } catch {
-      // not JSON; keep the raw text
-    }
-    throw new Error(detail || `${res.status} ${res.statusText}`);
+    throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -160,7 +163,7 @@ export const api = {
     }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ""}`);
+      throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
     }
     return (await res.json()) as {
       title: string;

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type KeyProvider } from "@/lib/api";
-import { extractDetail } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
 import { Wordmark } from "../Brand";
 import { ThemeToggle } from "../ThemeToggle";
@@ -102,7 +102,7 @@ export function OnboardingWizard() {
       // The PUT endpoint returns 400 with the provider's rejection detail
       // inside a JSON body, wrapped by our fetch helper as
       // "400 Bad Request: {\"detail\":\"...\"}". Pull out just the detail.
-      setError(extractDetail(e));
+      setError(errorMessage(e));
       return false;
     } finally {
       setSaving(false);
@@ -134,7 +134,7 @@ export function OnboardingWizard() {
       }
       return true;
     } catch (e) {
-      setError(extractDetail(e));
+      setError(errorMessage(e));
       return false;
     } finally {
       setSaving(false);
@@ -169,7 +169,7 @@ export function OnboardingWizard() {
       // BootGate routes on completed_at: navigating to /chat with the flag
       // unset just bounces straight back here (the "onboarding ping-pong").
       // Surface the failure and let the user retry instead.
-      setFinishError(extractDetail(e));
+      setFinishError(errorMessage(e));
       setFinishing(false);
       return;
     }

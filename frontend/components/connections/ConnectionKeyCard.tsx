@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { api, type ConnectionStatus, type KeyProvider } from "@/lib/api";
-import { extractDetail } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { validateKeyFormat, type KeyFormatMeta } from "@/lib/providers";
 import { KeyInput } from "./KeyInput";
 import { Banner, ProviderGlyph, StatusPill } from "./kit";
@@ -50,7 +50,7 @@ export function ConnectionKeyCard({
       setEditing(false);
       onChanged();
     } catch (e) {
-      setError(extractDetail(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }
