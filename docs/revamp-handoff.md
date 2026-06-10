@@ -48,6 +48,20 @@ the best code; delete what becomes redundant."** Compatibility shims were
 deliberately removed (e.g. `groq_client` no longer re-exports the stream
 types); follow the same rule.
 
+**Inspecting the changes:** all commits are pushed to `origin`, so from any
+clone:
+
+```bash
+git fetch origin main claude/pmomentum-code-review-c8myfm
+git diff main...claude/pmomentum-code-review-c8myfm --stat   # the whole revamp
+git show ae443a1                                             # any single commit + its message/rationale
+git log --oneline main..claude/pmomentum-code-review-c8myfm  # the 30+ commit list
+```
+
+Commit messages carry the per-change rationale and cite the finding IDs from
+the review doc — prefer `git show` over re-reading whole files when you need
+the "what exactly changed here".
+
 ## 3. What was implemented, with rationale
 
 ### Phase 0 — Security & data-safety (`66666ed`)
