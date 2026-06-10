@@ -161,21 +161,81 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+# --- credential vault key storage (item 23, finding P3) ----------------------
+# Preference order: OS keychain (macOS Keychain via `keyring`) > vault.key
+# file. The file was a plaintext Fernet key sitting next to the very DB it
+# encrypts; the keychain keeps it behind the user's login session instead.
+# `keyring` ships only with the desktop extra — when it's absent (Linux CI,
+# web dev) or its backend fails (headless session, locked keychain), every
+# helper degrades silently to the file path, which is byte-for-byte the old
+# behavior.
+_KEYRING_SERVICE = "pMomentum"
+_KEYRING_ACCOUNT = "vault-key"
+
+
+def _keyring_module():
+    """The `keyring` module, or None when not installed. Separate function so
+    tests can monkeypatch a fake backend in."""
+    try:
+        import keyring
+    except ImportError:
+        return None
+    return keyring
+
+
+def _keychain_get_key() -> str | None:
+    kr = _keyring_module()
+    if kr is None:
+        return None
+    try:
+        return kr.get_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT) or None
+    except Exception:  # noqa: BLE001 — any backend failure means "no keychain"
+        return None
+
+
+def _keychain_store_key(key: str) -> bool:
+    kr = _keyring_module()
+    if kr is None:
+        return False
+    try:
+        kr.set_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT, key)
+    except Exception:  # noqa: BLE001 — best-effort; file remains the fallback
+        return False
+    return True
+
+
 def _load_or_create_vault_key(root: Path) -> str:
-    """Return the persisted credential vault key under `root`, minting one if
-    absent. Treats an empty/truncated file as absent (a half-written key from a
-    crash or full disk must not brick the vault). Writes atomically so a partial
-    file is never observed."""
+    """Return the credential vault key, minting one if absent.
+
+    Resolution order:
+      1. OS keychain entry (service "pMomentum" / account "vault-key").
+      2. `vault.key` file under `root` — the pre-keychain location. Its key
+         is pushed INTO the keychain (migration) but the file is kept so the
+         user can roll back to an older build that only reads the file.
+      3. Mint a fresh key: stored in the keychain when available, else
+         written to the file (atomically, 0600) exactly as before.
+
+    Treats an empty/truncated file as absent (a half-written key from a
+    crash or full disk must not brick the vault)."""
+    keychain_key = _keychain_get_key()
+    if keychain_key:
+        return keychain_key
+
     key_path = root / "vault.key"
     if key_path.exists():
         existing = key_path.read_text(encoding="utf-8").strip()
         if existing:
+            # Migrate into the keychain; keep the file for rollback.
+            _keychain_store_key(existing)
             return existing
         # else: empty/truncated → fall through and mint a fresh key
 
     from cryptography.fernet import Fernet
 
     new_key = Fernet.generate_key().decode("utf-8")
+    if _keychain_store_key(new_key):
+        return new_key  # keychain-only — no plaintext key on disk
+
     tmp = root / f"vault.key.{os.getpid()}.tmp"
     tmp.write_text(new_key, encoding="utf-8")
     try:
