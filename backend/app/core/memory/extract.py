@@ -19,9 +19,9 @@ import re
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import credentials, llm
-from app.core.groq_client import StreamChunk, StreamResult
+from app.core.llm_types import StreamChunk, StreamResult
 from app.core.memory.store import ALLOWED_TYPES, save_memory
-from app.core.model_router import select_model
+from app.core.model_router import NoProviderConfiguredError, select_model
 from app.models import MemoryRecord, Project, User
 
 logger = logging.getLogger(__name__)
@@ -81,13 +81,19 @@ async def _run_heavy(
 ) -> str:
     """Resolve the user's heavy model + key and run a single completion."""
     configured = await credentials.configured_llm_providers(db, user.id)
-    model = select_model(
-        "",
-        None,
-        user_preferences=user.preferences,
-        configured_providers=configured,
-        force_heavy=True,
-    )
+    try:
+        model = select_model(
+            "",
+            None,
+            user_preferences=user.preferences,
+            configured_providers=configured,
+            force_heavy=True,
+        )
+    except NoProviderConfiguredError:
+        # Extraction is best-effort: with no provider configured at all,
+        # skip rather than crash the upload.
+        logger.info("doc extraction skipped: no LLM provider configured")
+        return ""
     cred_provider = credentials.llm_provider_for_model(model)
     api_key = await credentials.resolve_api_key(db, user.id, cred_provider)
     if api_key is None:

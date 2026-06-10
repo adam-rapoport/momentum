@@ -39,14 +39,19 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     # psycopg (sync) is only needed to run the test suite against Postgres
-    # (set PMOMENTUM_TEST_DATABASE_URL to a postgres URL). The default test
-    # DB is SQLite, which needs no extra driver.
+    # (set TEST_DATABASE_URL to a postgres URL). The default test DB is
+    # SQLite, which needs no extra driver.
     "psycopg[binary]>=3.2",
+    # Lint floor for CI (see [tool.ruff.lint] below).
+    "ruff>=0.8",
 ]
 # Sprint 8B Stage 2: freezes the backend into the desktop sidecar binary.
 # Only needed to BUILD the desktop app, not to run the web app or tests.
 desktop = [
     "pyinstaller>=6.0",
+    # Item 23 (P3): vault key in the macOS Keychain instead of a plaintext
+    # file. Optional — app.config degrades to the file when this is absent.
+    "keyring>=25",
 ]
 
 [tool.setuptools.packages.find]
@@ -58,6 +63,17 @@ include = ["app*"]
 
 [tool.uvicorn]
 reload = true
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# Deliberately minimal floor: syntax errors (E9), invalid literal comparisons
+# (F63), forward-annotation/keyword misuse (F7), and undefined names (F82).
+# These are always-bugs, never style. F401 (unused imports) has a handful of
+# existing hits in app code owned by the engine revamp tracks — enable it once
+# those land.
+select = ["E9", "F63", "F7", "F82"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -35,6 +35,11 @@ class ModelEntry:
     # SDK (app.core.google_genai_client), which is required for Gemini 3.x.
     # Groq/OpenAI models ignore this field.
     client: str = "openai_compat"
+    # Max context size in tokens, per the provider's model docs. Used by the
+    # session engine's history sliding window (Phase 1 item 10). The default
+    # matches the 128k that every current entry meets or exceeds; set the
+    # real value when adding a model.
+    context_window: int = 128_000
 
 
 # Model IDs below were verified against each provider's live model-list API in
@@ -46,6 +51,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (free tier) ---
     ModelEntry(
         id="meta-llama/llama-4-scout-17b-16e-instruct",
+        context_window=131_072,
         provider="groq",
         display_name="Llama 4 Scout (Groq)",
         # "either" so Groq can be picked for the heavy slot too — it's fast and
@@ -55,6 +61,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="llama-3.1-8b-instant",
+        context_window=131_072,
         provider="groq",
         display_name="Llama 3.1 8B Instant (Groq)",
         role="light",
@@ -62,6 +69,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="openai/gpt-oss-20b",
+        context_window=131_072,
         provider="groq",
         display_name="GPT-OSS 20B (Groq)",
         role="light",
@@ -69,6 +77,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="llama-3.3-70b-versatile",
+        context_window=131_072,
         provider="groq",
         display_name="Llama 3.3 70B (Groq)",
         role="either",
@@ -76,6 +85,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="openai/gpt-oss-120b",
+        context_window=131_072,
         provider="groq",
         display_name="GPT-OSS 120B (Groq)",
         role="heavy",
@@ -84,6 +94,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # --- Google: Gemma (open model, free tier) ---
     ModelEntry(
         id="gemma-4-31b-it",
+        context_window=128_000,
         provider="google",
         display_name="Gemma 4 31B (Google)",
         role="heavy",
@@ -95,6 +106,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # which breaks multi-step skill flows.
     ModelEntry(
         id="gemini-3.1-flash-lite",
+        context_window=1_048_576,
         provider="google",
         display_name="Gemini 3.1 Flash Lite (Google, native SDK)",
         role="light",
@@ -103,6 +115,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="gemini-3.5-flash",
+        context_window=1_048_576,
         provider="google",
         display_name="Gemini 3.5 Flash (Google, native SDK)",
         role="either",
@@ -111,6 +124,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="gemini-3.1-pro-preview",
+        context_window=1_048_576,
         provider="google",
         display_name="Gemini 3 Pro (Google, native SDK)",
         role="heavy",
@@ -124,6 +138,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # the current (GPT-5-class) models.
     ModelEntry(
         id="gpt-4o",
+        context_window=128_000,
         provider="openai",
         display_name="GPT-4o (OpenAI)",
         role="either",
@@ -131,12 +146,49 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         id="gpt-4o-mini",
+        context_window=128_000,
         provider="openai",
         display_name="GPT-4o mini (OpenAI)",
         role="light",
         notes="Cheaper, faster OpenAI model. Paid — needs billing.",
     ),
 )
+
+
+# Name-prefix heuristics for models that are NOT in the registry (raw env-var
+# overrides). The registry entry is always consulted first — these exist only
+# so a user pointing GROQ_MODEL/GROQ_HEAVY_MODEL at an unregistered ID still
+# gets a sensible provider (findings A17/C6).
+_GOOGLE_PREFIXES = ("gemini-", "gemma-")
+_OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-", "chatgpt-")
+
+
+def infer_provider(model_id: str) -> str:
+    """Provider name ("groq" | "google" | "openai") for `model_id`.
+
+    Single source of provider truth: the registry entry decides when one
+    exists; unknown (env-override) ids fall back to the name-prefix
+    heuristics, defaulting to groq — the original behavior.
+    """
+    entry = get_model(model_id)
+    if entry is not None:
+        return entry.provider
+    if model_id.startswith(_GOOGLE_PREFIXES):
+        return "google"
+    if model_id.startswith(_OPENAI_PREFIXES):
+        return "openai"
+    return "groq"
+
+
+def provider_available(
+    provider: str, configured_providers: set[str] | None = None
+) -> bool:
+    """Public availability check for a provider name: the per-user set when
+    given, the env vars otherwise (single-arg call so monkeypatched stand-ins
+    in tests keep working — same convention as get_available_models)."""
+    if configured_providers is not None:
+        return provider in configured_providers
+    return _provider_available(provider)
 
 
 def _provider_available(

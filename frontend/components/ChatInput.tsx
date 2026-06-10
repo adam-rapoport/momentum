@@ -6,14 +6,13 @@ interface Props {
   onSend: (content: string) => void;
   onCancel: () => void;
   isStreaming: boolean;
-  disabled?: boolean;
 }
 
 // Matches a message that is still just a command token being typed at the very
 // start — "/", "/wr", "/write-prd" — but NOT once a space follows ("/deep ho").
 const COMMAND_TOKEN_RE = /^\/[a-z0-9-]*$/i;
 
-export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
+export function ChatInput({ onSend, onCancel, isStreaming }: Props) {
   const [value, setValue] = useState("");
   const [commands, setCommands] = useState<CommandSummary[]>([]);
   const [selected, setSelected] = useState(0);
@@ -40,11 +39,11 @@ export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
   // The "/" menu is shown while the user is typing a command token at the start
   // of an otherwise-empty message, and hasn't dismissed it with Escape.
   const matches = useMemo(() => {
-    if (dismissed || isStreaming || disabled) return [];
+    if (dismissed || isStreaming) return [];
     if (!COMMAND_TOKEN_RE.test(value)) return [];
     const q = value.slice(1).toLowerCase();
     return commands.filter((c) => c.command.toLowerCase().startsWith(q));
-  }, [value, commands, dismissed, isStreaming, disabled]);
+  }, [value, commands, dismissed, isStreaming]);
 
   const menuOpen = matches.length > 0;
   const selectedIdx = Math.min(selected, matches.length - 1);
@@ -87,7 +86,7 @@ export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
 
   function submit() {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || disabled) return;
+    if (!trimmed || isStreaming) return;
     onSend(trimmed);
     setValue("");
     setDismissed(false);
@@ -132,9 +131,8 @@ export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
             }}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder={disabled ? "…" : "Message pMomentum (Enter to send, Shift+Enter for newline)"}
-            disabled={disabled}
-            className="flex-1 resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 disabled:bg-neutral-100"
+            placeholder="Message pMomentum (Enter to send, Shift+Enter for newline)"
+            className="flex-1 resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400"
           />
           {isStreaming ? (
             <button
@@ -146,7 +144,7 @@ export function ChatInput({ onSend, onCancel, isStreaming, disabled }: Props) {
           ) : (
             <button
               onClick={submit}
-              disabled={!value.trim() || disabled}
+              disabled={!value.trim()}
               className="rounded-md bg-neutral-900 text-white text-sm font-medium px-4 py-2 hover:bg-neutral-800 disabled:bg-neutral-400 disabled:cursor-not-allowed"
             >
               Send

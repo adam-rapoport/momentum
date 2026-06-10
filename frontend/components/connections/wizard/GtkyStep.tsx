@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { extractDetail } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { Banner, SectionHeader } from "../kit";
 
 export interface GtkyState {
@@ -64,15 +64,20 @@ export function GtkyStep({
     setUploading(true);
     setError(null);
     try {
+      // Accumulate locally instead of spreading the `uploads` prop each
+      // iteration — that closure is stale after the first await, so a
+      // multi-file selection used to record only the last file.
+      let next = uploads;
       for (const file of Array.from(files)) {
         const res = await api.uploadDocument(file);
-        setUploads([
-          ...uploads,
+        next = [
+          ...next,
           { name: res.title, chars: res.char_count, memories: res.memories_created },
-        ]);
+        ];
+        setUploads(next);
       }
     } catch (e) {
-      setError(extractDetail(e));
+      setError(errorMessage(e));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

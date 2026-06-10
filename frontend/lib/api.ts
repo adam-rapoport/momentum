@@ -1,3 +1,4 @@
+import { getApiBase, getBackendToken } from "./desktop";
 import type {
   DocumentArtifact,
   MemoryRecordDetail,
@@ -6,29 +7,63 @@ import type {
   SessionDetail,
 } from "./types";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+// Every request gets a deadline. Without one, a wedged backend leaves the
+// promise pending forever — and anything awaiting it (the stream.done
+// refetch, the boot poll, a panel load) hangs with it. 15s is generous for
+// localhost; uploads get longer (the backend runs LLM extraction on them).
+const DEFAULT_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+function timeoutError(err: unknown, timeoutMs: number): Error | null {
+  if (
+    err instanceof DOMException &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  ) {
+    return new Error(
+      `The backend didn't respond within ${Math.round(timeoutMs / 1000)} seconds. It may still be starting, or busy — please try again.`,
+    );
+  }
+  return null;
+}
+
+// FastAPI returns errors as {"detail": "..."} — surface that human-readable
+// message rather than the raw JSON blob.
+function detailFromBody(text: string): string {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed.detail === "string") return parsed.detail;
+  } catch {
+    // not JSON; keep the raw text
+  }
+  return text;
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
+  // Desktop builds authenticate every API call with the shell's per-launch
+  // token and derive the base URL from the port the shell actually chose;
+  // in web dev these resolve to null/the compile-time default.
+  const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-PMomentum-Token": token } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    throw timeoutError(err, timeoutMs) ?? err;
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    // FastAPI returns errors as {"detail": "..."} — surface that human-readable
-    // message rather than the raw JSON blob.
-    let detail = text;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed.detail === "string") detail = parsed.detail;
-    } catch {
-      // not JSON; keep the raw text
-    }
-    throw new Error(detail || `${res.status} ${res.statusText}`);
+    throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -113,13 +148,22 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     // Note: do NOT set Content-Type — the browser sets the multipart boundary.
-    const res = await fetch(`${API_BASE}/api/v1/onboarding/documents`, {
-      method: "POST",
-      body: form,
-    });
+    // The auth header still applies (this endpoint is not token-exempt).
+    const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
+    let res: Response;
+    try {
+      res = await fetch(`${base}/api/v1/onboarding/documents`, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        headers: token ? { "X-PMomentum-Token": token } : {},
+      });
+    } catch (err) {
+      throw timeoutError(err, UPLOAD_TIMEOUT_MS) ?? err;
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ""}`);
+      throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
     }
     return (await res.json()) as {
       title: string;

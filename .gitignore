@@ -53,3 +53,5 @@ Thumbs.db
 # --- Claude Code per-machine settings ---
 # launch.json is shareable dev-server config; settings.local.json is personal.
 .claude/settings.local.json
+# Transient agent worktrees created during Claude Code sessions.
+.claude/worktrees/

@@ -22,7 +22,10 @@ _ALLOWED_TODO_STATUS = {"pending", "in_progress", "completed"}
 async def _time_check(_input: dict) -> str:
     tz = ZoneInfo(settings.user_timezone)
     now = datetime.now(tz)
-    return now.strftime("%A, %B %-d, %Y %-I:%M %p %Z")
+    # No %-d / %-I: the glibc-only no-pad flags crash strftime on Windows
+    # (finding A24). Compose the unpadded pieces portably instead.
+    time_str = now.strftime("%I:%M %p %Z").lstrip("0")
+    return f"{now.strftime('%A, %B')} {now.day}, {now.year} {time_str}"
 
 
 TimeCheck = register(

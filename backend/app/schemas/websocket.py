@@ -1,4 +1,11 @@
-from decimal import Decimal
+"""Pydantic schemas for the WebSocket protocol.
+
+The outbound models are the frontend contract (pinned byte-for-byte in
+tests/integration/test_ws_contract.py): `app.api.websocket` serializes every
+outbound frame THROUGH these models (finding A30 — they used to be dead code
+that silently drifted from hand-built dicts). Fields may be added but never
+removed or renamed.
+"""
 from typing import Literal
 from uuid import UUID
 
@@ -42,17 +49,36 @@ class OutboundToolResult(BaseModel):
 class OutboundAwaitingReview(BaseModel):
     type: Literal["stream.awaiting_review"] = "stream.awaiting_review"
     session_id: UUID
+    # 'deliverable' (skill AwaitReview) | 'send_email' | 'create_event'.
+    kind: str
     deliverable_kind: str
     document_id: str | None = None
     summary_for_user: str
     url: str | None = None
+    model: str | None = None
+    # Populated when kind != 'deliverable' — the staged action's preview
+    # payload that the ApprovalBar renders.
+    pending_action: dict | None = None
+
+
+class StreamUsage(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    # Decimals cross the wire as strings, not floats.
+    cost_usd: str
+    total_cost_usd: str
+
+
+class StreamDoneMetadata(BaseModel):
+    cancelled: bool
+    model: str | None = None
 
 
 class OutboundStreamDone(BaseModel):
     type: Literal["stream.done"] = "stream.done"
     session_id: UUID
-    usage: dict
-    metadata: dict
+    usage: StreamUsage
+    metadata: StreamDoneMetadata
 
 
 class OutboundError(BaseModel):

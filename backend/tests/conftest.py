@@ -39,9 +39,6 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
-# Imports that depend on app.* live below the sys.path patch.
-from app.models import Base, Organization, Project, User  # noqa: E402
-
 # Default: a throwaway SQLite file in the temp dir (no service to install).
 # Override with TEST_DATABASE_URL to run the suite against Postgres.
 _SQLITE_TEST_PATH = os.path.join(tempfile.gettempdir(), "pmomentum_pytest.db")
@@ -52,6 +49,18 @@ def _test_db_url() -> str:
     # Empty or unset -> SQLite default (lets CI pass TEST_DATABASE_URL="" to
     # select the SQLite matrix leg).
     return os.environ.get("TEST_DATABASE_URL") or DEFAULT_TEST_DB_URL
+
+
+# Pin DATABASE_URL to the test DB BEFORE any `app.*` import constructs
+# `app.config.settings`. The contract tests (tests/integration/test_ws_contract,
+# test_rest_api) run the real app via TestClient, which talks to the engine
+# built in app.dependencies from settings.database_url — without this pin it
+# would point at ./pmomentum.db (a developer's real local DB) instead of the
+# throwaway test database the `db`/`seeded` fixtures migrate and truncate.
+os.environ["DATABASE_URL"] = _test_db_url()
+
+# Imports that depend on app.* live below the sys.path + env patch.
+from app.models import Base, Organization, Project, User  # noqa: E402
 
 
 def _is_sqlite(url: str) -> bool:
@@ -220,7 +229,6 @@ async def seeded(db: AsyncSession) -> dict:
         slug="test-org",
         plan="free",
         settings={},
-        llm_api_keys={},
     )
     db.add(org)
     await db.flush()
@@ -253,3 +261,39 @@ async def seeded(db: AsyncSession) -> dict:
     await db.commit()
 
     return {"organization": org, "user": user, "project": project}
+
+
+@pytest.fixture
+def client(_test_db_ready: str, tmp_path, monkeypatch):
+    """Starlette TestClient against the real `app.main.app`, wired to the
+    migrated test DB (see the DATABASE_URL pin at the top of this file).
+
+    Entering the client runs the app lifespan: migrations (a no-op — the
+    `_test_db_ready` fixture already brought the schema to head) and the
+    default-workspace seed, so `get_default_user` resolves on every request.
+    Each test gets a fresh client; all data tables are wiped afterwards so
+    contract tests stay isolated from each other and from the `db` fixture.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.config import settings as app_settings
+    from app.main import app
+
+    # Keep memory/document writes triggered through the API out of the repo.
+    monkeypatch.setattr(app_settings, "memory_root", str(tmp_path / "memory"))
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    asyncio.run(_wipe_all_tables(_test_db_ready))
+
+
+async def _wipe_all_tables(url: str) -> None:
+    """Post-test cleanup for the `client` fixture. Uses its own throwaway
+    engine + asyncio.run so it works from sync fixtures regardless of
+    pytest-asyncio's loop scoping."""
+    engine = create_async_engine(url, echo=False, poolclass=NullPool)
+    try:
+        await _truncate_all(engine)
+    finally:
+        await engine.dispose()

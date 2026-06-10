@@ -1,32 +1,71 @@
 "use client";
 import { api } from "./api";
+import { getBackendToken, getWsBase } from "./desktop";
 import { useChatStore } from "./store";
 import type { WsInbound, WsOutbound } from "./types";
-
-const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE ?? "ws://localhost:8000";
 
 class WsClient {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private explicitClose = false;
+  // True while we're fetching the auth token ahead of opening the socket —
+  // prevents a second connect() from racing a duplicate socket into existence.
+  private connecting = false;
   // Messages sent before the socket is OPEN — e.g. the very first message on a
   // brand-new session, fired before the connection finished handshaking. We
   // queue them and flush on open instead of silently dropping them (which was
   // the cause of "I asked a question and got no response" on a fresh chat).
   private pending: WsInbound[] = [];
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
+  // Sessions that were mid-stream when the socket dropped. On reconnect we
+  // refetch them so whatever the backend persisted (it kept running the turn
+  // server-side) replaces the truncated live view.
+  private resyncSessions = new Set<string>();
+  // Per-session refetch sequence numbers: only the newest in-flight
+  // getSession() refetch for a session may apply its result, so an
+  // out-of-order response can't overwrite newer messages.
+  private refetchSeq = new Map<string, number>();
 
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
+    if (this.connecting) return;
     this.explicitClose = false;
-    this.ws = new WebSocket(`${WS_BASE}/ws`);
+    this.connecting = true;
+    // Browser WebSocket clients can't set headers, so the desktop shell's
+    // per-launch auth token travels as a query param (null in web dev — the
+    // backend then skips the check), and the base URL follows whichever port
+    // the shell chose. Both fetches are async but cached after the first call.
+    Promise.all([getBackendToken(), getWsBase()]).then(([token, base]) => {
+      this.connecting = false;
+      if (this.explicitClose) return;
+      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      this.open(base, token);
+    });
+  }
+
+  private open(base: string, token: string | null): void {
+    const url = token
+      ? `${base}/ws?token=${encodeURIComponent(token)}`
+      : `${base}/ws`;
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
       useChatStore.getState().setWsConnected(true);
       this.flushPending();
+      // Resync any session that was streaming when the previous socket died:
+      // the backend may have finished (or errored) the turn while we were
+      // disconnected, and none of those events reached us.
+      const toResync = [...this.resyncSessions];
+      this.resyncSessions.clear();
+      for (const sessionId of toResync) {
+        this.refetchSession(sessionId, { clearReviewIfActive: true });
+      }
     };
 
     this.ws.onmessage = (ev) => {
@@ -39,11 +78,28 @@ class WsClient {
     };
 
     this.ws.onclose = () => {
-      useChatStore.getState().setWsConnected(false);
+      const store = useChatStore.getState();
+      store.setWsConnected(false);
+      // Finalize every in-flight stream so no session is stuck on "thinking…"
+      // forever (the events that would have ended it can no longer arrive),
+      // and remember them for a resync once we're back.
+      for (const [sessionId, streaming] of Object.entries(store.isStreamingBySession)) {
+        if (!streaming) continue;
+        this.resyncSessions.add(sessionId);
+        store.setLastError(sessionId, {
+          code: "WS_DISCONNECTED",
+          message:
+            "Lost the connection to the backend mid-response. Reconnecting — the conversation will resync automatically.",
+        });
+        store.finalizeStream(sessionId);
+      }
       if (!this.explicitClose) {
         const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
         this.reconnectAttempts += 1;
-        setTimeout(() => this.connect(), delay);
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectTimer = null;
+          this.connect();
+        }, delay);
       }
     };
 
@@ -54,8 +110,28 @@ class WsClient {
 
   disconnect(): void {
     this.explicitClose = true;
-    this.ws?.close();
-    this.ws = null;
+    // Kill the pending-reconnect/queue timers BEFORE closing, or a scheduled
+    // reconnect fires after we're gone (zombie socket flipping the header to
+    // "disconnected" / duplicating event handling).
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.pendingTimer) {
+      clearTimeout(this.pendingTimer);
+      this.pendingTimer = null;
+    }
+    this.pending = [];
+    if (this.ws) {
+      // Detach handlers so the close of THIS socket can't mutate store state
+      // owned by the next connect().
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   send(msg: WsInbound): void {
@@ -105,9 +181,67 @@ class WsClient {
           message:
             "Couldn't reach pMomentum's backend to send your message. Please make sure it's running, then try again.",
         });
-        store.finalizeStream(m.session_id, "0", false);
+        if (m.type === "session.message") {
+          // The optimistic bubble never reached the backend — mark it failed
+          // so the chat offers a retry instead of showing a phantom message.
+          store.markSendFailed(m.session_id);
+        }
+        store.finalizeStream(m.session_id);
       }
     }, 15000);
+  }
+
+  /**
+   * Refetch a session's authoritative state and apply it — unless it's stale.
+   * Two staleness guards:
+   *   1. refetchSeq — a newer refetch for the same session started after this
+   *      one; let the newest win.
+   *   2. turn epoch — the user started a NEW turn while this refetch was in
+   *      flight; applying now would clobber the new turn's optimistic message
+   *      and kill its streaming indicator. The new turn's own stream.done
+   *      refetch will deliver everything this one would have.
+   */
+  private refetchSession(
+    sessionId: string,
+    opts: {
+      totalCost?: string;
+      cancelled?: boolean;
+      clearReviewIfActive?: boolean;
+    } = {},
+  ): void {
+    const epoch = useChatStore.getState().turnEpochBySession[sessionId] ?? 0;
+    const seq = (this.refetchSeq.get(sessionId) ?? 0) + 1;
+    this.refetchSeq.set(sessionId, seq);
+    const isStale = () =>
+      this.refetchSeq.get(sessionId) !== seq ||
+      (useChatStore.getState().turnEpochBySession[sessionId] ?? 0) !== epoch;
+    api
+      .getSession(sessionId)
+      .then((detail) => {
+        if (isStale()) return;
+        const s = useChatStore.getState();
+        s.setMessages(sessionId, detail.messages);
+        s.upsertSession(detail);
+        // If the backend resumed from awaiting_review (status back to
+        // "active"), drop any stale approval bar on the client.
+        if (opts.clearReviewIfActive && detail.status === "active") {
+          s.clearAwaitingReview(sessionId);
+        }
+        s.finalizeStream(
+          sessionId,
+          opts.totalCost ?? detail.total_cost_usd,
+          opts.cancelled ?? false,
+        );
+      })
+      .catch((err) => {
+        console.error("[ws] failed to refetch session:", err);
+        if (isStale()) return;
+        // Still finalize so the input control unlocks; pass no cost so the
+        // last known value is preserved (no $0 reset on error paths).
+        useChatStore
+          .getState()
+          .finalizeStream(sessionId, opts.totalCost, opts.cancelled ?? false);
+      });
   }
 
   private handleEvent(event: WsOutbound): void {
@@ -154,22 +288,7 @@ class WsClient {
       });
       // Refetch so the persisted state (messages, session_metadata) is
       // canonical, then drop the live streaming state.
-      api
-        .getSession(sessionId)
-        .then((detail) => {
-          const s = useChatStore.getState();
-          s.setMessages(sessionId, detail.messages);
-          s.upsertSession(detail);
-          s.finalizeStream(
-            sessionId,
-            detail.total_cost_usd ?? "0",
-            false,
-          );
-        })
-        .catch((err) => {
-          console.error("[ws] failed to refetch session after pause:", err);
-          useChatStore.getState().finalizeStream(sessionId, "0", false);
-        });
+      this.refetchSession(sessionId);
       // A skill that pauses for review has just produced a deliverable;
       // refresh the documents panel so it shows up immediately.
       api
@@ -183,29 +302,12 @@ class WsClient {
       // Otherwise we get a flicker: streamed text + tool cards disappear
       // and there's a ~100ms gap before the refetched messages render.
       const sessionId = event.session_id;
-      const totalCost = event.usage.total_cost_usd;
-      const cancelled = event.metadata.cancelled;
       if (event.metadata.model) store.setLastModel(sessionId, event.metadata.model);
-      api
-        .getSession(sessionId)
-        .then((detail) => {
-          const s = useChatStore.getState();
-          s.setMessages(sessionId, detail.messages);
-          // Refresh session in the sessions array so skill state (Section 15
-          // metadata, pending deliverables) stays in sync with the header.
-          s.upsertSession(detail);
-          // If the backend resumed from awaiting_review (status back to
-          // "active"), drop any stale approval bar on the client.
-          if (detail.status === "active") {
-            s.clearAwaitingReview(sessionId);
-          }
-          s.finalizeStream(sessionId, totalCost, cancelled);
-        })
-        .catch((err) => {
-          console.error("[ws] failed to refetch session after stream.done:", err);
-          // Still finalize so the input control unlocks.
-          useChatStore.getState().finalizeStream(sessionId, totalCost, cancelled);
-        });
+      this.refetchSession(sessionId, {
+        totalCost: event.usage.total_cost_usd,
+        cancelled: event.metadata.cancelled,
+        clearReviewIfActive: true,
+      });
 
       // The turn may have called SaveMemory or WriteDocument — refresh both
       // panels so new entries show up without a page reload. Independent of
@@ -232,7 +334,8 @@ class WsClient {
           code: event.code,
           message: event.message,
         });
-        store.finalizeStream(event.session_id, "0", false);
+        // No cost: error paths keep the previously displayed total.
+        store.finalizeStream(event.session_id);
       }
     }
   }

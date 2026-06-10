@@ -1,14 +1,17 @@
-name: Backend tests
+name: CI
 
 on:
   push:
-    branches: ["**"]
+    # Pushes only build on main; every PR (any base) gets the full run via the
+    # pull_request trigger below — avoids double-running branch pushes that
+    # have an open PR.
+    branches: ["main"]
   pull_request:
     branches: ["**"]
 
 jobs:
-  pytest:
-    name: pytest (${{ matrix.db }})
+  backend:
+    name: backend (${{ matrix.name }})
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,16 +22,27 @@ jobs:
       matrix:
         include:
           # SQLite is the shipping default (desktop build) — no service needed.
-          - db: sqlite
+          - name: sqlite
             test_database_url: ""
+            data_dir: ""
+            postgres_image: ""
+          # Same suite with DATA_DIR set, exercising the desktop-mode config
+          # path (app.config derives DB/memory/vault paths from DATA_DIR).
+          - name: sqlite-desktop
+            test_database_url: ""
+            data_dir: pm-data
+            postgres_image: ""
           # Postgres proves the dialect-portable models still work there too.
-          - db: postgres
+          - name: postgres
             test_database_url: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+            data_dir: ""
+            postgres_image: postgres:16
 
     services:
-      # Always available; only the Postgres matrix leg actually connects to it.
+      # An empty `image` skips the service entirely, so the Postgres container
+      # only boots for the matrix leg that actually connects to it.
       postgres:
-        image: postgres:16
+        image: ${{ matrix.postgres_image }}
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -47,14 +61,14 @@ jobs:
       # `app.config.Settings` validates these at import time, and most tests
       # transitively import the settings module. CI has no .env (it's
       # gitignored), so fill in placeholders. DATABASE_URL is never connected
-      # to during tests — conftest uses TEST_DATABASE_URL. GROQ_API_KEY isn't
-      # called from any unit test (LLM clients are constructed lazily).
+      # to during tests — conftest uses TEST_DATABASE_URL. No real LLM call
+      # goes out during tests (clients are constructed lazily).
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
       GROQ_API_KEY: ci-placeholder-not-a-real-key
       # The model_router tests assert Gemini/Gemma models are picker-available;
       # the registry filters Google models out when GOOGLE_AI_API_KEY is unset.
-      # Placeholder is enough — no actual call goes out to Google during tests.
       GOOGLE_AI_API_KEY: ci-placeholder-not-a-real-key
+      OPENAI_API_KEY: ci-placeholder-not-a-real-key
 
     steps:
       - uses: actions/checkout@v4
@@ -71,5 +85,78 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Set DATA_DIR (desktop-mode leg only)
+        if: matrix.data_dir != ''
+        run: echo "DATA_DIR=$RUNNER_TEMP/${{ matrix.data_dir }}" >> "$GITHUB_ENV"
+
       - name: Run pytest (unit + integration)
         run: pytest -q
+
+  frontend:
+    name: frontend (lint + typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Build (next build, static export)
+        run: npm run build
+
+  # Freezes the backend sidecar with PyInstaller on macOS and runs the
+  # extended --selfcheck (migrations on a temp SQLite DB, SDK imports, bundled
+  # data files). continue-on-error while this leg is unproven — it validates
+  # the desktop packaging path but must not block merges yet.
+  desktop-sidecar-macos:
+    name: macos sidecar freeze + selfcheck (advisory)
+    runs-on: macos-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-desktop.lock
+
+      - name: Install pinned desktop dependency set
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-desktop.lock
+          pip install --no-deps -e .
+
+      - name: Selfcheck (unfrozen)
+        run: python -m app.desktop --selfcheck
+
+      - name: Freeze sidecar (PyInstaller)
+        run: pyinstaller pmomentum.spec --noconfirm
+
+      - name: Selfcheck (frozen binary)
+        run: ./dist/pmomentum-backend --selfcheck

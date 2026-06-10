@@ -6,7 +6,7 @@ import {
   type KeyProvider,
   type ModelPreferences,
 } from "@/lib/api";
-import { extractDetail } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import {
   PROVIDERS,
   providersForTier,
@@ -105,7 +105,7 @@ export function SlotModelCard({
         loadPrefs();
         onChanged();
       })
-      .catch((e) => setError(extractDetail(e)))
+      .catch((e) => setError(errorMessage(e)))
       .finally(() => setSaving(false));
   }
 
@@ -131,7 +131,7 @@ export function SlotModelCard({
           loadPrefs();
           onChanged();
         })
-        .catch((e) => setError(extractDetail(e)))
+        .catch((e) => setError(errorMessage(e)))
         .finally(() => setSaving(false));
     }
     // Not connected → the render shows a KeyInput for `shown`.
@@ -149,7 +149,7 @@ export function SlotModelCard({
       loadPrefs();
       onChanged();
     } catch (e) {
-      setError(extractDetail(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }

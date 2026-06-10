@@ -26,6 +26,7 @@ from app.core.integrations.google_oauth import (
     enabled_services,
 )
 from app.core.memory.store import project_memory_dir
+from app.core.search import get_active_search_provider
 from app.core.skills import get_skill
 from app.models import Integration, Project, User
 
@@ -63,9 +64,12 @@ def _build_environment_section(user: User, google_email: str | None) -> str:
     prefs = user.preferences or {}
     if isinstance(prefs, dict) and prefs.get("role"):
         role = str(prefs["role"])
+    # No %-d: the glibc-only no-pad flag crashes strftime on Windows (A24).
+    date_str = f"{now.strftime('%A, %B')} {now.day}, {now.year}"
+    time_str = now.strftime("%I:%M %p %Z").lstrip("0")
     lines = [
         "## Section 11: Environment Context\n",
-        f"- Current date: {now.strftime('%A, %B %-d, %Y')} ({now.strftime('%I:%M %p %Z')})",
+        f"- Current date: {date_str} ({time_str})",
         f"- User: {user.display_name or user.email}",
     ]
     if google_email:
@@ -78,7 +82,10 @@ def _build_environment_section(user: User, google_email: str | None) -> str:
     lines.extend(
         [
             f"- Role: {role}",
-            "- Platform: pMomentum MVP (local dev, Groq + Llama 3.3)",
+            # Stale "Groq + Llama 3.3" claim removed (A25): the actual model
+            # is routed per turn across whichever providers are configured.
+            "- Platform: pMomentum (local desktop app; the model serving "
+            "each turn is routed per turn from the user's Settings)",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -118,7 +125,11 @@ def _build_memory_section(project: Project) -> str:
     )
 
 
-def _build_integrations_section(project: Project, google_services: list[str]) -> str:
+def _build_integrations_section(
+    project: Project,
+    google_services: list[str],
+    search_provider: str | None,
+) -> str:
     mem_dir = project_memory_dir(project)
     if google_services:
         google_line = (
@@ -132,9 +143,20 @@ def _build_integrations_section(project: Project, google_services: list[str]) ->
             "- **Google Workspace:** not connected. Tell the user to visit "
             "Settings and connect Google to use Docs / Gmail / Calendar tools."
         )
+    # Reflect the ACTUAL search config (A25) — the prompt used to hardcode
+    # "Tavily (active)" even with no key, so the model called WebSearch into
+    # a guaranteed failure.
+    if search_provider:
+        search_line = f"- **Web search:** {search_provider.title()} (active)"
+    else:
+        search_line = (
+            "- **Web search:** NOT configured — `WebSearch` will fail. Tell "
+            "the user to add a Tavily or Perplexity key in Settings before "
+            "relying on it."
+        )
     return (
         "## Section 14: Active Integrations\n\n"
-        "- **Web search:** Tavily (active)\n"
+        f"{search_line}\n"
         "- **Web fetch:** httpx + trafilatura (active)\n"
         "- **Project management:** `QueryTickets` returns MOCK data only. Real Jira/Linear integration is post-MVP — always flag this to the user.\n"
         f"{google_line}\n"
@@ -167,12 +189,17 @@ def _build_skill_section(session_metadata: dict | None) -> str | None:
         logger.warning("session_metadata.active_skill='%s' but skill not registered", name)
         return None
 
-    phase = str(meta.get("active_skill_phase") or skill.first_phase)
-    phases_str = " → ".join(f"**{p}**" if p == phase else p for p in skill.phases)
+    # NOTE (A22): we deliberately do NOT claim a "current phase". The old
+    # active_skill_phase field was set once at activation and never advanced,
+    # so every turn told the model it was in "intake" — actively misleading
+    # mid-workflow. The model tracks its own position from the conversation
+    # and the workflow body below; we only pin the endpoint.
+    phases_str = " → ".join(skill.phases)
     header = (
         "## Section 15: Active Skill\n\n"
         f"You are currently in the **`{skill.name}`** skill workflow.\n\n"
-        f"- Current phase: **{phase}** (of: {phases_str})\n"
+        f"- Phases, in order: {phases_str}. Judge your current phase from "
+        "the conversation so far.\n"
         f"- Final phase: **{skill.final_phase}** — call `AwaitReview` here and stop.\n"
         f"- Skill description: {skill.description}\n"
         f"- To exit without completing, the user can type `/cancel-skill`.\n\n"
@@ -209,11 +236,14 @@ async def build_dynamic(
     session_metadata: dict | None = None,
 ) -> str:
     google_email, google_services = await _load_google_integration(db, user.id)
+    search = await get_active_search_provider(db, user.id)
     parts = [
         _build_environment_section(user, google_email),
         _build_project_section(project),
         _build_memory_section(project),
-        _build_integrations_section(project, google_services),
+        _build_integrations_section(
+            project, google_services, search.name if search else None
+        ),
     ]
     skill_section = _build_skill_section(session_metadata)
     if skill_section:

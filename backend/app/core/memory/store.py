@@ -175,19 +175,36 @@ async def save_memory(
             f"invalid memory type '{mem_type}'. Allowed: {sorted(ALLOWED_TYPES)}"
         )
     tags = tags or []
-    slug = slugify(title)
     directory = project_memory_dir(project)
     directory.mkdir(parents=True, exist_ok=True)
+
+    async def _record_for(s: str) -> MemoryRecord | None:
+        return await db.scalar(
+            select(MemoryRecord).where(
+                MemoryRecord.project_id == project.id,
+                MemoryRecord.type == mem_type,
+                MemoryRecord.slug == s,
+            )
+        )
+
+    # Same (type, slug, title) is an upsert — re-saving a memory updates it
+    # in place. A DIFFERENT title that happens to slugify to the same slug
+    # ("Q3 plan!" vs "Q3 plan?") must NOT silently overwrite someone else's
+    # memory (finding A28): suffix -2, -3, … until we hit a free slug or this
+    # title's own previously-suffixed slot.
+    slug = slugify(title)
+    existing = await _record_for(slug)
+    if existing is not None and existing.title != title:
+        base, n = slug, 2
+        while True:
+            slug = f"{base}-{n}"
+            existing = await _record_for(slug)
+            if existing is None or existing.title == title:
+                break
+            n += 1
+
     filename = f"{mem_type}_{slug}.md"
     file_path = directory / filename
-
-    existing = await db.scalar(
-        select(MemoryRecord).where(
-            MemoryRecord.project_id == project.id,
-            MemoryRecord.type == mem_type,
-            MemoryRecord.slug == slug,
-        )
-    )
 
     if existing is not None:
         existing.title = title
@@ -212,6 +229,11 @@ async def save_memory(
         db.add(record)
         created_at = None
 
+    # Flush BEFORE touching the filesystem (finding A28): a constraint
+    # violation used to surface only after the markdown file was already
+    # written, leaving the file and the DB index permanently diverged.
+    await db.flush()
+
     markdown = render_markdown(
         title=title,
         mem_type=mem_type,
@@ -223,7 +245,6 @@ async def save_memory(
     )
     file_path.write_text(markdown, encoding="utf-8")
 
-    await db.flush()
     await _regenerate_index(db, project)
     return record
 

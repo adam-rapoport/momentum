@@ -1,10 +1,18 @@
 # Installing pMomentum (Mac test build)
 
-This is the **internal test build** of the pMomentum desktop app: unsigned, built
-for **Intel Macs** (it also runs on Apple Silicon Macs through Apple's Rosetta
-translation layer). It is meant for your own testing — not a public release yet.
-Code signing, notarization, an Apple Silicon build, and a public download come in
-later sprints.
+This is the **internal test build** of the pMomentum desktop app: unsigned, and
+built **for the architecture of the Mac that runs the build script** — there is
+no cross-compilation:
+
+- Built on an **Intel Mac** → an `x86_64` build. It also runs on Apple Silicon
+  Macs through Apple's Rosetta translation layer.
+- Built on an **Apple Silicon Mac** → a native `aarch64` (arm64) build. It will
+  **not** run on Intel Macs.
+
+The `.dmg` filename carries the real architecture (`_x64` / `_aarch64`), so you
+always know what you built. It is meant for your own testing — not a public
+release yet. Code signing, notarization, a universal (dual-arch) build, and a
+public download come in later sprints.
 
 ---
 
@@ -16,14 +24,16 @@ From the project root (`pmomentum/`):
 ./build-desktop.sh
 ```
 
-When it finishes, the installer is here:
+When it finishes, the installer is here (`<triple>` is your machine's Rust
+target triple, e.g. `aarch64-apple-darwin` on Apple Silicon or
+`x86_64-apple-darwin` on Intel; `<arch>` is `aarch64` or `x64` accordingly):
 
 ```
-frontend/src-tauri/target/release/bundle/dmg/pMomentum_0.1.0_x64.dmg
+frontend/src-tauri/target/<triple>/release/bundle/dmg/pMomentum_0.1.0_<arch>.dmg
 ```
 
 (The raw app, if you want it directly, is alongside it at
-`frontend/src-tauri/target/release/bundle/macos/pMomentum.app`.)
+`frontend/src-tauri/target/<triple>/release/bundle/macos/pMomentum.app`.)
 
 ## 2. Install it
 
@@ -64,12 +74,17 @@ You only have to do this **once** per Mac.
 
 On first launch pMomentum opens an **onboarding wizard**. Use it to:
 
-- Enter your API keys (Groq is required; Google AI Studio for heavy drafting;
-  Tavily for web search). Keys are stored **encrypted on your Mac** — they never
-  leave the machine except to call the providers you entered them for.
-- Optionally connect Google (Docs / Gmail / Calendar) and set your name/workspace.
+- Pick a model and paste an API key for the **fast** slot (casual chat, tool
+  calls) and the **drafting** slot (PRDs, updates) — any supported provider
+  works for either: Groq, Google AI Studio, or OpenAI. Keys are stored
+  **encrypted on your Mac** — they never leave the machine except to call the
+  providers you entered them for.
+- Optionally tell it about yourself and your product so the agent has context
+  from message one.
 
-You can change all of this later in the in-app **Settings**.
+Web search (Tavily / Perplexity) and the Google connection (Docs / Gmail /
+Calendar) can be added afterwards in the in-app **Settings**, where you can
+also change everything above.
 
 ## 5. Where your data lives
 

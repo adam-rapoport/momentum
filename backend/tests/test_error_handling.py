@@ -74,11 +74,101 @@ async def test_generic_api_error_routes_to_model_api_error():
     assert frame["code"] == "MODEL_API_ERROR"
 
 
-async def test_rate_limit_error_routes_to_model_api_error():
-    # Google's free-tier quota-exceeded (429). We treat this as a generic
-    # API error since retrying in 38s isn't something the model can fix.
+async def test_quota_message_routes_to_model_rate_limited():
+    # Google's free-tier quota-exceeded surfaces through the OpenAI-compat
+    # endpoint as a bare APIError whose message carries the native status.
+    # Phase 1 item 9: classified by message hint as MODEL_RATE_LIMITED.
     frame = await _run_case(_fake_api_error("RESOURCE_EXHAUSTED: quota exceeded"))
+    assert frame["code"] == "MODEL_RATE_LIMITED"
+
+
+# ---------- Phase 1 item 9: provider-neutral taxonomy ----------
+
+
+def _status_error(cls, status: int, message: str):
+    req = httpx.Request("POST", "https://example.test/v1/chat/completions")
+    return cls(message, response=httpx.Response(status, request=req), body=None)
+
+
+async def test_openai_auth_error_routes_to_model_auth_error():
+    import openai
+
+    frame = await _run_case(_status_error(openai.AuthenticationError, 401, "bad key"))
+    assert frame["code"] == "MODEL_AUTH_ERROR"
+    assert "Settings" in frame["message"]
+
+
+async def test_openai_rate_limit_routes_to_model_rate_limited():
+    import openai
+
+    frame = await _run_case(_status_error(openai.RateLimitError, 429, "slow down"))
+    assert frame["code"] == "MODEL_RATE_LIMITED"
+
+
+async def test_context_length_message_routes_to_context_too_long():
+    frame = await _run_case(
+        _fake_api_error(
+            "This model's maximum context length is 131072 tokens, however "
+            "you requested 180000 tokens."
+        )
+    )
+    assert frame["code"] == "MODEL_CONTEXT_TOO_LONG"
+
+
+async def test_not_configured_runtime_error_routes_to_model_auth_error():
+    frame = await _run_case(
+        RuntimeError(
+            "GROQ_API_KEY is not configured — set it in .env or connect "
+            "Groq in Settings to route turns to Groq models."
+        )
+    )
+    assert frame["code"] == "MODEL_AUTH_ERROR"
+    # The message names the provider so the user knows which key to fix.
+    assert "GROQ_API_KEY" in frame["message"]
+
+
+async def test_genai_client_error_401_routes_to_model_auth_error():
+    from google.genai import errors as genai_errors
+
+    exc = genai_errors.ClientError(
+        401, {"error": {"message": "API key not valid", "status": "UNAUTHENTICATED"}}
+    )
+    frame = await _run_case(exc)
+    assert frame["code"] == "MODEL_AUTH_ERROR"
+
+
+async def test_genai_client_error_429_routes_to_model_rate_limited():
+    from google.genai import errors as genai_errors
+
+    exc = genai_errors.ClientError(
+        429, {"error": {"message": "quota exceeded", "status": "RESOURCE_EXHAUSTED"}}
+    )
+    frame = await _run_case(exc)
+    assert frame["code"] == "MODEL_RATE_LIMITED"
+
+
+async def test_genai_server_error_routes_to_model_api_error():
+    from google.genai import errors as genai_errors
+
+    exc = genai_errors.ServerError(503, {"error": {"message": "overloaded"}})
+    frame = await _run_case(exc)
     assert frame["code"] == "MODEL_API_ERROR"
+
+
+async def test_no_provider_configured_routes_to_dedicated_code():
+    # Phase 3 item 18: the model router raises when NO provider has a key at
+    # all — distinct from a per-provider auth failure (nothing to retry).
+    from app.core.model_router import NoProviderConfiguredError
+
+    frame = await _run_case(
+        NoProviderConfiguredError(
+            "No LLM provider is configured — pMomentum has no API key to run "
+            "a model with. Open Settings → Connections and connect Groq, "
+            "Google AI, or OpenAI (or set an API key in .env)."
+        )
+    )
+    assert frame["code"] == "NO_PROVIDER_CONFIGURED"
+    assert "Settings" in frame["message"]
 
 
 async def test_commit_failed_routes_to_db_error():
