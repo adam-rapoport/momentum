@@ -17,6 +17,12 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.pending_actions import (
+    clear_pending_action,
+    get_pending_action,
+    get_pending_actions,
+    mark_action_executing,
+)
 from app.core.session_engine import (
     _classify_review_response,
     _resolve_pending_action,
@@ -78,6 +84,66 @@ def test_classify_revise_requires_slash():
 def test_classify_empty_returns_none():
     assert _classify_review_response("") is None
     assert _classify_review_response("   ") is None
+
+
+def test_classify_lenient_approve_phrases():
+    """Phase 1 item 8: natural approvals — trailing punctuation stripped,
+    commas/apostrophes folded. The word list stays deliberately small."""
+    for text in ["Yes", "yes, send it.", "Send it!", "go ahead", "LGTM!", "Approved."]:
+        assert _classify_review_response(text) == "approve", text
+
+
+def test_classify_lenient_restart_phrases():
+    for text in ["No", "don't", "stop", "Don't send it.", "never mind", "do not send"]:
+        assert _classify_review_response(text) == "restart", text
+
+
+def test_classify_free_text_stays_none():
+    """Anything off-list is free text — with a staged action the engine
+    refuses to run a model turn for it (APPROVAL_REQUIRED)."""
+    for text in [
+        "what about carol?",
+        "yes but change the subject first",
+        "maybe later",
+        "can you cc dave too",
+    ]:
+        assert _classify_review_response(text) is None, text
+
+
+# ---------- pending_actions queue (Phase 1 item 8, finding A4) ----------
+
+
+def test_queue_reads_legacy_singular_first():
+    """A pre-Phase-1 singular pending_action is the queue head; clearing pops
+    it before any list entries, then the list drains FIFO."""
+    legacy = _fake_send_email_action()
+    queued = {**_fake_send_email_action(), "call_id": "c2"}
+    session = _fake_session({"pending_action": legacy, "pending_actions": [queued]})
+
+    actions = get_pending_actions(session)
+    assert actions[0] == legacy
+    assert actions[1]["call_id"] == "c2"
+
+    assert clear_pending_action(session) == legacy
+    assert get_pending_action(session)["call_id"] == "c2"
+    assert clear_pending_action(session)["call_id"] == "c2"
+    assert get_pending_action(session) is None
+    assert clear_pending_action(session) is None
+    # Fully drained — neither key lingers in metadata.
+    assert "pending_action" not in session.session_metadata
+    assert "pending_actions" not in session.session_metadata
+
+
+def test_mark_action_executing_stamps_queue_head_only():
+    a1 = {**_fake_send_email_action(), "call_id": "c1"}
+    a2 = {**_fake_send_email_action(), "call_id": "c2"}
+    session = _fake_session({"pending_actions": [a1, a2]})
+
+    mark_action_executing(session)
+
+    queue = session.session_metadata["pending_actions"]
+    assert queue[0]["status"] == "executing"
+    assert "status" not in queue[1]
 
 
 # ---------- _summarize_pending_action ----------

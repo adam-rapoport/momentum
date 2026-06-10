@@ -206,6 +206,7 @@ async def _create_calendar_event(input_data: dict) -> str:
                 "attendees": attendees_parsed,
                 "description": description,
             },
+            call_id=ctx.current_call_id,
         )
     except ValueError as e:
         return f"Error: {e}"

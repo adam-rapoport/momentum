@@ -6,9 +6,12 @@ registry can't silently break error propagation to the model.
 """
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.core.tools import (
+    DEFAULT_TOOL_TIMEOUT_SECONDS,
     REGISTRY,
     Tool,
     _load_builtin_tools,
@@ -103,3 +106,59 @@ async def test_context_requiring_tool_outside_engine_errors_cleanly():
 def test_get_context_raises_without_engine():
     with pytest.raises(RuntimeError):
         get_context()
+
+
+# ---------- per-tool timeouts (Phase 1 item 11, finding A23) ----------
+
+
+@pytest.fixture
+def slow_tool():
+    async def _handler(args: dict) -> str:
+        await asyncio.sleep(5)
+        return "too late"  # pragma: no cover
+
+    tool = register(
+        Tool(
+            name="TestSlow",
+            description="test-only tool that never finishes in time",
+            input_schema={"type": "object", "properties": {}},
+            handler=_handler,
+            timeout_seconds=0.05,  # explicit override beats the category map
+        )
+    )
+    yield tool
+    REGISTRY.pop("TestSlow", None)
+
+
+async def test_timeout_returns_error_string(slow_tool):
+    out = await execute_tool("TestSlow", {})
+    assert out.startswith("Error")
+    assert "TestSlow timed out" in out
+
+
+def test_category_budgets_resolve_from_spec():
+    """Budgets live on the tool spec: explicit timeout_seconds wins, then the
+    category map, then the default."""
+    def make(category: str, timeout: float | None = None) -> Tool:
+        async def _h(args: dict) -> str:
+            return "ok"
+
+        return Tool(
+            name="t",
+            description="d",
+            input_schema={},
+            handler=_h,
+            category=category,
+            timeout_seconds=timeout,
+        )
+
+    assert make("research").effective_timeout_seconds == 60.0
+    assert make("gmail").effective_timeout_seconds == 60.0
+    assert make("calendar").effective_timeout_seconds == 60.0
+    assert make("documents").effective_timeout_seconds == 30.0
+    # Local-only categories fall through to the 15s default.
+    assert make("memory").effective_timeout_seconds == DEFAULT_TOOL_TIMEOUT_SECONDS
+    assert make("pm").effective_timeout_seconds == DEFAULT_TOOL_TIMEOUT_SECONDS
+    assert make("utility").effective_timeout_seconds == DEFAULT_TOOL_TIMEOUT_SECONDS
+    # Explicit override beats everything.
+    assert make("research", timeout=5.0).effective_timeout_seconds == 5.0
