@@ -186,13 +186,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port])
         .setup(move |app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // File logging in RELEASE builds too (~/Library/Logs/<identifier>/):
+            // the sidecar's stdout/stderr and shell events are only observable
+            // here — without it a field failure (e.g. the app stuck on the boot
+            // screen) leaves no evidence to diagnose.
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
 
             // Managed state first so spawn_backend (and its respawn path) can
             // update the handle/PID slots in place.

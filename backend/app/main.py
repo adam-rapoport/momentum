@@ -103,20 +103,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="pMomentum", version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    # Local web-dev origins PLUS the Tauri desktop webview, which serves the app
-    # from a custom scheme: tauri://localhost (macOS/Linux) and
-    # http://tauri.localhost (Windows). Keep in sync with app.security.
-    allow_origin_regex=r"(tauri://localhost|http://tauri\.localhost|http://(localhost|127\.0\.0\.1)(:\d+)?)",
-    # No cookies or HTTP auth in use — the shared token travels in a plain
-    # header — so don't advertise credentialed CORS.
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 @app.middleware("http")
 async def _local_trust_boundary(request: Request, call_next) -> Response:
     """Reject requests that can't have come from a legitimate local client:
@@ -132,6 +118,28 @@ async def _local_trust_boundary(request: Request, call_next) -> Response:
     ):
         return JSONResponse(status_code=401, content={"detail": "missing or invalid token"})
     return await call_next(request)
+
+
+# Registered AFTER the trust boundary so it is the OUTERMOST middleware
+# (Starlette runs user middleware in reverse registration order). The order is
+# load-bearing: the X-PMomentum-Token header makes every webview request
+# non-simple, so the browser sends a CORS preflight (OPTIONS) first — and
+# preflights never carry custom headers. CORSMiddleware must answer them
+# before the token check runs, or the packaged desktop app 401s every
+# preflight and the UI can never reach the backend at all (it sticks on the
+# boot screen). Regression test: test_rest_api.test_cors_preflight_bypasses_token.
+app.add_middleware(
+    CORSMiddleware,
+    # Local web-dev origins PLUS the Tauri desktop webview, which serves the app
+    # from a custom scheme: tauri://localhost (macOS/Linux) and
+    # http://tauri.localhost (Windows). Keep in sync with app.security.
+    allow_origin_regex=r"(tauri://localhost|http://tauri\.localhost|http://(localhost|127\.0\.0\.1)(:\d+)?)",
+    # No cookies or HTTP auth in use — the shared token travels in a plain
+    # header — so don't advertise credentialed CORS.
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 app.include_router(api_router)

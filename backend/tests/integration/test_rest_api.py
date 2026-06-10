@@ -142,6 +142,38 @@ def test_token_enforced_when_configured(client, monkeypatch):
     assert client.get("/health").status_code == 200
 
 
+def test_cors_preflight_bypasses_token(client, monkeypatch):
+    """The packaged-app regression (2026-06): the token header makes every
+    webview request non-simple, so the browser preflights with OPTIONS — which
+    by design carries NO custom headers. CORSMiddleware must answer the
+    preflight before the trust boundary's token check, or the desktop app
+    401s every preflight and the UI can never reach the backend (it sticks on
+    the boot screen forever). Asserts the exact request shape the Tauri
+    webview sends."""
+    monkeypatch.setattr(settings, "auth_token", "per-launch-secret")
+
+    resp = client.options(
+        f"{API}/onboarding/status",
+        headers={
+            "Origin": "tauri://localhost",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type,x-pmomentum-token",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "tauri://localhost"
+    assert "x-pmomentum-token" in resp.headers["access-control-allow-headers"].lower()
+
+    # The real (post-preflight) request still requires the token: the
+    # preflight exemption must not weaken the trust boundary itself.
+    assert (
+        client.get(
+            f"{API}/onboarding/status", headers={"Origin": "tauri://localhost"}
+        ).status_code
+        == 401
+    )
+
+
 # ---------- preferences (smoke) ----------
 
 
