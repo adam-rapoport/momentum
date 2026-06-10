@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core import session_engine
+from app.core import model_registry, session_engine
 from app.core.groq_client import StreamChunk, StreamResult, ToolCall
 from app.core.local_store import LocalKVStore
 from app.core.session_engine import (
@@ -203,6 +203,23 @@ async def test_plain_text_turn_events_and_persistence(db, seeded, kv, monkeypatc
     sent = stub.calls[0]["messages"]
     assert [m["role"] for m in sent] == ["system", "user"]
     assert sent[1]["content"] == "hi there"
+
+
+async def test_session_row_records_the_turns_actual_model(
+    db, seeded, kv, monkeypatch
+):
+    """Phase 3 item 20 (A20): sessions.llm_model/llm_provider must track the
+    brain that served the latest turn, not the write-once column defaults."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream([_result(text="ok")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "hello")
+    done = events[-1]
+
+    await db.refresh(session)
+    assert session.llm_model == done.model
+    assert session.llm_provider == model_registry.infer_provider(done.model)
 
 
 async def test_second_turn_includes_history_and_continues_seq(

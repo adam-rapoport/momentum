@@ -815,6 +815,11 @@ async def _process_message_locked(
     turn_api_key = await credentials.resolve_api_key(
         db, session.user_id, credentials.llm_provider_for_model(turn_model)
     )
+    # Keep the session row's provider/model columns pointing at the brain that
+    # actually served the latest turn (finding A20: they were write-once
+    # defaults that never matched reality). Committed with the user message.
+    session.llm_model = turn_model
+    session.llm_provider = model_registry.infer_provider(turn_model)
 
     stmt = (
         select(Message)
