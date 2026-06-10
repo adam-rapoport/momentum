@@ -1340,3 +1340,144 @@ async def test_wrap_up_failure_still_closes_turn(
     assert isinstance(events[-1], DoneEvent)
     messages = await _messages_for(db, session.id)
     assert len([m for m in messages if m.role == "tool"]) == MAX_TOOL_ITERATIONS
+
+
+# ---------- (i) context-window management (Phase 1 item 10) ----------
+
+
+def _hist_msg(turn_id: int, seq: int, role: str, text: str, estimate: int | None):
+    return Message(
+        id=uuid4(),
+        session_id=uuid4(),  # unit tests below never touch the DB
+        turn_id=turn_id,
+        seq=seq,
+        role=role,
+        content=[{"type": "text", "text": text}],
+        token_count_estimate=estimate,
+    )
+
+
+def test_truncation_drops_whole_oldest_turns():
+    history = [
+        _hist_msg(1, 1, "user", "q1", 100),
+        _hist_msg(1, 2, "assistant", "a1", 100),
+        _hist_msg(2, 3, "user", "q2", 100),
+        _hist_msg(2, 4, "assistant", "a2", 100),
+        _hist_msg(3, 5, "user", "q3", 100),
+        _hist_msg(3, 6, "assistant", "a3", 100),
+    ]
+    kept, omitted = session_engine._truncate_history_to_budget(history, 450)
+    # 3 turns x 200 tokens = 600 > 450 → exactly the oldest turn goes, whole.
+    assert omitted == 1
+    assert [m.turn_id for m in kept] == [2, 2, 3, 3]
+
+
+def test_truncation_keeps_newest_turn_even_over_budget():
+    history = [
+        _hist_msg(1, 1, "user", "old", 100),
+        _hist_msg(2, 2, "user", "huge", 10_000),
+    ]
+    kept, omitted = session_engine._truncate_history_to_budget(history, 50)
+    assert omitted == 1
+    assert [m.turn_id for m in kept] == [2]
+
+
+def test_truncation_noop_under_budget():
+    history = [
+        _hist_msg(1, 1, "user", "q1", 100),
+        _hist_msg(1, 2, "assistant", "a1", 100),
+    ]
+    kept, omitted = session_engine._truncate_history_to_budget(history, 10_000)
+    assert omitted == 0
+    assert kept == history
+
+
+def test_truncation_falls_back_to_content_estimate_for_legacy_rows():
+    # Pre-Phase-1 rows have token_count_estimate=None — the window must
+    # estimate from content instead of treating them as free.
+    big_text = "x" * 400_000  # ~100k tokens at 4 chars/token
+    history = [
+        _hist_msg(1, 1, "user", big_text, None),
+        _hist_msg(2, 2, "user", "small", None),
+    ]
+    kept, omitted = session_engine._truncate_history_to_budget(history, 1_000)
+    assert omitted == 1
+    assert [m.turn_id for m in kept] == [2]
+
+
+async def test_token_estimates_populated_on_persist(db, seeded, kv, monkeypatch):
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(id="c1", name="TestEcho", arguments_json='{"value": "v"}')
+                ]
+            ),
+        ],
+        [StreamChunk(text="done"), _result(text="done")],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    await _run_turn(db, kv, session.id, "estimate me")
+
+    messages = await _messages_for(db, session.id)
+    assert len(messages) >= 3  # user + assistant(tool_use) + tool + final text
+    for m in messages:
+        assert m.token_count_estimate is not None and m.token_count_estimate > 0
+
+
+async def test_long_history_window_truncates_and_notes(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Six prior turns claiming ~100k tokens each blow any budget: the model
+    must receive only the newest turn(s), plus a system note marking the cut,
+    and the oldest content must not be sent."""
+    session = await _make_session(db, seeded)
+    for t in range(1, 7):
+        for role, seq_off, text in (("user", 0, f"question {t}"), ("assistant", 1, f"answer {t}")):
+            db.add(
+                Message(
+                    id=uuid4(),
+                    session_id=session.id,
+                    turn_id=t,
+                    seq=t * 2 - 1 + seq_off,
+                    role=role,
+                    content=[{"type": "text", "text": text}],
+                    token_count_estimate=50_000,
+                )
+            )
+    session.turn_count = 6
+    await db.commit()
+
+    stub = _scripted_stream([StreamChunk(text="ok"), _result(text="ok")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    await _run_turn(db, kv, session.id, "and now?")
+
+    sent = stub.calls[0]["messages"]
+    system_text = " ".join(
+        m.get("content") or "" for m in sent if m.get("role") == "system"
+    )
+    assert "truncated" in system_text
+    all_text = json.dumps(sent)
+    assert "answer 6" in all_text  # newest turn survives
+    assert "question 1" not in all_text  # oldest turn dropped
+
+
+async def test_short_history_sends_everything_unnoted(db, seeded, kv, monkeypatch):
+    session = await _make_session(db, seeded)
+    stub1 = _scripted_stream([StreamChunk(text="hi"), _result(text="hi")])
+    monkeypatch.setattr(session_engine, "stream_message", stub1)
+    await _run_turn(db, kv, session.id, "first")
+
+    stub2 = _scripted_stream([StreamChunk(text="again"), _result(text="again")])
+    monkeypatch.setattr(session_engine, "stream_message", stub2)
+    await _run_turn(db, kv, session.id, "second")
+
+    sent = stub2.calls[0]["messages"]
+    system_text = " ".join(
+        m.get("content") or "" for m in sent if m.get("role") == "system"
+    )
+    assert "truncated" not in system_text
+    assert any("first" in (m.get("content") or "") for m in sent)

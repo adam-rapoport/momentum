@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core import credentials
+from app.core import credentials, model_registry
 from app.core.documents import router as docs_router
 from app.core.groq_client import StreamChunk, StreamResult
 from app.core.llm import stream_message
@@ -604,6 +604,93 @@ def _history_to_llm_messages(history: list[Message]) -> list[dict]:
     return out
 
 
+# ---- token estimation + history budgeting (Phase 1 item 10, C5/A8) ----
+
+# Context-window room reserved for the model's own response.
+RESPONSE_TOKEN_RESERVE = 2048
+# For raw env-override models that aren't in the registry. Every registered
+# model is ≥128k, so this is the conservative floor.
+DEFAULT_CONTEXT_WINDOW = 128_000
+
+
+def _estimate_tokens(text: str) -> int:
+    """Crude but dependable token estimate: ~4 characters per token (the
+    common English average across the providers we route to). We only need
+    budget-level accuracy for the sliding window — the 2k response reserve
+    absorbs the estimation error."""
+    return max(1, len(text) // 4) if text else 0
+
+
+def _estimate_content_tokens(blocks: list) -> int:
+    """Estimate for a Message's content blocks: text, tool inputs (JSON, the
+    way the provider sees them), and tool outputs — plus a few tokens of
+    structural overhead per message (role markers etc.)."""
+    total = 0
+    for block in blocks or []:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype == "text":
+            total += _estimate_tokens(block.get("text") or "")
+        elif btype == "tool_use":
+            total += _estimate_tokens(block.get("name") or "")
+            total += _estimate_tokens(json.dumps(block.get("input") or {}))
+        elif btype == "tool_result":
+            total += _estimate_tokens(block.get("output") or "")
+    return total + 4
+
+
+def _context_window_for(model: str) -> int:
+    entry = model_registry.get_model(model)
+    return entry.context_window if entry is not None else DEFAULT_CONTEXT_WINDOW
+
+
+def _truncate_history_to_budget(
+    history: list[Message], budget_tokens: int
+) -> tuple[list[Message], int]:
+    """Sliding-window truncation: walk turns newest→oldest accumulating
+    token estimates and drop whole TURNS beyond the budget. Never splits a
+    turn — an assistant tool_use without its paired tool_results (or vice
+    versa) makes the rebuilt provider history invalid.
+
+    Returns (kept_history, omitted_turn_count). The newest turn is always
+    kept, even when over budget on its own — better to let the provider
+    reject one pathological turn than to send the model nothing.
+
+    NOTE: deliberately just a window. Summarize-then-mark compaction
+    (Message.is_compacted, which the history query already filters on) is
+    left for a later phase.
+    """
+    if not history:
+        return history, 0
+
+    turns: list[list[Message]] = []
+    for msg in history:  # already ordered by (turn_id, seq)
+        if turns and turns[-1][0].turn_id == msg.turn_id:
+            turns[-1].append(msg)
+        else:
+            turns.append([msg])
+
+    kept_rev: list[list[Message]] = []
+    used = 0
+    for turn in reversed(turns):
+        cost = sum(
+            m.token_count_estimate
+            if m.token_count_estimate is not None
+            # Legacy rows (pre-Phase-1) have no stored estimate.
+            else _estimate_content_tokens(m.content or [])
+            for m in turn
+        )
+        if kept_rev and used + cost > budget_tokens:
+            break
+        used += cost
+        kept_rev.append(turn)
+
+    omitted = len(turns) - len(kept_rev)
+    kept = [m for turn in reversed(kept_rev) for m in turn]
+    return kept, omitted
+
+
 async def process_message(
     *,
     db: AsyncSession,
@@ -753,8 +840,37 @@ async def _process_message_locked(
         project_id=session.project_id,
         session_metadata=session.session_metadata or {},
     )
+    # Sliding-window budget: the model's context minus the static prompt, the
+    # incoming user message, and room for the response. Whole turns beyond the
+    # budget are dropped oldest-first (see _truncate_history_to_budget) —
+    # without this, long sessions grow until the provider hard-rejects every
+    # turn.
+    budget = (
+        _context_window_for(turn_model)
+        - _estimate_tokens(system_prompt)
+        - _estimate_tokens(user_text)
+        - RESPONSE_TOKEN_RESERVE
+    )
+    window, omitted_turns = _truncate_history_to_budget(list(history), budget)
+    if omitted_turns:
+        logger.info(
+            "session %s: omitting %d oldest turn(s) to fit %s's context window",
+            session_id, omitted_turns, turn_model,
+        )
     llm_messages: list[dict] = [{"role": "system", "content": system_prompt}]
-    llm_messages.extend(_history_to_llm_messages(list(history)))
+    if omitted_turns:
+        # Tell the model the transcript is windowed so it doesn't treat the
+        # cut point as the actual start of the conversation.
+        llm_messages.append(
+            {
+                "role": "system",
+                "content": (
+                    f"[Earlier conversation truncated: {omitted_turns} older "
+                    f"turn(s) omitted to fit the context window.]"
+                ),
+            }
+        )
+    llm_messages.extend(_history_to_llm_messages(window))
     llm_messages.append({"role": "user", "content": user_text})
     if resume_note:
         llm_messages.append({"role": "system", "content": resume_note})
@@ -768,6 +884,9 @@ async def _process_message_locked(
         seq=_take_seq(),
         role="user",
         content=[{"type": "text", "text": user_text}],
+        token_count_estimate=_estimate_content_tokens(
+            [{"type": "text", "text": user_text}]
+        ),
     )
     db.add(user_message)
     session.turn_count = turn_id
@@ -910,6 +1029,7 @@ async def _process_message_locked(
                     seq=_take_seq(),
                     role="assistant",
                     content=content_blocks,
+                    token_count_estimate=_estimate_content_tokens(content_blocks),
                 )
                 db.add(assistant_message)
 
@@ -986,21 +1106,23 @@ async def _process_message_locked(
                     call_id=call_id, name=name, output=output, is_error=is_error
                 )
 
+                tool_content = [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": call_id,
+                        "tool_name": name,
+                        "output": output,
+                        "is_error": is_error,
+                    }
+                ]
                 tool_message = Message(
                     id=uuid4(),
                     session_id=session_id,
                     turn_id=turn_id,
                     seq=_take_seq(),
                     role="tool",
-                    content=[
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": call_id,
-                            "tool_name": name,
-                            "output": output,
-                            "is_error": is_error,
-                        }
-                    ],
+                    content=tool_content,
+                    token_count_estimate=_estimate_content_tokens(tool_content),
                 )
                 db.add(tool_message)
 
@@ -1185,6 +1307,9 @@ async def _process_message_locked(
                         seq=_take_seq(),
                         role="assistant",
                         content=[{"type": "text", "text": wrap_text}],
+                        token_count_estimate=_estimate_content_tokens(
+                            [{"type": "text", "text": wrap_text}]
+                        ),
                     )
                 )
 
@@ -1192,6 +1317,13 @@ async def _process_message_locked(
         # an explicit interruption marker — a reload must not lose text the
         # user already saw, and later turns' history should show the cutoff.
         if cancelled and cancelled_partial_text:
+            interrupted_content = [
+                {
+                    "type": "text",
+                    "text": cancelled_partial_text
+                    + "\n\n_[Response interrupted — stopped by the user.]_",
+                }
+            ]
             db.add(
                 Message(
                     id=uuid4(),
@@ -1199,13 +1331,10 @@ async def _process_message_locked(
                     turn_id=turn_id,
                     seq=_take_seq(),
                     role="assistant",
-                    content=[
-                        {
-                            "type": "text",
-                            "text": cancelled_partial_text
-                            + "\n\n_[Response interrupted — stopped by the user.]_",
-                        }
-                    ],
+                    content=interrupted_content,
+                    token_count_estimate=_estimate_content_tokens(
+                        interrupted_content
+                    ),
                 )
             )
 
