@@ -543,7 +543,12 @@ def _apply_skill_detection(session: Session, user_text: str) -> None:
         return
 
     current_meta["active_skill"] = skill.name
-    current_meta["active_skill_phase"] = skill.first_phase
+    # NOTE (A22): active_skill_phase is no longer written. It was set to the
+    # first phase at activation and never advanced, so the prompt told the
+    # model "current phase: intake" on every turn of a workflow. The prompt
+    # now lists the phases without claiming a position; the key stays in
+    # _SKILL_METADATA_KEYS so legacy sessions still get it cleaned up.
+    current_meta.pop("active_skill_phase", None)
     # A new skill invalidates any pending deliverable from a prior skill.
     current_meta.pop("pending_deliverable", None)
     session.session_metadata = current_meta

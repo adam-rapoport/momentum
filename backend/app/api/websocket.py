@@ -16,6 +16,7 @@ session, process-wide; a second `session.message` for a busy session is
 rejected with TURN_IN_PROGRESS instead of queueing.
 """
 import asyncio
+import json
 import logging
 from uuid import UUID
 from weakref import WeakKeyDictionary
@@ -26,7 +27,7 @@ from openai import APIError as OpenAIAPIError
 from pydantic import ValidationError
 from starlette.websockets import WebSocketState
 
-from app.core.model_router import NoProviderConfiguredError
+from app.core.model_router import NoProviderConfiguredError, parse_deep_flag
 from app.core.session_engine import (
     ApprovalPendingError,
     AwaitingReviewEvent,
@@ -39,7 +40,18 @@ from app.core.session_engine import (
     process_message,
 )
 from app.dependencies import SessionLocal, kv_store
-from app.schemas.websocket import InboundCancel, InboundMessage
+from app.schemas.websocket import (
+    InboundCancel,
+    InboundMessage,
+    OutboundAwaitingReview,
+    OutboundError,
+    OutboundStreamDone,
+    OutboundStreamText,
+    OutboundToolResult,
+    OutboundToolStart,
+    StreamDoneMetadata,
+    StreamUsage,
+)
 from app.security import origin_allowed, token_valid
 
 logger = logging.getLogger(__name__)
@@ -89,6 +101,17 @@ _CONTEXT_TOO_LONG_HINTS = (
 router = APIRouter()
 
 
+def _error_frame(
+    code: str, message: str, session_id: UUID | str | None = None
+) -> dict:
+    """Error frame, serialized through the pydantic schema (finding A30).
+    `session_id` is omitted (not null) when absent — that's the pinned
+    contract shape for connection-level errors."""
+    return OutboundError(
+        code=code, message=message, session_id=session_id
+    ).model_dump(mode="json", exclude_none=True)
+
+
 def _model_error_frame(e: BaseException, session_id: UUID) -> dict | None:
     """Map a provider/SDK error to an actionable WS error frame, or None when
     `e` isn't a model-provider error (caller falls through to INTERNAL_ERROR).
@@ -101,7 +124,7 @@ def _model_error_frame(e: BaseException, session_id: UUID) -> dict | None:
     msg = str(e).lower()
 
     def frame(code: str, message: str) -> dict:
-        return {"type": "error", "code": code, "message": message, "session_id": sid}
+        return _error_frame(code, message, session_id=sid)
 
     # The model router found NO provider with a usable key at all — distinct
     # from a per-provider auth failure: there is nothing to retry, the user
@@ -209,28 +232,57 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     own_tasks: set[asyncio.Task] = set()
     try:
         while True:
-            raw = await ws.receive_json()
+            # Guard the read against garbage frames (finding P12): a non-JSON
+            # or non-object frame used to kill the read loop silently —
+            # answer with VALIDATION_ERROR and keep serving instead.
+            try:
+                raw = await ws.receive_json()
+            except json.JSONDecodeError:
+                await _send(
+                    ws,
+                    _error_frame("VALIDATION_ERROR", "frame is not valid JSON"),
+                )
+                continue
+            if not isinstance(raw, dict):
+                await _send(
+                    ws,
+                    _error_frame(
+                        "VALIDATION_ERROR", "frame must be a JSON object"
+                    ),
+                )
+                continue
             msg_type = raw.get("type")
 
             if msg_type == "session.message":
                 try:
                     payload = InboundMessage.model_validate(raw)
                 except ValidationError as e:
-                    await _send(ws, {"type": "error", "code": "VALIDATION_ERROR", "message": str(e)})
+                    await _send(ws, _error_frame("VALIDATION_ERROR", str(e)))
+                    continue
+                # Reject messages that are empty once the /deep flag is
+                # stripped (finding A29) — the engine would otherwise persist
+                # an empty user message and run an assistant turn against it.
+                if not parse_deep_flag(payload.content)[1].strip():
+                    await _send(
+                        ws,
+                        _error_frame(
+                            "VALIDATION_ERROR",
+                            "message is empty — type something after /deep, "
+                            "or send a non-empty message",
+                            session_id=payload.session_id,
+                        ),
+                    )
                     continue
                 existing = _turn_tasks.get(payload.session_id)
                 if existing is not None and not existing.done():
                     await _send(
                         ws,
-                        {
-                            "type": "error",
-                            "code": "TURN_IN_PROGRESS",
-                            "message": (
-                                "A response is already being generated for this "
-                                "session. Wait for it to finish or stop it first."
-                            ),
-                            "session_id": str(payload.session_id),
-                        },
+                        _error_frame(
+                            "TURN_IN_PROGRESS",
+                            "A response is already being generated for this "
+                            "session. Wait for it to finish or stop it first.",
+                            session_id=payload.session_id,
+                        ),
                     )
                     continue
                 task = asyncio.create_task(
@@ -247,7 +299,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 try:
                     payload_c = InboundCancel.model_validate(raw)
                 except ValidationError as e:
-                    await _send(ws, {"type": "error", "code": "VALIDATION_ERROR", "message": str(e)})
+                    await _send(ws, _error_frame("VALIDATION_ERROR", str(e)))
                     continue
                 # Just set the KV flag — the engine checks it on every chunk,
                 # at the top of each tool-loop iteration, and before each tool
@@ -258,7 +310,9 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             else:
                 await _send(
                     ws,
-                    {"type": "error", "code": "UNKNOWN_MESSAGE_TYPE", "message": f"unknown type: {msg_type}"},
+                    _error_frame(
+                        "UNKNOWN_MESSAGE_TYPE", f"unknown type: {msg_type}"
+                    ),
                 )
     except WebSocketDisconnect:
         return
@@ -286,54 +340,59 @@ def _turn_task_cleanup(session_id: UUID, own_tasks: set[asyncio.Task]):
 
 
 def _event_frame(event, session_id: UUID) -> dict | None:
-    """Engine event -> outbound JSON frame. These shapes are the frontend
+    """Engine event -> outbound JSON frame, serialized through the pydantic
+    schemas in app.schemas.websocket (finding A30 — hand-built dicts used to
+    drift from the dead schema models). These shapes are the frontend
     contract (pinned in tests/integration/test_ws_contract.py) — fields may
     be added but never removed or renamed."""
-    sid = str(session_id)
+    model = None
     if isinstance(event, TextEvent):
-        return {"type": "stream.text", "session_id": sid, "text": event.text}
-    if isinstance(event, ToolStartEvent):
-        return {
-            "type": "stream.tool_start",
-            "session_id": sid,
-            "call_id": event.call_id,
-            "name": event.name,
-            "input": event.input,
-        }
-    if isinstance(event, ToolResultEvent):
-        return {
-            "type": "stream.tool_result",
-            "session_id": sid,
-            "call_id": event.call_id,
-            "name": event.name,
-            "output": event.output,
-            "is_error": event.is_error,
-        }
-    if isinstance(event, AwaitingReviewEvent):
-        return {
-            "type": "stream.awaiting_review",
-            "session_id": sid,
-            "kind": event.kind,
-            "deliverable_kind": event.deliverable_kind,
-            "document_id": event.document_id,
-            "summary_for_user": event.summary_for_user,
-            "url": event.url,
-            "model": event.model,
-            "pending_action": event.pending_action,
-        }
-    if isinstance(event, DoneEvent):
-        return {
-            "type": "stream.done",
-            "session_id": sid,
-            "usage": {
-                "input_tokens": event.input_tokens,
-                "output_tokens": event.output_tokens,
-                "cost_usd": str(event.cost_usd),
-                "total_cost_usd": str(event.total_cost_usd),
-            },
-            "metadata": {"cancelled": event.cancelled, "model": event.model},
-        }
-    return None
+        model = OutboundStreamText(session_id=session_id, text=event.text)
+    elif isinstance(event, ToolStartEvent):
+        model = OutboundToolStart(
+            session_id=session_id,
+            call_id=event.call_id,
+            name=event.name,
+            input=event.input,
+        )
+    elif isinstance(event, ToolResultEvent):
+        model = OutboundToolResult(
+            session_id=session_id,
+            call_id=event.call_id,
+            name=event.name,
+            output=event.output,
+            is_error=event.is_error,
+        )
+    elif isinstance(event, AwaitingReviewEvent):
+        model = OutboundAwaitingReview(
+            session_id=session_id,
+            kind=event.kind,
+            deliverable_kind=event.deliverable_kind,
+            document_id=event.document_id,
+            summary_for_user=event.summary_for_user,
+            url=event.url,
+            model=event.model,
+            pending_action=event.pending_action,
+        )
+    elif isinstance(event, DoneEvent):
+        model = OutboundStreamDone(
+            session_id=session_id,
+            usage=StreamUsage(
+                input_tokens=event.input_tokens,
+                output_tokens=event.output_tokens,
+                # Decimals cross the wire as strings, not floats.
+                cost_usd=str(event.cost_usd),
+                total_cost_usd=str(event.total_cost_usd),
+            ),
+            metadata=StreamDoneMetadata(
+                cancelled=event.cancelled, model=event.model
+            ),
+        )
+    if model is None:
+        return None
+    # mode="json" stringifies the UUID; nulls stay present (the contract
+    # includes them on event frames, unlike error frames).
+    return model.model_dump(mode="json")
 
 
 async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) -> None:
@@ -366,8 +425,7 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
         raise
     except ValueError as e:
         await _send(
-            ws,
-            {"type": "error", "code": "NOT_FOUND", "message": str(e), "session_id": str(session_id)},
+            ws, _error_frame("NOT_FOUND", str(e), session_id=session_id)
         )
     except ApprovalPendingError as e:
         # The session is paused on a staged side effect (send email / create
@@ -376,12 +434,7 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
         # must use the approval buttons.
         await _send(
             ws,
-            {
-                "type": "error",
-                "code": "APPROVAL_REQUIRED",
-                "message": str(e),
-                "session_id": str(session_id),
-            },
+            _error_frame("APPROVAL_REQUIRED", str(e), session_id=session_id),
         )
     except CommitFailedError as e:
         # DB write failed partway through the turn. The session engine has
@@ -395,16 +448,13 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
         sentry_sdk.capture_exception(e)
         await _send(
             ws,
-            {
-                "type": "error",
-                "code": "DB_ERROR",
-                "message": (
-                    "Couldn't save this turn to the database — the partial "
-                    "state has been rolled back. Please try again; if this "
-                    "keeps happening, check the backend logs."
-                ),
-                "session_id": str(session_id),
-            },
+            _error_frame(
+                "DB_ERROR",
+                "Couldn't save this turn to the database — the partial "
+                "state has been rolled back. Please try again; if this "
+                "keeps happening, check the backend logs.",
+                session_id=session_id,
+            ),
         )
     except Exception as e:
         # Provider/model errors (any of the three SDKs, or a missing key)
@@ -419,10 +469,9 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
         sentry_sdk.capture_exception(e)
         await _send(
             ws,
-            {
-                "type": "error",
-                "code": "INTERNAL_ERROR",
-                "message": "Something went wrong processing your message.",
-                "session_id": str(session_id),
-            },
+            _error_frame(
+                "INTERNAL_ERROR",
+                "Something went wrong processing your message.",
+                session_id=session_id,
+            ),
         )
