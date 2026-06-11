@@ -2,6 +2,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { ChatView } from "@/components/ChatView";
+import { HomeView } from "@/components/HomeView";
 import { Toolbar } from "@/components/Toolbar";
 import { useChatStore } from "@/lib/store";
 
@@ -22,16 +23,7 @@ function ChatInner() {
     return (
       <>
         <Toolbar />
-        <div className="flex flex-1 items-center justify-center">
-          <div className="max-w-md text-center">
-            <h1 className="mb-2 text-xl font-semibold text-ink">Welcome to pMomentum</h1>
-            <p className="text-sm text-ink-muted">
-              Your AI assistant for PM work. Click{" "}
-              <span className="font-medium">&quot;New chat&quot;</span> in the sidebar to start a
-              conversation, or pick an existing one.
-            </p>
-          </div>
-        </div>
+        <HomeView />
       </>
     );
   }

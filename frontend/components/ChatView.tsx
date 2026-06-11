@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
+import { useUiStore } from "@/lib/uiStore";
 import { getWsClient } from "@/lib/ws";
 import type {
   LiveToolCall,
@@ -161,6 +162,22 @@ export function ChatView({ sessionId }: Props) {
           });
         } else {
           clearAwaitingReview(sessionId);
+        }
+        // First message typed on the home screen: send it only now that the
+        // initial load is done, so this fetch can't clobber the optimistic
+        // user bubble.
+        const queued = useUiStore.getState().queuedFirstMessage;
+        if (queued && queued.sessionId === sessionId) {
+          useUiStore.getState().setQueuedFirstMessage(null);
+          const store = useChatStore.getState();
+          store.clearLastError(sessionId);
+          store.appendUserMessage(sessionId, queued.content);
+          store.startStreaming(sessionId);
+          getWsClient().send({
+            type: "session.message",
+            session_id: sessionId,
+            content: queued.content,
+          });
         }
       })
       .catch((err) => {
