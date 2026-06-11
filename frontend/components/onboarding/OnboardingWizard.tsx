@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, IconBtn, PixelIcon, PmLogo } from "@/components/pm";
-import { api, type KeyProvider } from "@/lib/api";
+import { api, type KeyProvider, type ModelEntry } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
+import { useChatStore } from "@/lib/store";
 import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
 import { DoneStep, ModelStep, ToolsStep, WelcomeStep, type ModelStepState } from "./steps";
 import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
@@ -30,7 +31,7 @@ const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
 function initialModelState(tier: "light" | "heavy"): ModelStepState {
   const list = providersForTier(tier);
   const preferred = list.find((p) => p.id === RECOMMENDED_PROVIDER[tier]) ?? list[0];
-  return { providerId: preferred?.id ?? null, key: "" };
+  return { providerId: preferred?.id ?? null, key: "", model: null };
 }
 
 // First-run wizard: Welcome → Light model → Heavy model → Tools (Google) →
@@ -51,6 +52,15 @@ export function OnboardingWizard() {
   // re-run, or a key configured via Settings). Those steps are advanceable
   // without re-pasting the key — see canAdvance/saveModel.
   const [configured, setConfigured] = useState<Partial<Record<KeyProvider, boolean>>>({});
+  // Full model registry for the per-slot model dropdowns (null until loaded).
+  const [registry, setRegistry] = useState<ModelEntry[] | null>(null);
+
+  useEffect(() => {
+    api
+      .getModelPreferences()
+      .then((p) => setRegistry(p.registry_models ?? null))
+      .catch(() => setRegistry(null)); // dropdown hides; defaults apply
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,7 +109,7 @@ export function OnboardingWizard() {
   async function saveModel(state: ModelStepState, tier: "light" | "heavy"): Promise<boolean> {
     if (!state.providerId) return false;
     const provider = PROVIDERS[state.providerId];
-    const model = provider.defaultModel[tier];
+    const model = state.model ?? provider.defaultModel[tier];
     if (!model) return false;
     setSaving(true);
     setError(null);
@@ -194,6 +204,9 @@ export function OnboardingWizard() {
       setFinishing(false);
       return;
     }
+    // Doc uploads during onboarding created memories while the context panels
+    // were unmounted — drop their caches so /chat refetches fresh lists.
+    useChatStore.getState().invalidateContextPanels();
     router.replace("/chat");
   }
 
@@ -256,6 +269,7 @@ export function OnboardingWizard() {
               setState={setLight}
               error={error}
               configured={isConfigured(light)}
+              registry={registry}
             />
           )}
           {step.key === "heavy" && (
@@ -266,6 +280,7 @@ export function OnboardingWizard() {
               setState={setHeavy}
               error={error}
               configured={isConfigured(heavy)}
+              registry={registry}
             />
           )}
           {step.key === "tools" && <ToolsStep stepNumber={4} />}

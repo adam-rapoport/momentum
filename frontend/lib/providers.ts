@@ -59,13 +59,13 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     name: "OpenAI",
     tiers: ["light", "heavy"],
     pricing: "Paid · billing required on your OpenAI account",
-    description: "GPT-4o for either slot. Paid, but works as a light or heavy model.",
+    description: "GPT-5.5 and the GPT-5.4 family. Paid, but works as a light or heavy model.",
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: 'In OpenAI → API keys → "Create new secret key".',
     keyHint: "Starts with sk-",
     keyPrefix: "sk-",
     keyLength: [20, 200],
-    defaultModel: { light: "gpt-4o-mini", heavy: "gpt-4o" },
+    defaultModel: { light: "gpt-5.4-mini", heavy: "gpt-5.5" },
   },
 };
 

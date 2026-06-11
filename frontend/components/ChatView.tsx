@@ -373,7 +373,7 @@ export function ChatView({ sessionId }: Props) {
                   : lastError.code === "APPROVAL_REQUIRED"
                   ? "Waiting for your decision"
                   : lastError.code === "TOOL_ERROR"
-                  ? "A tool failed"
+                  ? "A tool call failed (the agent kept going)"
                   : lastError.code === "DB_ERROR"
                   ? "Couldn't save this turn"
                   : lastError.code === "WS_DISCONNECTED"
@@ -384,7 +384,23 @@ export function ChatView({ sessionId }: Props) {
               }
               onDismiss={() => clearLastError(sessionId)}
             >
-              {lastError.message}
+              {lastError.code === "TOOL_ERROR" ? (
+                <>
+                  {/* Tool errors embed the raw call args — useful for a quick
+                      glance, noise beyond a couple of lines. */}
+                  <span className="break-words">
+                    {lastError.message.length > 220
+                      ? `${lastError.message.slice(0, 220)}…`
+                      : lastError.message}
+                  </span>
+                  <span className="mt-1 block text-ink-dim">
+                    The agent usually retries or works around a failed tool on its own — check its
+                    reply for the outcome.
+                  </span>
+                </>
+              ) : (
+                lastError.message
+              )}
             </Banner>
           )}
         </div>

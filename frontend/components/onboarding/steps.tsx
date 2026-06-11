@@ -3,12 +3,15 @@ import { useEffect, useState } from "react";
 import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
 import { GoogleCard } from "@/components/settings/IntegrationsPane";
 import { KeyInput } from "@/components/settings/KeyInput";
-import { api } from "@/lib/api";
+import { api, type ModelEntry } from "@/lib/api";
 import { providersForTier, PROVIDERS, type ProviderMeta, type Tier } from "@/lib/providers";
 
 export interface ModelStepState {
   providerId: string | null;
   key: string;
+  // Specific model pick for this slot; null = the provider's recommended
+  // default for the tier.
+  model: string | null;
 }
 
 export function WelcomeStep({
@@ -64,6 +67,7 @@ export function ModelStep({
   setState,
   error,
   configured,
+  registry,
 }: {
   tier: Tier;
   stepNumber: number;
@@ -73,9 +77,16 @@ export function ModelStep({
   /** True when the selected provider already has a stored key — the step can
    * be advanced with the key field left blank. */
   configured?: boolean;
+  /** Full model registry (unfiltered) — drives the per-slot model dropdown.
+   * Null while loading/unavailable: the dropdown hides, defaults apply. */
+  registry: ModelEntry[] | null;
 }) {
   const providers = providersForTier(tier);
   const chosen: ProviderMeta | null = state.providerId ? PROVIDERS[state.providerId] : null;
+  const providerModels = (registry ?? []).filter(
+    (m) => chosen && m.provider === chosen.id && (m.role === tier || m.role === "either"),
+  );
+  const modelPick = state.model ?? chosen?.defaultModel[tier] ?? providerModels[0]?.id ?? "";
 
   return (
     <div className="flex flex-col gap-5">
@@ -100,7 +111,7 @@ export function ModelStep({
             <button
               key={p.id}
               type="button"
-              onClick={() => setState({ providerId: p.id, key: "" })}
+              onClick={() => setState({ providerId: p.id, key: "", model: null })}
               className={`rounded-[12px] border p-3.5 text-left transition-colors ${
                 selected
                   ? "border-accent bg-accent-tint-2 shadow-[0_0_0_3px_var(--accent-tint)]"
@@ -127,6 +138,26 @@ export function ModelStep({
           );
         })}
       </div>
+
+      {chosen && providerModels.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="text-[12.5px] font-medium text-ink-muted">Model</label>
+          <select
+            value={modelPick}
+            onChange={(e) => setState({ ...state, model: e.target.value })}
+            className="rounded-[7px] border border-line-strong bg-surface px-2 py-1.5 text-[13px] text-ink"
+          >
+            {providerModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.display_name}
+              </option>
+            ))}
+          </select>
+          {state.model === null && (
+            <span className="font-mono text-[10.5px] text-ink-dim">recommended</span>
+          )}
+        </div>
+      )}
 
       {chosen && (
         <div className="rounded-[12px] border border-line bg-surface p-4">

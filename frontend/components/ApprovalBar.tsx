@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Btn, Chip, PixelIcon, StatusDot } from "@/components/pm";
+import { isTauri, openLocalPath, revealInFolder } from "@/lib/desktop";
+import { useChatStore } from "@/lib/store";
 import { ExternalLink } from "./ExternalLink";
 import type {
   AwaitingReview,
@@ -109,6 +111,20 @@ export function ApprovalBar({ review, onApprove, onRevise, onRestart }: Props) {
 }
 
 function DeliverablePreview({ review }: { review: AwaitingReview }) {
+  // For local deliverables (no Google Docs URL), find the file on disk via the
+  // documents list — it refreshes on stream.done, i.e. just before this card
+  // appears. Desktop-only affordance: a browser can't open local files.
+  const documents = useChatStore((s) => s.documents);
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    setDesktop(isTauri());
+  }, []);
+  const localPath =
+    !review.url && review.document_id
+      ? (documents.find((d) => d.document_id === review.document_id && d.backend === "local")
+          ?.file_path ?? null)
+      : null;
+
   return (
     <div>
       {review.summary_for_user && <div className="text-ink">{review.summary_for_user}</div>}
@@ -127,6 +143,26 @@ function DeliverablePreview({ review }: { review: AwaitingReview }) {
             >
               Open in Google Docs ↗
             </ExternalLink>
+          )}
+          {desktop && localPath && (
+            <span className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void openLocalPath(localPath)}
+                className="rounded-[6px] border border-line bg-surface px-2 py-0.5 text-[12px] font-semibold text-accent-text hover:bg-raised"
+                title="Open in your default app"
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                onClick={() => void revealInFolder(localPath)}
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] border border-line bg-surface text-ink-muted hover:bg-raised hover:text-ink"
+                title="Show in Finder"
+              >
+                <PixelIcon name="folder" size={11} />
+              </button>
+            </span>
           )}
         </div>
       )}

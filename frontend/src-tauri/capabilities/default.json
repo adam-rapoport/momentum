@@ -13,6 +13,13 @@
         { "url": "http://*" },
         { "url": "https://*" }
       ]
-    }
+    },
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$HOME/**" }
+      ]
+    },
+    "opener:allow-reveal-item-in-dir"
   ]
 }

@@ -290,9 +290,12 @@ export function Sidebar() {
         <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-accent-tint text-[11.5px] font-bold text-accent-text">
           {displayName.charAt(0).toUpperCase()}
         </span>
-        <div className="min-w-0 flex-1">
+        <div
+          className="min-w-0 flex-1"
+          title="Everything stays on this Mac. Your API keys are encrypted at rest; chats and memories are private local files."
+        >
           <div className="truncate text-[12.5px] font-semibold text-ink">{displayName}</div>
-          <div className="font-mono text-[10.5px] text-ink-dim">local · encrypted</div>
+          <div className="font-mono text-[10.5px] text-ink-dim">local · private</div>
         </div>
         <IconBtn
           icon={theme === "dark" ? "sun" : "moon"}

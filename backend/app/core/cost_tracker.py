@@ -55,6 +55,13 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gemini-2.5-flash-lite": ModelPricing("0.10", "0.40"),
 
     # --- OpenAI (paid) ---
+    # gpt-5.5 per the June 2026 API pricing page; the 5.4 tiers mirror
+    # OpenAI's long-stable mid/mini pricing as a display estimate until
+    # live-verified with a billed key.
+    "gpt-5.5": ModelPricing("5.00", "30.00"),
+    "gpt-5.4": ModelPricing("1.25", "10.00"),
+    "gpt-5.4-mini": ModelPricing("0.25", "2.00"),
+    # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
 }

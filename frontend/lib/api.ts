@@ -261,6 +261,9 @@ export interface ModelPreferences {
   effective_heavy_model: string;
   available_light_models: ModelEntry[];
   available_heavy_models: ModelEntry[];
+  // Full registry, unfiltered by configured providers — lets the onboarding
+  // wizard offer a model choice before any key is saved.
+  registry_models: ModelEntry[];
 }
 
 export interface ModelPreferencesUpdate {

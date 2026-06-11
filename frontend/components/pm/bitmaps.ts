@@ -344,6 +344,17 @@ export const PM_BITMAPS = {
     "   ##### ",
     "         ",
   ],
+  folder: [
+    "         ",
+    " ####    ",
+    " ####### ",
+    " #     # ",
+    " #     # ",
+    " #     # ",
+    " ####### ",
+    "         ",
+    "         ",
+  ],
 } as const;
 
 export type PixelIconName = keyof typeof PM_BITMAPS;

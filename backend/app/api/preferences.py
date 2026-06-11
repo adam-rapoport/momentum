@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core import credentials
 from app.core.default_user import get_default_user
-from app.core.model_registry import get_available_models, is_model_available
+from app.core.model_registry import REGISTRY, get_available_models, is_model_available
 from app.core.search import DEFAULT_PROVIDER, VALID_PROVIDERS
 from app.dependencies import get_db
 from app.models import Organization
@@ -78,6 +78,10 @@ def _public_view(user_preferences: dict, configured: set[str]) -> dict:
     return {
         "light_model": light_pick,
         "heavy_model": heavy_pick,
+        # The FULL registry, unfiltered by configured providers — the
+        # onboarding wizard offers a model choice BEFORE the key is saved.
+        # The PUT endpoint still validates picks against what's configured.
+        "registry_models": [asdict(m) for m in REGISTRY],
         "effective_light_model": (
             light_pick
             if light_pick

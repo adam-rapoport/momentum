@@ -82,3 +82,20 @@ export async function openExternal(url: string): Promise<void> {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 }
+
+/**
+ * Open a local file in its default app (desktop only — a browser can't touch
+ * local paths, so callers should hide the affordance when !isTauri()).
+ */
+export async function openLocalPath(path: string): Promise<void> {
+  if (!isTauri()) return;
+  const { openPath } = await import("@tauri-apps/plugin-opener");
+  await openPath(path);
+}
+
+/** Reveal a local file in Finder (desktop only). */
+export async function revealInFolder(path: string): Promise<void> {
+  if (!isTauri()) return;
+  const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+  await revealItemInDir(path);
+}

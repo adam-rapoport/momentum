@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { ExternalLink } from "@/components/ExternalLink";
 import { Chip, IconBtn, PixelIcon, PxLabel, Segmented, type PixelIconName } from "@/components/pm";
 import { api } from "@/lib/api";
+import { isTauri, openLocalPath, revealInFolder } from "@/lib/desktop";
 import { useChatStore } from "@/lib/store";
 import { useUiStore } from "@/lib/uiStore";
 import type {
@@ -233,6 +234,12 @@ function DocumentsTab() {
   const documents = useChatStore((s) => s.documents);
   const documentsLoadedAt = useChatStore((s) => s.documentsLoadedAt);
   const setDocuments = useChatStore((s) => s.setDocuments);
+  // Local files can only be opened from the desktop shell — set after mount
+  // so server-rendered HTML matches the first client render.
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    setDesktop(isTauri());
+  }, []);
 
   useEffect(() => {
     if (documentsLoadedAt !== 0) return;
@@ -281,6 +288,25 @@ function DocumentsTab() {
                     >
                       Open ↗
                     </ExternalLink>
+                  ) : desktop && d.file_path ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void openLocalPath(d.file_path as string)}
+                        className="rounded-[5px] border border-line bg-surface px-1.5 py-px text-[10.5px] font-semibold text-accent-text hover:bg-raised"
+                        title="Open in your default app"
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void revealInFolder(d.file_path as string)}
+                        className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border border-line bg-surface text-ink-muted hover:bg-raised hover:text-ink"
+                        title="Show in Finder"
+                      >
+                        <PixelIcon name="folder" size={10} />
+                      </button>
+                    </span>
                   ) : (
                     <span
                       className="mt-[3px] shrink-0 font-mono text-[10px] text-ink-dim"

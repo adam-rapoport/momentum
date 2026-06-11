@@ -34,6 +34,8 @@ const TOOL_ICONS: Record<string, PixelIconName> = {
   CreateDocument: "doc",
   UpdateDocument: "doc",
   ReadDocument: "doc",
+  WriteDocument: "doc",
+  AwaitReview: "clock",
   ListCalendarEvents: "calendar",
   FindAvailability: "calendar",
   CreateCalendarEvent: "calendar",
