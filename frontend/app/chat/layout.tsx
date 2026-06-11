@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BootGate } from "@/components/BootGate";
 import { ContextPanel } from "@/components/ContextPanel";
+import { SettingsSheet } from "@/components/settings/SettingsSheet";
 import { Sidebar } from "@/components/Sidebar";
 import { WsProvider } from "@/components/WsProvider";
 import { useUiStore } from "@/lib/uiStore";
@@ -42,6 +43,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           <main className="flex min-w-0 flex-1 flex-col">{children}</main>
           {contextPanelOpen && <ContextPanel />}
         </div>
+        <SettingsSheet />
       </WsProvider>
     </BootGate>
   );

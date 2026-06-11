@@ -17,11 +17,19 @@ interface QueuedFirstMessage {
   content: string;
 }
 
+export interface GoogleBanner {
+  kind: "success" | "danger";
+  message: string;
+}
+
 interface UiState {
   contextPanelOpen: boolean;
   contextTab: ContextTab;
   settingsOpen: boolean;
   settingsPane: SettingsPane;
+  // One-shot banner shown in the Integrations pane after an OAuth return
+  // (web dev only — the flow lands on /settings?google=… and redirects here).
+  googleBanner: GoogleBanner | null;
   profile: UiProfile | null;
   // Message typed on the home screen, sent once the new session's ChatView
   // has finished its initial load (avoids the mount-fetch clobbering the
@@ -32,6 +40,7 @@ interface UiState {
   setContextTab: (tab: ContextTab) => void;
   openSettings: (pane?: SettingsPane) => void;
   closeSettings: () => void;
+  setGoogleBanner: (banner: GoogleBanner | null) => void;
   setProfile: (profile: UiProfile) => void;
   loadProfile: () => void;
   setQueuedFirstMessage: (q: QueuedFirstMessage | null) => void;
@@ -45,6 +54,7 @@ export const useUiStore = create<UiState>((set) => ({
   contextTab: "memory",
   settingsOpen: false,
   settingsPane: "models",
+  googleBanner: null,
   profile: null,
   queuedFirstMessage: null,
 
@@ -58,7 +68,8 @@ export const useUiStore = create<UiState>((set) => ({
   },
   setContextTab: (tab) => set({ contextTab: tab }),
   openSettings: (pane) => set((s) => ({ settingsOpen: true, settingsPane: pane ?? s.settingsPane })),
-  closeSettings: () => set({ settingsOpen: false }),
+  closeSettings: () => set({ settingsOpen: false, googleBanner: null }),
+  setGoogleBanner: (banner) => set({ googleBanner: banner }),
   setProfile: (profile) => set({ profile }),
   loadProfile: () => {
     api

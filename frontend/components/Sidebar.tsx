@@ -135,6 +135,7 @@ export function Sidebar() {
   const removeSession = useChatStore((s) => s.removeSession);
   const profile = useUiStore((s) => s.profile);
   const loadProfile = useUiStore((s) => s.loadProfile);
+  const openSettings = useUiStore((s) => s.openSettings);
 
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -298,8 +299,7 @@ export function Sidebar() {
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           onClick={toggleTheme}
         />
-        {/* TODO(phase 5): switch to useUiStore openSettings() once the settings sheet lands */}
-        <IconBtn icon="gear" title="Settings" onClick={() => router.push("/settings")} />
+        <IconBtn icon="gear" title="Settings" onClick={() => openSettings()} />
       </div>
     </aside>
   );
