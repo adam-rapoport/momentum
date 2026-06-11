@@ -2,6 +2,7 @@
 import { useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { PmLogo } from "@/components/pm";
 import { ExternalLink } from "./ExternalLink";
 
 // Markdown links (e.g. web-search citations, Google Docs URLs the model
@@ -43,34 +44,46 @@ function CopyButton({ text }: { text: string }) {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="absolute -bottom-2.5 right-2 hidden group-hover:block rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[10px] text-neutral-500 shadow-sm hover:text-neutral-900"
+      className="mt-1 hidden rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[10px] text-ink-dim hover:text-ink group-hover:inline-block"
     >
       {copied ? "Copied ✓" : "Copy"}
     </button>
   );
 }
 
-export function MessageBubble({ role, text }: Props) {
-  const isUser = role === "user";
+// 26px logo avatar chip used by assistant messages and the thinking row.
+export function AssistantAvatar({ pulse }: { pulse?: boolean }) {
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`group relative max-w-2xl rounded-lg px-4 py-2.5 text-sm ${
-          isUser ? "bg-neutral-900 text-white" : "bg-white border border-neutral-200"
-        }`}
-      >
-        {isUser ? (
-          <div className="whitespace-pre-wrap">{text}</div>
-        ) : (
-          <>
-            <div className="markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
-                {text}
-              </ReactMarkdown>
-            </div>
-            <CopyButton text={text} />
-          </>
-        )}
+    <span
+      className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-surface ${
+        pulse ? "pm-pulse" : ""
+      }`}
+    >
+      <PmLogo size={13} />
+    </span>
+  );
+}
+
+export function MessageBubble({ role, text }: Props) {
+  if (role === "user") {
+    return (
+      <div className="pm-enter flex justify-end">
+        <div className="max-w-[78%] whitespace-pre-wrap rounded-[14px_14px_4px_14px] border border-line bg-surface px-3.5 py-2.5 text-[14px] text-ink shadow-card">
+          {text}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="pm-enter group flex items-start gap-3">
+      <AssistantAvatar />
+      <div className="min-w-0 flex-1 pt-0.5">
+        <div className="markdown-body text-[14.5px] text-ink">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+            {text}
+          </ReactMarkdown>
+        </div>
+        <CopyButton text={text} />
       </div>
     </div>
   );
@@ -78,13 +91,14 @@ export function MessageBubble({ role, text }: Props) {
 
 export function StreamingBubble({ text }: { text: string }) {
   return (
-    <div className="flex justify-start">
-      <div className="max-w-2xl rounded-lg px-4 py-2.5 text-sm bg-white border border-neutral-200">
-        <div className="markdown-body">
+    <div className="flex items-start gap-3">
+      <AssistantAvatar />
+      <div className="min-w-0 flex-1 pt-0.5">
+        <div className="markdown-body text-[14.5px] text-ink">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
             {text}
           </ReactMarkdown>
-          <span className="inline-block w-2 h-4 bg-neutral-400 ml-0.5 animate-pulse align-middle" />
+          <span className="pm-cursor" aria-hidden="true" />
         </div>
       </div>
     </div>
