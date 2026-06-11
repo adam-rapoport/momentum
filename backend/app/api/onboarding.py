@@ -148,6 +148,11 @@ async def upload_document(
     # Persist the reference doc first so it's never lost, even if the
     # (best-effort) extraction step below fails.
     await db.commit()
+    # Snapshot the id NOW: if extraction fails below, its rollback expires the
+    # ORM object, and a later `record.id` would lazy-load outside the async
+    # greenlet context (MissingGreenlet → the whole upload 500s even though
+    # the document was saved).
+    record_id = str(record.id)
 
     # Have the user's heavy model read the doc and turn its durable facts into
     # their own memories, so the agent has real context from message one — not
@@ -170,7 +175,7 @@ async def upload_document(
 
     return {
         "title": parsed.title,
-        "memory_id": str(record.id),
+        "memory_id": record_id,
         "char_count": len(parsed.text),
         "memories_created": memories_created,
     }

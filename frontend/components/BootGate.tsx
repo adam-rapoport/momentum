@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Btn, PmLogo } from "@/components/pm";
 import { api } from "@/lib/api";
 
 // Gates the whole app behind a backend-readiness check, and shows a loading
@@ -82,35 +83,25 @@ export function BootGate({ children }: { children: React.ReactNode }) {
 function BootScreen({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
   return (
     <div
-      className="flex h-screen w-screen flex-col items-center justify-center gap-4"
-      style={{ background: "var(--bg-canvas)", color: "var(--text)" }}
+      data-tauri-drag-region=""
+      className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-app text-ink"
     >
-      <div className="text-lg font-semibold tracking-tight">pMomentum</div>
-
-      <div
-        className="h-6 w-6 animate-spin rounded-full border-2 border-transparent"
-        style={{ borderTopColor: "var(--accent)", borderRightColor: "var(--accent)" }}
-        aria-hidden
-      />
+      <span className="pm-pulse">
+        <PmLogo size={32} />
+      </span>
+      <div className="font-pixel text-[13px] tracking-[0.08em]">PMOMENTUM</div>
       {phase === "stalled" ? (
         <>
-          <div style={{ color: "var(--text-muted)" }} className="text-sm text-center max-w-sm">
-            Still starting… this is taking longer than usual. We&apos;ll keep
-            trying — or restart the app if it never comes up.
+          <div className="max-w-sm text-center text-sm text-ink-muted">
+            Still starting… this is taking longer than usual. We&apos;ll keep trying — or restart
+            the app if it never comes up.
           </div>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-md px-4 py-2 text-sm font-medium"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
+          <Btn kind="primary" size="sm" onClick={onRetry}>
             Try again
-          </button>
+          </Btn>
         </>
       ) : (
-        <div style={{ color: "var(--text-muted)" }} className="text-sm">
-          Starting pMomentum…
-        </div>
+        <div className="font-mono text-[12px] text-ink-muted">Starting pMomentum…</div>
       )}
     </div>
   );

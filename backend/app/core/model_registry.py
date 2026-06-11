@@ -132,25 +132,31 @@ REGISTRY: tuple[ModelEntry, ...] = (
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
-    # NOTE: these IDs could not be live-verified here (no OpenAI key in this
-    # environment). gpt-4o / gpt-4o-mini still resolve in the API today but are
-    # OpenAI's older generation; once an OpenAI key is available, verify and add
-    # the current (GPT-5-class) models.
+    # IDs checked against developers.openai.com/api/docs/models (2026-06-11).
+    # The gpt-4o generation is deprecated upstream and was removed here.
     ModelEntry(
-        id="gpt-4o",
-        context_window=128_000,
+        id="gpt-5.5",
+        context_window=1_000_000,
         provider="openai",
-        display_name="GPT-4o (OpenAI)",
+        display_name="GPT-5.5 (OpenAI)",
         role="either",
-        notes="OpenAI model. Paid — needs billing on your OpenAI key.",
+        notes="OpenAI's current flagship. Paid — needs billing on your OpenAI key.",
     ),
     ModelEntry(
-        id="gpt-4o-mini",
-        context_window=128_000,
+        id="gpt-5.4",
+        context_window=400_000,
         provider="openai",
-        display_name="GPT-4o mini (OpenAI)",
+        display_name="GPT-5.4 (OpenAI)",
+        role="either",
+        notes="More affordable previous flagship. Paid — needs billing.",
+    ),
+    ModelEntry(
+        id="gpt-5.4-mini",
+        context_window=400_000,
+        provider="openai",
+        display_name="GPT-5.4 mini (OpenAI)",
         role="light",
-        notes="Cheaper, faster OpenAI model. Paid — needs billing.",
+        notes="Fast, cheap OpenAI mini model — a solid light pick. Paid.",
     ),
 )
 

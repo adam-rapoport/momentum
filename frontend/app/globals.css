@@ -3,198 +3,234 @@
 @tailwind utilities;
 
 /* ──────────────────────────────────────────────────────────────────────────
-   C8 theme — warm cream + terracotta, with a dark variant.
-   Variables drive the Connections component kit (components/connections/*).
-   Toggle dark mode by setting data-theme="dark" on <html>.
+   "Graphite & Phosphor" theme — cool graphite neutrals + pixel-green accent.
+   Tokens drive every surface; toggle dark mode via data-theme="dark" on <html>.
+   Accent is fixed (pixel green) with precomputed theme-aware variants.
+   Spec: docs/design/graphite-phosphor/README.md
    ────────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg-page: #efe9de;
-  --bg-canvas: #f4efe6;
-  --bg-elev: #faf6ee;
-  --bg-elev-2: #efe7d8;
-  --bg-inset: #e7decd;
+  --bg-app: #f2f3f3; /* window background, toolbar */
+  --bg-panel: #eaebeb; /* sidebar, context panel */
+  --bg-surface: #ffffff; /* cards, composer, active rows */
+  --bg-raised: #f7f8f8; /* hover rows, tool blocks, code wells */
+  --bg-inset: #e3e4e4; /* inset wells, segmented track */
 
-  --text: #1f1a14;
-  --text-muted: #6b6357;
-  --text-dim: #9a9081;
+  --text: #17181a;
+  --text-muted: #65696e;
+  --text-dim: #94999f;
 
-  --border: #e0d7c8;
-  --border-strong: #cdc2ae;
-  --border-faint: #ece4d6;
+  --border: #dedfe0;
+  --border-strong: #c8cacc;
+  --border-faint: #e8e9e9;
 
-  --accent: #ab5f3f;
-  --accent-fg: #fff6ee;
-  --accent-tint: #f0e2d8;
-  --accent-soft: #e4c9b8;
-  --accent-text: #8a4b30;
+  --accent: #0f9d63;
+  --accent-bright: #0f9d63; /* dots, glows, logo */
+  --accent-fg: #f4fbf7; /* text on solid accent */
+  --accent-tint: #e2f3eb; /* soft fills */
+  --accent-tint-2: #eff8f3; /* softer fills */
+  --accent-text: #0b7a4d; /* accent-colored text, AA on bg */
 
-  --success: #5c7b53;
-  --success-soft: #e1ecdc;
-  --warn: #9a6a1f;
-  --warn-soft: #f2e6cf;
-  --danger: #b0463c;
-  --danger-soft: #f3dad5;
+  --warn: #b07c18;
+  --warn-soft: #f5e8c8;
+  --danger: #c2452e;
+  --danger-soft: #f6dcd5;
+  --ok: #0f9d63;
+  --ok-soft: #dcf0e6;
 
-  --radius-lg: 12px;
-  --shadow-card: 0 1px 2px rgba(31, 26, 20, 0.05);
-  --shadow-lift: 0 12px 32px rgba(31, 26, 20, 0.18);
+  --shadow-card: 0 1px 2px rgba(20, 24, 28, 0.05), 0 6px 20px -8px rgba(20, 24, 28, 0.08);
+  --shadow-pop: 0 2px 6px rgba(20, 24, 28, 0.08), 0 20px 50px -16px rgba(20, 24, 28, 0.22);
+  --shadow-composer: 0 1px 2px rgba(20, 24, 28, 0.04), 0 10px 32px -12px rgba(20, 24, 28, 0.14);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --sidebar-w: 264px;
+  --context-w: 312px;
+  --toolbar-h: 48px;
 }
 
 [data-theme="dark"] {
-  --bg-page: #15110d;
-  --bg-canvas: #1b1611;
-  --bg-elev: #221c16;
-  --bg-elev-2: #2a2219;
-  --bg-inset: #120e0a;
+  --bg-app: #131416;
+  --bg-panel: #18191c;
+  --bg-surface: #1f2024;
+  --bg-raised: #26272c;
+  --bg-inset: #0e0f10;
 
-  --text: #f0e9dd;
-  --text-muted: #b6ac9c;
-  --text-dim: #837868;
+  --text: #ecedee;
+  --text-muted: #9ba0a6;
+  --text-dim: #61656c;
 
-  --border: #322a20;
-  --border-strong: #41372a;
-  --border-faint: #2a2219;
+  --border: #2b2d31;
+  --border-strong: #3c3f45;
+  --border-faint: #232529;
 
-  --accent: #c2774f;
-  --accent-fg: #1a130e;
-  --accent-tint: #2e241b;
-  --accent-soft: #3a2c20;
-  --accent-text: #e0b89e;
+  --accent: #2ecc8c;
+  --accent-bright: #3de39e;
+  --accent-fg: #07130d;
+  --accent-tint: #11352a;
+  --accent-tint-2: #102a21;
+  --accent-text: #4adba0;
 
-  --success: #8fb07f;
-  --success-soft: #23301e;
-  --warn: #d0a24e;
-  --warn-soft: #322713;
-  --danger: #d77468;
-  --danger-soft: #3a211c;
+  --warn: #d9a93f;
+  --warn-soft: #38300f;
+  --danger: #e0684f;
+  --danger-soft: #3d1b12;
+  --ok: #2ecc8c;
+  --ok-soft: #143726;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px -8px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.5), 0 24px 60px -16px rgba(0, 0, 0, 0.75);
+  --shadow-composer: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 32px -12px rgba(0, 0, 0, 0.55);
 }
 
 html,
-body,
-#__next {
+body {
   height: 100%;
-  background-color: #f7f7f5;
-  color: #1f1f1f;
-}
-
-/* The Connections surfaces opt into the warm theme via this class on a
-   wrapping element, so the rest of the app keeps its existing look. */
-.c8-surface {
-  background-color: var(--bg-page);
+  background-color: var(--bg-app);
   color: var(--text);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-}
-.c8-surface .mono,
-.c8-surface code {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* ── Reusable component classes (match the design prototype vocabulary) ── */
-@layer components {
-  .c8-surface .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors;
-    padding: 8px 14px;
-    background: var(--bg-elev);
-    color: var(--text);
-    border: 1px solid var(--border-strong);
-    cursor: pointer;
-  }
-  .c8-surface .btn:hover { background: var(--bg-elev-2); }
-  .c8-surface .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .c8-surface .btn.primary {
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: transparent;
-  }
-  .c8-surface .btn.primary:hover { filter: brightness(0.95); background: var(--accent); }
-  .c8-surface .btn.ghost {
-    background: transparent;
-    border-color: transparent;
-    color: var(--text-muted);
-  }
-  .c8-surface .btn.ghost:hover { background: var(--bg-elev-2); }
-  .c8-surface .btn.small { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
-  .c8-surface .btn.large { padding: 11px 20px; font-size: 15px; border-radius: 10px; }
-  .c8-surface .btn.danger-ghost {
-    background: transparent;
-    border-color: var(--border-strong);
-    color: var(--danger);
-  }
-  .c8-surface .btn.danger-ghost:hover { background: var(--danger-soft); }
-
-  .c8-surface .input {
-    @apply block w-full rounded-lg text-sm;
-    padding: 9px 12px;
-    background: var(--bg-canvas);
-    color: var(--text);
-    border: 1px solid var(--border-strong);
-    outline: none;
-    font-family: var(--font-geist-mono), ui-monospace, monospace;
-  }
-  .c8-surface .input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-tint);
-  }
-  .c8-surface .input.valid { border-color: var(--success); }
-  .c8-surface .input.invalid { border-color: var(--danger); }
-
-  .c8-surface .card {
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-  }
-
-  .c8-surface .tag {
-    @apply inline-flex items-center rounded-full text-xs font-medium;
-    height: 20px;
-    padding: 0 8px;
-    background: var(--bg-inset);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-  .c8-surface .tag.accent {
-    background: var(--accent-tint);
-    color: var(--accent-text);
-    border-color: var(--accent-soft);
-  }
-  .c8-surface .tag.success {
-    background: var(--success-soft);
-    color: var(--success);
-    border-color: transparent;
-  }
-
-  .c8-surface .link {
-    color: var(--accent-text);
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* ── existing markdown styles (chat surface) ── */
+::selection {
+  background: var(--accent-tint);
+  color: var(--accent-text);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-app), 0 0 0 4px var(--accent);
+}
+
+/* ── scrollbars: thin, unobtrusive ── */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── desktop-only chrome: room for the macOS traffic lights, which overlay
+      the top-left of the window when the title bar is hidden (Tauri) ── */
+.pm-traffic-spacer {
+  height: 0;
+}
+[data-desktop] .pm-traffic-spacer {
+  height: 30px;
+}
+
+/* ── dither checkerboard (retro) — paints with currentColor ── */
+.dither {
+  --dither-size: 2px;
+  background-image: conic-gradient(currentColor 25%, transparent 0 50%, currentColor 0 75%, transparent 0);
+  background-size: calc(var(--dither-size) * 2) calc(var(--dither-size) * 2);
+}
+
+/* blinking block cursor for streaming */
+@keyframes pm-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.pm-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  background: var(--accent-bright);
+  vertical-align: -2px;
+  margin-left: 2px;
+  animation: pm-blink 0.9s steps(1) infinite;
+}
+
+@keyframes pm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pm-pulse {
+  animation: pm-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pm-enter {
+  animation: pm-fade-up 0.22s ease both;
+}
+
+@keyframes pm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pm-spin {
+  animation: pm-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-cursor,
+  .pm-pulse,
+  .pm-enter,
+  .pm-spin {
+    animation: none;
+  }
+}
+
+/* ── markdown inside assistant messages ── */
 .markdown-body {
-  line-height: 1.55;
+  line-height: 1.62;
 }
 .markdown-body p {
-  margin-bottom: 0.75rem;
+  margin-bottom: 10px;
 }
 .markdown-body p:last-child {
   margin-bottom: 0;
 }
 .markdown-body ul,
 .markdown-body ol {
-  margin: 0.5rem 0 0.75rem 1.25rem;
+  margin: 6px 0 10px 22px;
 }
 .markdown-body li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 3px;
   list-style: disc;
 }
 .markdown-body ol li {
   list-style: decimal;
+}
+.markdown-body strong {
+  font-weight: 600;
 }
 .markdown-body h1,
 .markdown-body h2,
@@ -202,19 +238,35 @@ body,
   font-weight: 600;
   margin: 1rem 0 0.5rem;
 }
-.markdown-body h1 { font-size: 1.2rem; }
-.markdown-body h2 { font-size: 1.1rem; }
-.markdown-body h3 { font-size: 1rem; }
+.markdown-body h1 {
+  font-size: 1.2rem;
+}
+.markdown-body h2 {
+  font-size: 1.1rem;
+}
+.markdown-body h3 {
+  font-size: 1rem;
+}
+.markdown-body h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
 .markdown-body code {
-  background: #ececec;
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
-  font-size: 0.9em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-faint);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .markdown-body pre {
-  background: #1f1f1f;
-  color: #f7f7f5;
+  background: var(--bg-inset);
+  color: var(--text);
+  border: 1px solid var(--border-faint);
   padding: 0.75rem;
   border-radius: 6px;
   overflow-x: auto;
@@ -222,6 +274,7 @@ body,
 }
 .markdown-body pre code {
   background: transparent;
+  border: none;
   color: inherit;
   padding: 0;
 }
@@ -231,6 +284,6 @@ body,
 }
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid #d4d4d4;
+  border: 1px solid var(--border);
   padding: 0.35rem 0.6rem;
 }

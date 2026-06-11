@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { PixelIcon, PxLabel, StatusDot, type PixelIconName } from "@/components/pm";
 import { ExternalLink } from "./ExternalLink";
 
 interface Props {
@@ -16,34 +17,32 @@ function statusLabel(status: Props["status"], hasOutput: boolean, isError: boole
   return "done";
 }
 
-function statusColor(label: string): string {
-  if (label === "running…") return "bg-amber-50 text-amber-700 border-amber-200";
-  if (label === "error") return "bg-red-50 text-red-700 border-red-200";
-  return "bg-emerald-50 text-emerald-700 border-emerald-200";
-}
+const TOOL_ICONS: Record<string, PixelIconName> = {
+  WebSearch: "globe",
+  WebFetch: "globe",
+  SaveMemory: "floppy",
+  RecallMemory: "brain",
+  SearchMemories: "brain",
+  TodoWrite: "check",
+  DraftMessage: "mail",
+  SendEmail: "mail",
+  DraftEmail: "mail",
+  ListEmails: "mail",
+  ReadEmail: "mail",
+  QueryTickets: "tag",
+  TimeCheck: "clock",
+  CreateDocument: "doc",
+  UpdateDocument: "doc",
+  ReadDocument: "doc",
+  WriteDocument: "doc",
+  AwaitReview: "clock",
+  ListCalendarEvents: "calendar",
+  FindAvailability: "calendar",
+  CreateCalendarEvent: "calendar",
+};
 
-function toolIcon(name: string): string {
-  switch (name) {
-    case "WebSearch":
-      return "🔎";
-    case "WebFetch":
-      return "🌐";
-    case "SaveMemory":
-      return "💾";
-    case "RecallMemory":
-    case "SearchMemories":
-      return "🧠";
-    case "TodoWrite":
-      return "✓";
-    case "DraftMessage":
-      return "✉️";
-    case "QueryTickets":
-      return "🎫";
-    case "TimeCheck":
-      return "🕒";
-    default:
-      return "⚙️";
-  }
+function toolIcon(name: string): PixelIconName {
+  return TOOL_ICONS[name] ?? "gear";
 }
 
 // Match the first Google Docs URL in a tool result so we can surface an
@@ -62,13 +61,11 @@ function compactInput(input: Record<string, unknown>): string {
   if (entries.length === 0) return "";
   return entries
     .map(([k, v]) => {
-      if (typeof v === "string") {
-        const s = v.length > 60 ? v.slice(0, 60) + "…" : v;
-        return `${k}="${s}"`;
-      }
-      return `${k}=${JSON.stringify(v)}`;
+      const raw = typeof v === "string" ? v : JSON.stringify(v);
+      const s = raw.length > 48 ? raw.slice(0, 48) + "…" : raw;
+      return `${k}: ${s}`;
     })
-    .join(", ");
+    .join(" · ");
 }
 
 export function ToolCallBlock({ name, input, output, isError, status }: Props) {
@@ -79,64 +76,68 @@ export function ToolCallBlock({ name, input, output, isError, status }: Props) {
   const hasOutput = output !== undefined && output !== "";
   const effectiveStatus = status ?? (hasOutput ? (isError ? "error" : "done") : "running");
   const label = statusLabel(effectiveStatus, hasOutput, !!isError);
-  const colorClasses = statusColor(label);
+  const dotTone = label === "running…" ? "warn" : label === "error" ? "danger" : "ok";
   const compact = compactInput(input);
   const docUrl = extractGoogleDocUrl(output);
 
   return (
-    <div
-      className={`rounded-md border text-xs font-mono ${colorClasses} my-1.5`}
-    >
-      <div className="w-full flex items-center gap-2 px-3 py-1.5">
+    <div className="my-1.5 rounded-[9px] border border-line-faint bg-raised font-mono text-[11.5px] text-ink">
+      <div className="flex w-full items-center gap-2 px-3 py-[7px]">
         <button
           type="button"
           onClick={() => setExpanded((x) => !x)}
-          className="flex-1 min-w-0 flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left transition-opacity hover:opacity-80"
         >
-          <span className="shrink-0">{toolIcon(name)}</span>
-          <span className="font-semibold">{name}</span>
-          {compact && (
-            <span className="opacity-70 truncate min-w-0">{compact}</span>
-          )}
+          <span className="shrink-0 text-ink-muted">
+            <PixelIcon name={toolIcon(name)} size={12} />
+          </span>
+          <span className="shrink-0 font-semibold">{name}</span>
+          {compact && <span className="min-w-0 truncate text-ink-dim">{compact}</span>}
         </button>
         {docUrl && (
           <ExternalLink
             href={docUrl}
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 inline-flex items-center gap-1 rounded bg-white/80 ring-1 ring-inset ring-current/30 px-1.5 py-0.5 text-[10px] font-sans font-medium hover:bg-white"
+            className="shrink-0 rounded-[5px] border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-accent-text hover:bg-surface/60"
             title="Open in Google Docs"
           >
             Open ↗
           </ExternalLink>
         )}
-        <span className="shrink-0 text-[10px] uppercase tracking-wide">
+        <StatusDot tone={dotTone} size={6} pulse={label === "running…"} />
+        <span
+          className={`shrink-0 text-[10px] uppercase tracking-wide ${
+            dotTone === "warn" ? "text-warn" : dotTone === "danger" ? "text-danger" : "text-ok"
+          }`}
+        >
           {label}
         </span>
         <button
           type="button"
           onClick={() => setExpanded((x) => !x)}
-          className="shrink-0 text-[10px] opacity-60 hover:opacity-100"
+          className="shrink-0 text-ink-dim transition-transform duration-[120ms] hover:text-ink"
+          style={{ transform: expanded ? "rotate(90deg)" : "none" }}
           aria-label={expanded ? "Collapse" : "Expand"}
         >
-          {expanded ? "▾" : "▸"}
+          <PixelIcon name="chevR" size={11} />
         </button>
       </div>
       {expanded && (
-        <div className="px-3 pb-2 pt-0.5 space-y-2 border-t border-current/20">
+        <div className="space-y-2 border-t border-line-faint px-3 pb-2.5 pt-1.5">
           <div>
-            <div className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">
-              input
+            <div className="mb-1">
+              <PxLabel style={{ fontSize: 9.5 }}>Input</PxLabel>
             </div>
-            <pre className="whitespace-pre-wrap break-words bg-white/60 rounded px-2 py-1 text-[11px]">
+            <pre className="whitespace-pre-wrap break-words rounded-[6px] bg-inset px-2 py-1.5 text-[11px]">
               {JSON.stringify(input, null, 2)}
             </pre>
           </div>
           {hasOutput && (
             <div>
-              <div className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">
-                output
+              <div className="mb-1">
+                <PxLabel style={{ fontSize: 9.5 }}>Output</PxLabel>
               </div>
-              <pre className="whitespace-pre-wrap break-words bg-white/60 rounded px-2 py-1 text-[11px] max-h-64 overflow-y-auto">
+              <pre className="max-h-[180px] overflow-y-auto whitespace-pre-wrap break-words rounded-[6px] bg-inset px-2 py-1.5 text-[11px]">
                 {output}
               </pre>
             </div>

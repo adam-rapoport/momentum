@@ -37,7 +37,7 @@ OPENAI_BASE_URL = "https://api.openai.com/v1"
 _PING_MODEL = {
     "llm:groq": "llama-3.1-8b-instant",
     "llm:google_ai": "gemini-2.5-flash",
-    "llm:openai": "gpt-4o-mini",
+    "llm:openai": "gpt-5.4-mini",
     "search:perplexity": "sonar",
 }
 _BASE_URL = {

@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { OnboardingWizard } from "@/components/connections/wizard/OnboardingWizard";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 function OnboardingInner() {
   const router = useRouter();
@@ -36,10 +36,7 @@ function OnboardingInner() {
 
   if (!ready) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center text-sm"
-        style={{ color: "var(--text-dim)" }}
-      >
+      <div className="flex min-h-screen items-center justify-center bg-app font-mono text-[12px] text-ink-dim">
         Loading…
       </div>
     );

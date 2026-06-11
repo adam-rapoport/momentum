@@ -83,6 +83,10 @@ interface ChatState {
 
   setMemories: (memories: MemoryRecordSummary[]) => void;
   setDocuments: (documents: DocumentArtifact[]) => void;
+  // Drops the memory/document panel caches so their next mount refetches —
+  // used when onboarding finishes (its doc uploads create memories while the
+  // panels are unmounted; a stale cache would hide them until the next turn).
+  invalidateContextPanels: () => void;
 
   setWsConnected: (connected: boolean) => void;
   setActiveSession: (id: string | null) => void;
@@ -283,6 +287,9 @@ export const useChatStore = create<ChatState>((set) => ({
 
   setDocuments: (documents) =>
     set({ documents, documentsLoadedAt: Date.now() }),
+
+  invalidateContextPanels: () =>
+    set({ memoriesLoadedAt: 0, documentsLoadedAt: 0 }),
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setActiveSession: (activeSessionId) => set({ activeSessionId }),

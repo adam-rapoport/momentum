@@ -28,11 +28,16 @@ class WsClient {
   private refetchSeq = new Map<string, number>();
 
   connect(): void {
+    // Reset BEFORE the early returns: under React StrictMode's dev-only
+    // mount→unmount→remount, the remount's connect() lands while the first
+    // connect() is still fetching its token (connecting=true). It must still
+    // clear the explicitClose set by the unmount's disconnect(), or the first
+    // connect() aborts on resolve and the socket never opens.
+    this.explicitClose = false;
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
     if (this.connecting) return;
-    this.explicitClose = false;
     this.connecting = true;
     // Browser WebSocket clients can't set headers, so the desktop shell's
     // per-launch auth token travels as a query param (null in web dev — the
