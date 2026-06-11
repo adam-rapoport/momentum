@@ -12,9 +12,6 @@ const config: Config = {
         sans: ["var(--font-ui)", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
         pixel: ["var(--font-pixel)", "monospace"],
-        // TEMPORARY aliases for not-yet-rewritten C8 surfaces (cleanup phase removes)
-        geist: ["var(--font-ui)", "ui-sans-serif", "system-ui", "sans-serif"],
-        "geist-mono": ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         app: "var(--bg-app)",
