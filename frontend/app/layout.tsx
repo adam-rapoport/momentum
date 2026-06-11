@@ -1,7 +1,22 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { Schibsted_Grotesk, IBM_Plex_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted at build time (next/font) so the desktop build works offline.
+const fontUi = Schibsted_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-ui",
+});
+const fontMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+});
+const fontPixel = Silkscreen({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-pixel",
+});
 
 export const metadata: Metadata = {
   title: "pMomentum",
@@ -21,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${fontUi.variable} ${fontMono.variable} ${fontPixel.variable}`}
       suppressHydrationWarning
     >
       <head>
