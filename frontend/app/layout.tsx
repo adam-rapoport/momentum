@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Schibsted_Grotesk, IBM_Plex_Mono, Silkscreen } from "next/font/google";
+import { DesktopFlag } from "@/components/DesktopFlag";
 import "./globals.css";
 
 // Self-hosted at build time (next/font) so the desktop build works offline.
@@ -42,7 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <DesktopFlag />
+        {children}
+      </body>
     </html>
   );
 }

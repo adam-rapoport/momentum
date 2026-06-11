@@ -2,7 +2,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { ChatView } from "@/components/ChatView";
-import { Header } from "@/components/Header";
+import { Toolbar } from "@/components/Toolbar";
 import { useChatStore } from "@/lib/store";
 
 function ChatInner() {
@@ -21,13 +21,13 @@ function ChatInner() {
   if (!sessionId) {
     return (
       <>
-        <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <h1 className="text-xl font-semibold mb-2">Welcome to pMomentum</h1>
-            <p className="text-sm text-neutral-600">
+        <Toolbar />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="max-w-md text-center">
+            <h1 className="mb-2 text-xl font-semibold text-ink">Welcome to pMomentum</h1>
+            <p className="text-sm text-ink-muted">
               Your AI assistant for PM work. Click{" "}
-              <span className="font-medium">&quot;+ New session&quot;</span> in the sidebar to start a
+              <span className="font-medium">&quot;New chat&quot;</span> in the sidebar to start a
               conversation, or pick an existing one.
             </p>
           </div>
@@ -38,7 +38,7 @@ function ChatInner() {
 
   return (
     <>
-      <Header sessionId={sessionId} title={session?.title} />
+      <Toolbar sessionId={sessionId} title={session?.title} />
       <ChatView sessionId={sessionId} />
     </>
   );

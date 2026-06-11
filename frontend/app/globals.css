@@ -143,6 +143,15 @@ body {
   background: transparent;
 }
 
+/* ── desktop-only chrome: room for the macOS traffic lights, which overlay
+      the top-left of the window when the title bar is hidden (Tauri) ── */
+.pm-traffic-spacer {
+  height: 0;
+}
+[data-desktop] .pm-traffic-spacer {
+  height: 30px;
+}
+
 /* ── dither checkerboard (retro) — paints with currentColor ── */
 .dither {
   --dither-size: 2px;

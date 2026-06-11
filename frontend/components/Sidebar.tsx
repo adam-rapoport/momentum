@@ -1,9 +1,130 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Btn, DitherRule, IconBtn, PixelIcon, PmLogo, PxLabel, StatusDot } from "@/components/pm";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
+import { useUiStore } from "@/lib/uiStore";
+import type { Session } from "@/lib/types";
+
+type RecencyGroup = "Today" | "Yesterday" | "This week" | "Earlier";
+const GROUP_ORDER: RecencyGroup[] = ["Today", "Yesterday", "This week", "Earlier"];
+
+function recencyGroup(iso: string): RecencyGroup {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Earlier";
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+  const startOfWeek = new Date(startOfToday.getTime() - 6 * 86_400_000);
+  if (d >= startOfToday) return "Today";
+  if (d >= startOfYesterday) return "Yesterday";
+  if (d >= startOfWeek) return "This week";
+  return "Earlier";
+}
+
+function SessionRow({
+  session,
+  active,
+  renaming,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  confirmingDelete,
+  onDelete,
+  onCancelDelete,
+}: {
+  session: Session;
+  active: boolean;
+  renaming: boolean;
+  onStartRename: () => void;
+  onCommitRename: (title: string) => void;
+  onCancelRename: () => void;
+  confirmingDelete: boolean;
+  onDelete: () => void;
+  onCancelDelete: () => void;
+}) {
+  const [draft, setDraft] = useState(session.title ?? "");
+  // Re-seed the draft each time rename mode opens (the row stays mounted, so
+  // the useState initializer alone would go stale after the first rename).
+  useEffect(() => {
+    if (renaming) setDraft(session.title ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renaming]);
+  const hasSkill = Boolean(session.session_metadata?.active_skill);
+  const title = session.title ?? "(untitled)";
+
+  if (renaming) {
+    return (
+      <div className="px-2 py-[2px]">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => onCommitRename(draft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onCommitRename(draft);
+            if (e.key === "Escape") onCancelRename();
+          }}
+          aria-label="Session title"
+          className="h-[30px] w-full rounded-[7px] border border-accent bg-surface px-2 text-[13px] text-ink shadow-[0_0_0_3px_var(--accent-tint)] outline-none"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="group/row relative px-2" onMouseLeave={onCancelDelete}>
+      <Link
+        href={`/chat?s=${session.id}`}
+        className={`flex h-8 w-full items-center gap-2 rounded-[7px] border px-2.5 text-left transition-colors duration-100 ${
+          active
+            ? "border-line-faint bg-surface shadow-card"
+            : "border-transparent hover:bg-raised"
+        }`}
+      >
+        {hasSkill && <StatusDot tone="accent" size={6} />}
+        <span
+          className={`min-w-0 flex-1 truncate text-[13px] group-hover/row:pr-11 ${
+            active ? "font-semibold text-ink" : "font-[450] text-ink-muted"
+          }`}
+        >
+          {title}
+        </span>
+      </Link>
+      <div
+        className={`absolute right-3.5 top-1/2 hidden -translate-y-1/2 items-center gap-[2px] rounded-[6px] group-hover/row:flex ${
+          active ? "bg-surface" : "bg-panel"
+        }`}
+      >
+        <button
+          type="button"
+          title="Rename"
+          aria-label={`Rename ${title}`}
+          onClick={onStartRename}
+          className="flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-ink-dim hover:bg-inset hover:text-ink"
+        >
+          <PixelIcon name="pencil" size={11} />
+        </button>
+        <button
+          type="button"
+          title={confirmingDelete ? "Click again to delete" : "Delete"}
+          aria-label={`Delete ${title}`}
+          onClick={onDelete}
+          onBlur={onCancelDelete}
+          className={`flex h-[22px] items-center justify-center gap-1 rounded-[5px] text-[10.5px] font-semibold ${
+            confirmingDelete
+              ? "px-1.5 bg-danger text-white"
+              : "w-[22px] text-ink-dim hover:bg-danger-soft hover:text-danger"
+          }`}
+        >
+          {confirmingDelete ? "Sure?" : <PixelIcon name="trash" size={11} />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function Sidebar() {
   const router = useRouter();
@@ -12,14 +133,15 @@ export function Sidebar() {
   const setSessions = useChatStore((s) => s.setSessions);
   const upsertSession = useChatStore((s) => s.upsertSession);
   const removeSession = useChatStore((s) => s.removeSession);
-  const [displayName, setDisplayName] = useState<string>("You");
-  // Inline rename state: which session is being renamed, and the draft title.
+  const profile = useUiStore((s) => s.profile);
+  const loadProfile = useUiStore((s) => s.loadProfile);
+
+  const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  // Two-step delete: first click arms ("Sure?"), second click archives.
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
-    null,
-  );
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  // Theme is read from <html data-theme> after mount (set pre-paint by the
+  // root layout script) — state here only drives the toggle icon.
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     api
@@ -29,35 +151,29 @@ export function Sidebar() {
   }, [setSessions]);
 
   useEffect(() => {
-    api
-      .getProfile()
-      .then((p) => {
-        if (p.display_name?.trim()) setDisplayName(p.display_name.trim());
-      })
-      .catch((err) => console.error("failed to load profile:", err));
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    const t = document.documentElement.dataset.theme;
+    if (t === "dark" || t === "light") setTheme(t);
   }, []);
 
-  async function handleNewSession() {
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
     try {
-      const s = await api.createSession({});
-      upsertSession(s);
-      router.push(`/chat?s=${s.id}`);
-    } catch (err) {
-      console.error("failed to create session:", err);
+      localStorage.setItem("pmom-theme", next);
+    } catch {
+      // ignore
     }
   }
 
-  function startRename(id: string, currentTitle: string | null) {
-    setConfirmingDeleteId(null);
-    setRenamingId(id);
-    setDraftTitle(currentTitle ?? "");
-  }
-
-  async function commitRename() {
-    const id = renamingId;
-    const title = draftTitle.trim();
+  async function commitRename(id: string, raw: string) {
     setRenamingId(null);
-    if (!id || !title) return;
+    const title = raw.trim();
+    if (!title) return;
     try {
       const updated = await api.updateSession(id, { title });
       upsertSession(updated);
@@ -81,99 +197,109 @@ export function Sidebar() {
     }
   }
 
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? sessions.filter((s) => (s.title ?? "").toLowerCase().includes(q))
+      : sessions;
+    const byGroup: Partial<Record<RecencyGroup, Session[]>> = {};
+    for (const s of filtered) {
+      (byGroup[recencyGroup(s.updated_at)] ||= []).push(s);
+    }
+    return GROUP_ORDER.filter((g) => byGroup[g]?.length).map((g) => ({
+      name: g,
+      items: byGroup[g] as Session[],
+    }));
+  }, [sessions, query]);
+
+  const displayName = profile?.display_name ?? "You";
+
   return (
-    <aside className="w-64 shrink-0 border-r border-neutral-200 bg-white flex flex-col">
-      <div className="p-3 border-b border-neutral-200">
-        <button
-          onClick={handleNewSession}
-          className="w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2 hover:bg-neutral-800 transition-colors"
-        >
-          + New session
-        </button>
+    <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-line bg-panel">
+      {/* titlebar region — real traffic lights overlay here in the desktop build */}
+      <div data-tauri-drag-region="" className="px-4 pb-2.5 pt-3.5">
+        <div data-tauri-drag-region="" className="pm-traffic-spacer" />
+        <div data-tauri-drag-region="" className="flex items-center gap-2">
+          <PmLogo size={16} />
+          <span className="font-pixel text-[11px] tracking-[0.06em] text-ink">PMOMENTUM</span>
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        {sessions.length === 0 ? (
-          <div className="p-3 text-sm text-neutral-500">
-            No sessions yet. Click &quot;New session&quot; to start.
+
+      {/* new chat + search */}
+      <div className="flex flex-col gap-2 px-3 pb-2.5">
+        <Btn kind="primary" onClick={() => router.push("/chat")} className="w-full !justify-start gap-[9px]">
+          <PixelIcon name="plus" size={12} />
+          New chat
+          <span className="ml-auto font-mono text-[11px] opacity-70">⌘N</span>
+        </Btn>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-dim">
+            <PixelIcon name="search" size={11} />
+          </span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search chats"
+            aria-label="Search chats"
+            className="h-[30px] w-full rounded-[7px] border border-line bg-app pl-7 pr-2.5 text-[12.5px] text-ink outline-none placeholder:text-ink-dim focus:border-line-strong"
+          />
+        </div>
+      </div>
+
+      {/* sessions */}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+        {groups.length === 0 && (
+          <div className="px-5 py-4 text-[12.5px] text-ink-dim">
+            {query ? "No chats match." : "No chats yet."}
           </div>
-        ) : (
-          <ul className="py-1">
-            {sessions.map((s) => {
-              const active = s.id === activeSessionId;
-              if (s.id === renamingId) {
-                return (
-                  <li key={s.id} className="px-3 py-1.5">
-                    <input
-                      autoFocus
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitRename();
-                        if (e.key === "Escape") setRenamingId(null);
-                      }}
-                      aria-label="Session title"
-                      className="w-full rounded border border-neutral-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-500"
-                    />
-                  </li>
-                );
-              }
-              return (
-                <li key={s.id} className="group relative">
-                  <Link
-                    href={`/chat?s=${s.id}`}
-                    className={`block px-3 py-2 pr-16 text-sm truncate border-l-2 ${
-                      active
-                        ? "border-neutral-900 bg-neutral-100 font-medium"
-                        : "border-transparent text-neutral-700 hover:bg-neutral-50"
-                    }`}
-                  >
-                    {s.title ?? "(untitled)"}
-                  </Link>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => startRename(s.id, s.title)}
-                      title="Rename"
-                      aria-label={`Rename session ${s.title ?? "(untitled)"}`}
-                      className="rounded px-1 py-0.5 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(s.id)}
-                      onBlur={() => setConfirmingDeleteId(null)}
-                      title={
-                        confirmingDeleteId === s.id
-                          ? "Click again to delete"
-                          : "Delete"
-                      }
-                      aria-label={`Delete session ${s.title ?? "(untitled)"}`}
-                      className={`rounded px-1 py-0.5 text-xs ${
-                        confirmingDeleteId === s.id
-                          ? "bg-red-600 text-white hover:bg-red-700"
-                          : "text-neutral-500 hover:bg-neutral-200 hover:text-red-600"
-                      }`}
-                    >
-                      {confirmingDeleteId === s.id ? "Sure?" : "🗑"}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         )}
+        {groups.map((g) => (
+          <div key={g.name} className="mt-3">
+            <div className="px-[18px] pb-1">
+              <PxLabel>{g.name}</PxLabel>
+            </div>
+            <div className="flex flex-col gap-[1px]">
+              {g.items.map((s) => (
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  active={s.id === activeSessionId}
+                  renaming={renamingId === s.id}
+                  onStartRename={() => {
+                    setConfirmingDeleteId(null);
+                    setRenamingId(s.id);
+                  }}
+                  onCommitRename={(title) => commitRename(s.id, title)}
+                  onCancelRename={() => setRenamingId(null)}
+                  confirmingDelete={confirmingDeleteId === s.id}
+                  onDelete={() => handleDelete(s.id)}
+                  onCancelDelete={() => {
+                    if (confirmingDeleteId === s.id) setConfirmingDeleteId(null);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="border-t border-neutral-200 p-3 flex items-center justify-between text-xs text-neutral-500">
-        <span>Signed in as {displayName}</span>
-        <Link
-          href="/settings"
-          className="rounded px-2 py-1 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-          title="Settings"
-        >
-          Settings
-        </Link>
+
+      {/* footer */}
+      <DitherRule />
+      <div className="flex items-center gap-[9px] px-3 py-2.5">
+        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-accent-tint text-[11.5px] font-bold text-accent-text">
+          {displayName.charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12.5px] font-semibold text-ink">{displayName}</div>
+          <div className="font-mono text-[10.5px] text-ink-dim">local · encrypted</div>
+        </div>
+        <IconBtn
+          icon={theme === "dark" ? "sun" : "moon"}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={toggleTheme}
+        />
+        {/* TODO(phase 5): switch to useUiStore openSettings() once the settings sheet lands */}
+        <IconBtn icon="gear" title="Settings" onClick={() => router.push("/settings")} />
       </div>
     </aside>
   );
