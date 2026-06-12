@@ -46,6 +46,8 @@ export function AboutPane() {
         are encrypted at rest, and pMomentum talks directly to the providers you choose — nothing
         routes through a pMomentum server.
       </p>
+
+      <p className="mt-3 font-mono text-[11px] text-ink-dim">App by Adam Rapoport</p>
     </div>
   );
 }

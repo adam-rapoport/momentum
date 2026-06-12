@@ -45,6 +45,9 @@ interface ChatState {
 
   setSessions: (s: Session[]) => void;
   upsertSession: (s: Session) => void;
+  /** Move a session to the top of the list. Only called when a message is
+   * actually sent or a turn completes — opening a session must NOT reorder. */
+  bumpSession: (id: string) => void;
   removeSession: (id: string) => void;
 
   setMessages: (sessionId: string, messages: Message[]) => void;
@@ -112,10 +115,26 @@ export const useChatStore = create<ChatState>((set) => ({
   activeSessionId: null,
 
   setSessions: (sessions) => set({ sessions }),
+  // Replace in place so a mere fetch (opening a session, renaming it) never
+  // reorders the sidebar; new sessions go on top.
   upsertSession: (s) =>
     set((state) => {
-      const others = state.sessions.filter((x) => x.id !== s.id);
-      return { sessions: [s, ...others] };
+      const idx = state.sessions.findIndex((x) => x.id === s.id);
+      if (idx === -1) return { sessions: [s, ...state.sessions] };
+      const sessions = [...state.sessions];
+      sessions[idx] = s;
+      return { sessions };
+    }),
+  bumpSession: (id) =>
+    set((state) => {
+      const idx = state.sessions.findIndex((x) => x.id === id);
+      if (idx === -1) return state;
+      const sessions = [...state.sessions];
+      const [s] = sessions.splice(idx, 1);
+      // Touch updated_at locally so the sidebar's recency grouping moves the
+      // chat into "Today" immediately; the authoritative server timestamp
+      // replaces it on the next refetch.
+      return { sessions: [{ ...s, updated_at: new Date().toISOString() }, ...sessions] };
     }),
   removeSession: (id) =>
     set((state) => ({ sessions: state.sessions.filter((s) => s.id !== id) })),

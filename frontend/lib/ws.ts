@@ -212,6 +212,9 @@ class WsClient {
       totalCost?: string;
       cancelled?: boolean;
       clearReviewIfActive?: boolean;
+      /** Move the session to the top of the sidebar — only for refetches
+       * triggered by a completed turn, never for reconnect resyncs. */
+      bump?: boolean;
     } = {},
   ): void {
     const epoch = useChatStore.getState().turnEpochBySession[sessionId] ?? 0;
@@ -226,6 +229,9 @@ class WsClient {
         if (isStale()) return;
         const s = useChatStore.getState();
         s.setMessages(sessionId, detail.messages);
+        // Bump before upserting so the in-place upsert then lands the
+        // authoritative server record (incl. its updated_at) at the top.
+        if (opts.bump) s.bumpSession(sessionId);
         s.upsertSession(detail);
         // If the backend resumed from awaiting_review (status back to
         // "active"), drop any stale approval bar on the client.
@@ -293,7 +299,7 @@ class WsClient {
       });
       // Refetch so the persisted state (messages, session_metadata) is
       // canonical, then drop the live streaming state.
-      this.refetchSession(sessionId);
+      this.refetchSession(sessionId, { bump: true });
       // A skill that pauses for review has just produced a deliverable;
       // refresh the documents panel so it shows up immediately.
       api
@@ -312,6 +318,7 @@ class WsClient {
         totalCost: event.usage.total_cost_usd,
         cancelled: event.metadata.cancelled,
         clearReviewIfActive: true,
+        bump: true,
       });
 
       // The turn may have called SaveMemory or WriteDocument — refresh both

@@ -100,6 +100,7 @@ export function ChatView({ sessionId }: Props) {
   const removeMessage = useChatStore((s) => s.removeMessage);
   const startStreaming = useChatStore((s) => s.startStreaming);
   const upsertSession = useChatStore((s) => s.upsertSession);
+  const bumpSession = useChatStore((s) => s.bumpSession);
   const setAwaitingReview = useChatStore((s) => s.setAwaitingReview);
   const clearAwaitingReview = useChatStore((s) => s.clearAwaitingReview);
   const clearLastError = useChatStore((s) => s.clearLastError);
@@ -172,6 +173,7 @@ export function ChatView({ sessionId }: Props) {
           const store = useChatStore.getState();
           store.clearLastError(sessionId);
           store.appendUserMessage(sessionId, queued.content);
+          store.bumpSession(sessionId);
           store.startStreaming(sessionId);
           getWsClient().send({
             type: "session.message",
@@ -229,6 +231,7 @@ export function ChatView({ sessionId }: Props) {
     // doesn't nag about a message the user is already retrying.
     clearLastError(sessionId);
     appendUserMessage(sessionId, content);
+    bumpSession(sessionId);
     startStreaming(sessionId);
     getWsClient().send({ type: "session.message", session_id: sessionId, content });
   }

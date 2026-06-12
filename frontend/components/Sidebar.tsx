@@ -292,7 +292,7 @@ export function Sidebar() {
         </span>
         <div
           className="min-w-0 flex-1"
-          title="Everything stays on this Mac. Your API keys are encrypted at rest; chats and memories are private local files."
+          title="Everything stays on this Mac — chats and memories are private local files."
         >
           <div className="truncate text-[12.5px] font-semibold text-ink">{displayName}</div>
           <div className="font-mono text-[10.5px] text-ink-dim">local · private</div>

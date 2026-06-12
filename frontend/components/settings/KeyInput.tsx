@@ -67,6 +67,10 @@ export function KeyInput({
         </button>
       </div>
 
+      <div className="mt-1 text-[12px] text-ink-dim">
+        Stored encrypted on this Mac — never leaves it.
+      </div>
+
       <div className="mt-1.5 flex min-h-[18px] items-center gap-1.5 text-xs">
         {validation.state === "valid" && (
           <>
@@ -110,9 +114,6 @@ export function KeyInput({
               <ExternalLink href={provider.helpUrl} className="font-medium text-accent-text underline">
                 {provider.helpUrl.replace(/^https?:\/\//, "")} ↗
               </ExternalLink>
-              <div className="mt-1.5 text-[12px] text-ink-dim">
-                Stored encrypted on this Mac — never leaves it.
-              </div>
             </div>
           )}
         </div>
