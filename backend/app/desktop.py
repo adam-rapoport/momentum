@@ -112,6 +112,11 @@ def _selfcheck() -> int:
 
         assert openai.AsyncOpenAI is not None
 
+    def _anthropic_sdk() -> None:
+        import anthropic
+
+        assert anthropic.AsyncAnthropic is not None
+
     def _google_api_client() -> None:
         import googleapiclient.discovery
         from google.oauth2.credentials import Credentials
@@ -126,6 +131,7 @@ def _selfcheck() -> int:
         check("alembic migrations against temp SQLite", _migrations)
         check("google-genai SDK importable", _google_genai_sdk)
         check("openai SDK importable", _openai_sdk)
+        check("anthropic SDK importable", _anthropic_sdk)
         check("google-api-python-client + oauth importable", _google_api_client)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
