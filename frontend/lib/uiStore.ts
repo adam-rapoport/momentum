@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 // store (lib/store.ts) so the WS/data layer stays untouched.
 
 export type ContextTab = "memory" | "documents";
-export type SettingsPane = "models" | "integrations" | "search" | "profile" | "about";
+export type SettingsPane = "models" | "integrations" | "search" | "profile" | "help" | "about";
 
 export interface UiProfile {
   display_name: string;

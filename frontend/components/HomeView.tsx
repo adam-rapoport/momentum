@@ -41,6 +41,7 @@ export function HomeView() {
   const upsertSession = useChatStore((s) => s.upsertSession);
   const profile = useUiStore((s) => s.profile);
   const setQueuedFirstMessage = useUiStore((s) => s.setQueuedFirstMessage);
+  const openSettings = useUiStore((s) => s.openSettings);
 
   const [seed, setSeed] = useState<{ text: string; nonce: number } | null>(null);
   const [skillCount, setSkillCount] = useState<number | null>(null);
@@ -110,6 +111,15 @@ export function HomeView() {
 
         <div className="mt-6 text-center text-[11.5px] text-ink-dim">
           Type <Kbd>/</Kbd> in the composer to see all{skillCount ? ` ${skillCount}` : ""} skills
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => openSettings("help")}
+              className="text-[11.5px] text-ink-dim underline underline-offset-2 hover:text-ink-muted"
+            >
+              How pMomentum works
+            </button>
+          </div>
         </div>
       </div>
     </div>

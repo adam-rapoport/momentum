@@ -4,6 +4,7 @@ import { Banner, IconBtn, PixelIcon, PxLabel, type PixelIconName } from "@/compo
 import { api, type ConnectionStatus, type KeyProvider } from "@/lib/api";
 import { useUiStore, type SettingsPane } from "@/lib/uiStore";
 import { AboutPane } from "./AboutPane";
+import { HelpPane } from "./HelpPane";
 import { IntegrationsPane } from "./IntegrationsPane";
 import { ModelsPane } from "./ModelsPane";
 import { ProfilePane } from "./ProfilePane";
@@ -16,6 +17,7 @@ const NAV: { key: SettingsPane; label: string; icon: PixelIconName }[] = [
   { key: "integrations", label: "Integrations", icon: "plug" },
   { key: "search", label: "Web search", icon: "globe" },
   { key: "profile", label: "Profile", icon: "user" },
+  { key: "help", label: "How to use", icon: "doc" },
   { key: "about", label: "About", icon: "box" },
 ];
 
@@ -118,6 +120,7 @@ export function SettingsSheet() {
           {pane === "integrations" && <IntegrationsPane />}
           {pane === "search" && <SearchPane connections={connections} onChanged={refresh} />}
           {pane === "profile" && <ProfilePane onChanged={refresh} />}
+          {pane === "help" && <HelpPane />}
           {pane === "about" && <AboutPane />}
         </main>
       </div>
