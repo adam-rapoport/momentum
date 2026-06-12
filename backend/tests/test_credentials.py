@@ -30,6 +30,7 @@ def test_llm_provider_for_model_maps_new_providers():
     assert credentials.llm_provider_for_model("claude-99-imaginary") == "llm:anthropic"
     assert credentials.llm_provider_for_model("codestral-99") == "llm:mistral"
     assert credentials.llm_provider_for_model("somelab/some-model") == "llm:openrouter"
+    assert credentials.llm_provider_for_model("ollama:llama3.1:8b") == "llm:ollama"
 
 
 def test_llm_provider_for_model_defaults_to_groq():
@@ -65,6 +66,7 @@ def test_known_providers_namespaced_and_disjoint():
         "llm:anthropic",
         "llm:openrouter",
         "llm:mistral",
+        "llm:ollama",
     }
     assert set(credentials.SEARCH_PROVIDERS) == {"search:tavily", "search:perplexity"}
     # no overlap, and KEY_PROVIDERS is the union

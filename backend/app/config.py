@@ -127,6 +127,12 @@ class Settings(BaseSettings):
     # model (mistral-*-latest) in Settings.
     mistral_api_key: str | None = Field(None, alias="MISTRAL_API_KEY")
 
+    # Ollama server base URL for local models (e.g. http://localhost:11434).
+    # Deliberately NO default: a non-None value would make every fresh install
+    # look "configured" to onboarding even with no Ollama running. Users
+    # connect Ollama in Settings (stored like a key) or set this explicitly.
+    ollama_base_url: str | None = Field(None, alias="OLLAMA_BASE_URL")
+
     # Perplexity API key for the WebSearch tool's Perplexity provider option
     # (alternative to Tavily). Optional — only required if the user picks
     # Perplexity as their search provider (see app.core.search).

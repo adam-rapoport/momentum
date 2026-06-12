@@ -33,6 +33,7 @@ def record_clients(monkeypatch):
     monkeypatch.setattr(llm.anthropic_client, "stream_message", make("anthropic"))
     monkeypatch.setattr(llm.openrouter_client, "stream_message", make("openrouter"))
     monkeypatch.setattr(llm.mistral_client, "stream_message", make("mistral"))
+    monkeypatch.setattr(llm.ollama_client, "stream_message", make("ollama"))
     return calls
 
 
@@ -133,6 +134,15 @@ async def test_routes_mistral_models_to_mistral_client(record_clients):
     assert model, "expected at least one Mistral entry"
     await _drain(model)
     assert record_clients[0][0] == "mistral"
+
+
+async def test_routes_ollama_prefixed_models_to_ollama_client(record_clients):
+    model = "ollama:llama3.1:8b"
+    assert model_registry.get_model(model) is None
+    # The "api_key" for ollama is the resolved base URL — threaded unchanged.
+    await _drain(model, api_key="http://localhost:11434")
+    assert record_clients[0][0] == "ollama"
+    assert record_clients[0][2] == "http://localhost:11434"
 
 
 async def test_api_key_is_threaded_through(record_clients):

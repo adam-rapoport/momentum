@@ -94,6 +94,10 @@ _warned_unknown_models: set[str] = set()
 def calculate_cost_usd(
     model: str, input_tokens: int, output_tokens: int
 ) -> Decimal:
+    # Local Ollama models are free — and dynamic, so they can never have a
+    # pricing entry; skip the unknown-model warning for them.
+    if model.startswith("ollama:"):
+        return Decimal("0")
     pricing = GROQ_PRICING.get(model)
     if pricing is None:
         if model not in _warned_unknown_models:

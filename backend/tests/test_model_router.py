@@ -249,3 +249,28 @@ def test_force_heavy_param_routes_heavy(heavy_model):
     # The explicit force_heavy path (how session_engine passes the parsed flag)
     # routes heavy even when the text itself is already clean.
     assert select_model("clean text", {}, force_heavy=True) == heavy_model
+
+
+def test_ollama_preference_honored_when_connected():
+    # Dynamic local-model ids (ollama:<name>) never appear in the registry —
+    # the availability special case must let a stored pref through whenever
+    # the ollama connection is configured.
+    prefs = {"heavy_model": "ollama:llama3.1:8b", "light_model": "ollama:qwen2.5:7b"}
+    configured = {"groq", "ollama"}
+    assert (
+        select_model("/write-prd topic", {}, user_preferences=prefs,
+                     configured_providers=configured)
+        == "ollama:llama3.1:8b"
+    )
+    assert (
+        select_model("hi", {}, user_preferences=prefs,
+                     configured_providers=configured)
+        == "ollama:qwen2.5:7b"
+    )
+
+
+def test_ollama_preference_ignored_when_not_connected(default_model):
+    prefs = {"light_model": "ollama:llama3.1:8b"}
+    chosen = select_model("hi", {}, user_preferences=prefs,
+                          configured_providers={"groq", "google"})
+    assert chosen == default_model

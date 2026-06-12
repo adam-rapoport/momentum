@@ -50,6 +50,10 @@ LLM_PROVIDERS: dict[str, str] = {
     "llm:anthropic": "anthropic_api_key",
     "llm:openrouter": "openrouter_api_key",
     "llm:mistral": "mistral_api_key",
+    # Ollama is keyless — the stored "key" is the server's base URL
+    # (e.g. http://localhost:11434). Same storage/resolution path; the URL
+    # isn't a secret, encrypting it is just the path of least change.
+    "llm:ollama": "ollama_base_url",
 }
 SEARCH_PROVIDERS: dict[str, str] = {
     "search:tavily": "tavily_api_key",
@@ -65,6 +69,7 @@ _REGISTRY_PROVIDER: dict[str, str] = {
     "llm:anthropic": "anthropic",
     "llm:openrouter": "openrouter",
     "llm:mistral": "mistral",
+    "llm:ollama": "ollama",
 }
 _CREDENTIAL_PROVIDER = {v: k for k, v in _REGISTRY_PROVIDER.items()}
 

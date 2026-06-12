@@ -39,6 +39,7 @@ from app.core import (
     groq_client,
     mistral_client,
     model_registry,
+    ollama_client,
     openai_client,
     openrouter_client,
 )
@@ -107,6 +108,8 @@ async def _dispatch(
             "anthropic": anthropic_client,
             "openrouter": openrouter_client,
             "mistral": mistral_client,
+            # "ollama:<name>" ids — local models; api_key carries the base URL.
+            "ollama": ollama_client,
         }.get(provider, groq_client)
     async for event in client.stream_message(
         messages, model=model, tools=tools, api_key=api_key

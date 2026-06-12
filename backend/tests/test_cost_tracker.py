@@ -42,3 +42,11 @@ def test_unknown_model_costs_zero_and_warns_once(caplog):
     ]
     assert len(warnings) == 1, "unknown model should be logged exactly once"
     cost_tracker._warned_unknown_models.discard("imaginary-model-x")
+
+
+def test_ollama_models_are_free_and_silent(caplog):
+    # Local models can never have a pricing entry; they must cost $0 with
+    # no unknown-model warning.
+    with caplog.at_level(logging.WARNING, logger="app.core.cost_tracker"):
+        assert calculate_cost_usd("ollama:llama3.1:8b", 5_000, 5_000) == Decimal("0")
+    assert not [r for r in caplog.records if "ollama" in r.getMessage()]

@@ -322,6 +322,8 @@ def _provider_available(
         return bool(settings.openrouter_api_key)
     if provider == "mistral":
         return bool(settings.mistral_api_key)
+    if provider == "ollama":
+        return bool(settings.ollama_base_url)
     return False
 
 
@@ -356,7 +358,14 @@ def is_model_available(
     configured_providers: set[str] | None = None,
 ) -> bool:
     """Whether `model_id` is in the registry, has its provider configured,
-    and (optionally) can serve the requested role."""
+    and (optionally) can serve the requested role.
+
+    Ollama models are dynamic (whatever the user has pulled locally, ids
+    "ollama:<name>") and never appear in the static registry — any ollama:
+    id is available whenever the Ollama connection is configured. Role
+    doesn't gate them: a local model may serve either slot."""
+    if model_id.startswith("ollama:"):
+        return provider_available("ollama", configured_providers)
     return any(
         m.id == model_id
         for m in get_available_models(

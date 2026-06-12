@@ -132,6 +132,41 @@ async def _validate_models_list(api_key: str, base_url: str) -> ValidationResult
         return ValidationResult(False, f"Couldn't reach the provider: {e}")
 
 
+async def _validate_ollama(base_url: str) -> ValidationResult:
+    """Ollama: the 'key' is the server's base URL; validate by listing its
+    installed models (GET /api/tags — unauthenticated, local)."""
+    base = base_url.strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        return ValidationResult(
+            False, "That doesn't look like a URL — e.g. http://localhost:11434"
+        )
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            res = await client.get(f"{base}/api/tags")
+    except Exception as e:  # noqa: BLE001 — connect refused/timeout/etc.
+        logger.warning("ollama validation error (%s): %s", base, e)
+        return ValidationResult(
+            False, f"Couldn't reach Ollama at {base} — is it running?"
+        )
+    if res.status_code != 200:
+        return ValidationResult(
+            False, f"Ollama at {base} returned HTTP {res.status_code}."
+        )
+    try:
+        count = len(res.json().get("models") or [])
+    except ValueError:
+        return ValidationResult(False, f"{base} doesn't look like an Ollama server.")
+    if count == 0:
+        return ValidationResult(
+            True,
+            "Ollama is reachable, but no models are installed yet — run "
+            "`ollama pull llama3.1:8b` in Terminal.",
+        )
+    return ValidationResult(
+        True, f"Ollama is reachable ({count} model{'s' if count != 1 else ''} installed)."
+    )
+
+
 async def _validate_tavily(api_key: str) -> ValidationResult:
     client = AsyncTavilyClient(api_key=api_key)
     try:
@@ -160,6 +195,8 @@ async def validate_key(provider: str, key: str) -> ValidationResult:
         return ValidationResult(False, "No key provided.")
     if provider == "search:tavily":
         return await _validate_tavily(key)
+    if provider == "llm:ollama":
+        return await _validate_ollama(key)
     if provider == "llm:anthropic":
         return await _validate_anthropic(key)
     if provider == "llm:mistral":

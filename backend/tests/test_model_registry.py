@@ -140,6 +140,24 @@ def test_infer_provider_prefix_heuristics_for_unknown_ids():
     assert model_registry.infer_provider("totally-unknown") == "groq"
 
 
+def test_infer_provider_ollama_prefix():
+    assert model_registry.infer_provider("ollama:llama3.1:8b") == "ollama"
+
+
+def test_ollama_models_available_iff_connection_configured():
+    # Dynamic ids never hit the registry; availability == the ollama
+    # connection being configured, regardless of role.
+    assert model_registry.is_model_available(
+        "ollama:llama3.1:8b", configured_providers={"ollama"}
+    )
+    assert model_registry.is_model_available(
+        "ollama:llama3.1:8b", role="heavy", configured_providers={"ollama"}
+    )
+    assert not model_registry.is_model_available(
+        "ollama:llama3.1:8b", configured_providers={"groq"}
+    )
+
+
 def test_registered_slash_ids_keep_their_provider():
     # The "/" -> openrouter rule must NOT steal Groq's registered slash ids.
     assert (

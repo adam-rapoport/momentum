@@ -241,6 +241,7 @@ def test_list_connections_reports_all_key_providers(client):
         "llm:anthropic",
         "llm:openrouter",
         "llm:mistral",
+        "llm:ollama",
         "search:tavily",
         "search:perplexity",
     }
