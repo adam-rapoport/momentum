@@ -19,6 +19,14 @@ export interface ProviderMeta {
   keyPrefix: string;
   keyLength: [number, number];
   defaultModel: Partial<Record<Tier, string>>; // model auto-selected per slot when this provider is chosen
+  // false → the "key" isn't a secret (Ollama's server URL): plain-text input,
+  // no Show/Hide, no encryption note. Default true.
+  secret?: boolean;
+  // Label for the credential input when it isn't an API key (e.g. "Server URL").
+  inputLabel?: string;
+  // false → hidden from the first-run onboarding wizard (Settings only), so
+  // onboarding stays a focused three-provider choice. Default true.
+  wizard?: boolean;
 }
 
 export const PROVIDERS: Record<string, ProviderMeta> = {
@@ -67,10 +75,80 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyLength: [20, 200],
     defaultModel: { light: "gpt-5.4-mini", heavy: "gpt-5.5" },
   },
+  anthropic: {
+    id: "anthropic",
+    credProvider: "llm:anthropic",
+    name: "Anthropic Claude",
+    tiers: ["light", "heavy"],
+    pricing: "Paid · $1–$25 per million tokens by model",
+    description: "Claude Haiku, Sonnet, and Opus — strong drafting and reasoning. Paid.",
+    helpUrl: "https://console.anthropic.com/settings/keys",
+    helpText: 'In the Anthropic Console → API keys → "Create key".',
+    keyHint: "Starts with sk-ant-",
+    keyPrefix: "sk-ant-",
+    keyLength: [40, 200],
+    defaultModel: { light: "claude-haiku-4-5", heavy: "claude-sonnet-4-6" },
+    wizard: false,
+  },
+  openrouter: {
+    id: "openrouter",
+    credProvider: "llm:openrouter",
+    name: "OpenRouter",
+    tiers: ["light", "heavy"],
+    pricing: "Pay-as-you-go · one key, many labs",
+    description: "An aggregator: one key unlocks models from OpenAI, Google, Anthropic, and more.",
+    helpUrl: "https://openrouter.ai/settings/keys",
+    helpText: "Sign in at openrouter.ai → Keys → create a key (add credits to use paid models).",
+    keyHint: "Starts with sk-or-",
+    keyPrefix: "sk-or-",
+    keyLength: [30, 200],
+    defaultModel: { light: "openai/gpt-5.4-mini", heavy: "anthropic/claude-sonnet-4.6" },
+    wizard: false,
+  },
+  mistral: {
+    id: "mistral",
+    credProvider: "llm:mistral",
+    name: "Mistral",
+    tiers: ["light", "heavy"],
+    pricing: "Free tier available · paid tier for higher limits",
+    description: "Mistral's hosted models — fast, with a usable free tier.",
+    helpUrl: "https://console.mistral.ai/api-keys/",
+    helpText: "In the Mistral console → API keys → create a key.",
+    keyHint: "~32 characters",
+    keyPrefix: "",
+    keyLength: [20, 80],
+    defaultModel: { light: "mistral-small-latest", heavy: "mistral-large-latest" },
+    wizard: false,
+  },
+  ollama: {
+    id: "ollama",
+    credProvider: "llm:ollama",
+    name: "Ollama (local)",
+    tiers: ["light", "heavy"],
+    pricing: "Free · runs on this Mac",
+    description:
+      "Run open models locally — private and free. Tool-capable models (Llama 3.1+, Qwen 2.5+, Mistral-Nemo) are recommended.",
+    helpUrl: "https://ollama.com/download",
+    helpText:
+      "Install Ollama, then run `ollama pull llama3.1:8b` in Terminal. The default address below works for a standard install.",
+    keyHint: "e.g. http://localhost:11434",
+    keyPrefix: "http",
+    keyLength: [10, 200],
+    defaultModel: {},
+    secret: false,
+    inputLabel: "Server URL",
+    wizard: false,
+  },
 };
 
 export function providersForTier(tier: Tier): ProviderMeta[] {
   return Object.values(PROVIDERS).filter((p) => p.tiers.includes(tier));
+}
+
+// Providers offered in the first-run wizard — the focused starter set.
+// Everything else stays reachable in Settings → Models.
+export function wizardProvidersForTier(tier: Tier): ProviderMeta[] {
+  return providersForTier(tier).filter((p) => p.wizard !== false);
 }
 
 // Search providers (for the Web Search connection). Same key-card shape as
@@ -130,6 +208,8 @@ export interface KeyFormatMeta {
   keyLength: [number, number];
   helpUrl: string;
   helpText: string;
+  secret?: boolean; // false → plain-text credential (a URL, not a key)
+  inputLabel?: string;
 }
 
 // Client-side format check — fast feedback as the user types. The real

@@ -4,7 +4,15 @@
 // Map full model IDs to short friendly names. Unknown models fall through
 // to the last `/`-separated segment so the label is still useful.
 export function modelShortName(model: string): string {
+  // Local Ollama models: show the bare name the user pulled.
+  if (model.startsWith("ollama:")) return model.slice("ollama:".length);
   if (model.includes("llama-4-scout")) return "Scout";
+  if (model.includes("claude-opus")) return "Claude Opus";
+  if (model.includes("claude-sonnet")) return "Claude Sonnet";
+  if (model.includes("claude-haiku")) return "Claude Haiku";
+  if (model.startsWith("mistral-large")) return "Mistral Large";
+  if (model.startsWith("mistral-medium")) return "Mistral Medium";
+  if (model.startsWith("mistral-small")) return "Mistral Small";
   if (model.startsWith("gemini-3.1-pro")) return "Gemini 3.1 Pro";
   if (model.startsWith("gemini-3-pro")) return "Gemini 3 Pro";
   if (model.startsWith("gemini-3-flash")) return "Gemini 3 Flash";

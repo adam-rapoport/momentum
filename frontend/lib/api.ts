@@ -164,6 +164,11 @@ export const api = {
     request<void>(`/api/v1/connections/${encodeURIComponent(provider)}`, {
       method: "DELETE",
     }),
+  // Installed models on the user's local Ollama server (400 until connected).
+  listOllamaModels: () =>
+    request<{ base_url: string; models: OllamaModel[] }>(
+      `/api/v1/connections/ollama/models`,
+    ),
 
   // ── C8 Onboarding ──
   onboardingStatus: () =>
@@ -224,6 +229,10 @@ export type KeyProvider =
   | "llm:groq"
   | "llm:google_ai"
   | "llm:openai"
+  | "llm:anthropic"
+  | "llm:openrouter"
+  | "llm:mistral"
+  | "llm:ollama"
   | "search:tavily"
   | "search:perplexity";
 
@@ -256,10 +265,19 @@ export interface GoogleStatus {
 
 export interface ModelEntry {
   id: string;
-  provider: "groq" | "google" | "openai";
+  provider: "groq" | "google" | "openai" | "anthropic" | "openrouter" | "mistral";
   display_name: string;
   role: "light" | "heavy" | "either";
   notes: string;
+}
+
+// One installed model on the user's local Ollama server (dynamic — whatever
+// they've pulled; ids carry the "ollama:" prefix the backend expects).
+export interface OllamaModel {
+  id: string;
+  name: string;
+  supports_tools: boolean;
+  context_length: number | null;
 }
 
 export interface ModelPreferences {

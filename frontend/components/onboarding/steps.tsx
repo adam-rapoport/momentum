@@ -4,7 +4,7 @@ import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
 import { GoogleCard } from "@/components/settings/IntegrationsPane";
 import { KeyInput } from "@/components/settings/KeyInput";
 import { api, type ModelEntry } from "@/lib/api";
-import { providersForTier, PROVIDERS, type ProviderMeta, type Tier } from "@/lib/providers";
+import { PROVIDERS, wizardProvidersForTier, type ProviderMeta, type Tier } from "@/lib/providers";
 
 export interface ModelStepState {
   providerId: string | null;
@@ -81,7 +81,7 @@ export function ModelStep({
    * Null while loading/unavailable: the dropdown hides, defaults apply. */
   registry: ModelEntry[] | null;
 }) {
-  const providers = providersForTier(tier);
+  const providers = wizardProvidersForTier(tier);
   const chosen: ProviderMeta | null = state.providerId ? PROVIDERS[state.providerId] : null;
   const providerModels = (registry ?? []).filter(
     (m) => chosen && m.provider === chosen.id && (m.role === tier || m.role === "either"),

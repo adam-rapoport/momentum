@@ -5,7 +5,7 @@ import { Btn, IconBtn, PixelIcon, PmLogo } from "@/components/pm";
 import { api, type KeyProvider, type ModelEntry } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { useChatStore } from "@/lib/store";
-import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
+import { PROVIDERS, validateKeyFormat, wizardProvidersForTier } from "@/lib/providers";
 import { DoneStep, ModelStep, ToolsStep, WelcomeStep, type ModelStepState } from "./steps";
 import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
 
@@ -29,7 +29,7 @@ const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
 };
 
 function initialModelState(tier: "light" | "heavy"): ModelStepState {
-  const list = providersForTier(tier);
+  const list = wizardProvidersForTier(tier);
   const preferred = list.find((p) => p.id === RECOMMENDED_PROVIDER[tier]) ?? list[0];
   return { providerId: preferred?.id ?? null, key: "", model: null };
 }

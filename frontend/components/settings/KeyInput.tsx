@@ -24,6 +24,9 @@ export function KeyInput({
   const [helpOpen, setHelpOpen] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   const validation = useMemo(() => validateKeyFormat(provider, value), [provider, value]);
+  // Non-secret credentials (Ollama's server URL) render as plain text with no
+  // Show/Hide toggle and no encryption note — there's nothing to protect.
+  const isSecret = provider?.secret !== false;
 
   useEffect(() => {
     if (autoFocus && ref.current) ref.current.focus();
@@ -39,7 +42,7 @@ export function KeyInput({
   return (
     <div>
       <label className="mb-1.5 block text-[12.5px] font-medium text-ink-muted">
-        API key
+        {provider?.inputLabel ?? "API key"}
         {provider?.keyHint && (
           <span className="ml-2 font-mono text-[11.5px] font-normal text-ink-dim">
             {provider.keyHint}
@@ -51,24 +54,32 @@ export function KeyInput({
         <input
           ref={ref}
           className="h-full min-w-0 flex-1 bg-transparent px-3 font-mono text-[13px] text-ink outline-none placeholder:text-ink-dim focus-visible:shadow-none"
-          type={show ? "text" : "password"}
+          type={isSecret && !show ? "password" : "text"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={provider?.keyPrefix ? `${provider.keyPrefix}...` : "Paste your key"}
+          placeholder={
+            !isSecret && provider?.keyHint
+              ? provider.keyHint
+              : provider?.keyPrefix
+                ? `${provider.keyPrefix}...`
+                : "Paste your key"
+          }
           spellCheck={false}
           autoComplete="off"
         />
-        <button
-          type="button"
-          onClick={() => setShow((s) => !s)}
-          className="mr-1.5 shrink-0 rounded-[6px] px-2 py-1 text-[11.5px] font-medium text-ink-muted hover:bg-raised hover:text-ink"
-        >
-          {show ? "Hide" : "Show"}
-        </button>
+        {isSecret && (
+          <button
+            type="button"
+            onClick={() => setShow((s) => !s)}
+            className="mr-1.5 shrink-0 rounded-[6px] px-2 py-1 text-[11.5px] font-medium text-ink-muted hover:bg-raised hover:text-ink"
+          >
+            {show ? "Hide" : "Show"}
+          </button>
+        )}
       </div>
 
       <div className="mt-1 text-[12px] text-ink-dim">
-        Stored encrypted on this Mac — never leaves it.
+        {isSecret ? "Stored encrypted on this Mac — never leaves it." : "Saved on this Mac."}
       </div>
 
       <div className="mt-1.5 flex min-h-[18px] items-center gap-1.5 text-xs">
@@ -105,7 +116,7 @@ export function KeyInput({
             >
               ›
             </span>
-            Where do I get a {provider.name} key?
+            {isSecret ? `Where do I get a ${provider.name} key?` : `How do I set up ${provider.name}?`}
           </button>
           {helpOpen && (
             <div className="mt-2 rounded-[8px] border border-dashed border-line-strong bg-raised px-3.5 py-3 text-[12.5px] leading-snug text-ink-muted">

@@ -6,6 +6,7 @@ import {
   type ConnectionStatus,
   type KeyProvider,
   type ModelPreferences,
+  type OllamaModel,
 } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import {
@@ -66,6 +67,9 @@ function SlotCard({
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Local Ollama server state — fetched live when the Ollama pill is shown.
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[] | null>(null);
+  const [ollamaBase, setOllamaBase] = useState<string | null>(null);
 
   function loadPrefs() {
     api.getModelPreferences().then(setPrefs).catch(() => setPrefs(null));
@@ -83,8 +87,12 @@ function SlotCard({
       : prefs.effective_heavy_model
     : "";
   const effectiveEntry = available.find((m) => m.id === effectiveId) ?? null;
-  const activeProviderId =
-    effectiveEntry && providers.some((p) => p.id === effectiveEntry.provider)
+  // Ollama models are dynamic (never in the registry list), so the effective
+  // id is the only signal that this slot runs on the local provider.
+  const isOllamaActive = effectiveId.startsWith("ollama:");
+  const activeProviderId = isOllamaActive
+    ? "ollama"
+    : effectiveEntry && providers.some((p) => p.id === effectiveEntry.provider)
       ? effectiveEntry.provider
       : null;
   const activeProvider = activeProviderId ? PROVIDERS[activeProviderId] : null;
@@ -98,9 +106,33 @@ function SlotCard({
   const shownStatus = shown ? connections[shown.credProvider] : undefined;
   const shownConnected = shownStatus?.configured ?? false;
 
+  const showingOllama = shown?.id === "ollama";
+
+  // Fetch the live local-model list whenever the Ollama panel is visible and
+  // the connection exists (also fires right after the URL is first saved,
+  // via the parent's connections refresh flipping shownConnected).
+  useEffect(() => {
+    if (!expanded || !showingOllama || !shownConnected) return;
+    let cancelled = false;
+    api
+      .listOllamaModels()
+      .then((r) => {
+        if (cancelled) return;
+        setOllamaModels(r.models);
+        setOllamaBase(r.base_url);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorMessage(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, showingOllama, shownConnected]);
+
   const providerModels = shown ? available.filter((m) => m.provider === shown.id) : [];
-  const slotPick =
-    effectiveEntry && shown && effectiveEntry.provider === shown.id
+  const slotPick = showingOllama
+    ? (isOllamaActive ? effectiveId : (ollamaModels?.[0]?.id ?? ""))
+    : effectiveEntry && shown && effectiveEntry.provider === shown.id
       ? effectiveId
       : (shown?.defaultModel[tier] ?? providerModels[0]?.id ?? "");
 
@@ -191,12 +223,16 @@ function SlotCard({
             )}
           </div>
           <div className="mt-0.5 text-[12.5px] text-ink-muted">{copy.sub}</div>
-          {effectiveEntry && (
+          {(effectiveEntry || isOllamaActive) && (
             <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12.5px]">
               <span className="font-medium text-ink">
-                {activeProvider?.name ?? effectiveEntry.provider} · {effectiveEntry.display_name}
+                {isOllamaActive
+                  ? `Ollama (local) · ${effectiveId.slice("ollama:".length)}`
+                  : `${activeProvider?.name ?? effectiveEntry?.provider} · ${effectiveEntry?.display_name}`}
               </span>
-              {maskedKey && <span className="font-mono text-[11.5px] text-ink-dim">{maskedKey}</span>}
+              {!isOllamaActive && maskedKey && (
+                <span className="font-mono text-[11.5px] text-ink-dim">{maskedKey}</span>
+              )}
             </div>
           )}
         </div>
@@ -246,11 +282,13 @@ function SlotCard({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" />
-                  {shownStatus?.source === "env"
-                    ? `${shown.name} connected · from .env`
-                    : shownStatus?.key_suffix
-                      ? `${shown.name} connected · ••••${shownStatus.key_suffix}`
-                      : `${shown.name} connected`}
+                  {showingOllama
+                    ? `Ollama connected · ${ollamaBase ?? "local server"}`
+                    : shownStatus?.source === "env"
+                      ? `${shown.name} connected · from .env`
+                      : shownStatus?.key_suffix
+                        ? `${shown.name} connected · ••••${shownStatus.key_suffix}`
+                        : `${shown.name} connected`}
                 </span>
                 <Btn
                   size="sm"
@@ -261,25 +299,59 @@ function SlotCard({
                     setChangingKey(true);
                   }}
                 >
-                  Change key
+                  {shown.secret === false ? "Change URL" : "Change key"}
                 </Btn>
               </div>
-              {providerModels.length > 1 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <label className="text-[12.5px] text-ink-muted">Model</label>
-                  <select
-                    value={slotPick}
-                    disabled={saving}
-                    onChange={(e) => onSelectModel(e.target.value)}
-                    className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-[13px] text-ink"
-                  >
-                    {providerModels.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.display_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {showingOllama ? (
+                ollamaModels === null ? (
+                  <div className="mt-3 text-[12.5px] text-ink-dim">Looking for installed models…</div>
+                ) : ollamaModels.length === 0 ? (
+                  <div className="mt-3 text-[12.5px] text-ink-muted">
+                    No models installed yet — run{" "}
+                    <code className="font-mono text-[12px]">ollama pull llama3.1:8b</code> in
+                    Terminal, then reopen this panel.
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <label className="text-[12.5px] text-ink-muted">Model</label>
+                      <select
+                        value={slotPick}
+                        disabled={saving}
+                        onChange={(e) => onSelectModel(e.target.value)}
+                        className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-[13px] text-ink"
+                      >
+                        {ollamaModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                            {m.supports_tools ? " · tools" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="mt-2 text-[12px] text-ink-dim">
+                      pMomentum relies on tool calling — models marked &quot;tools&quot; work best.
+                    </div>
+                  </>
+                )
+              ) : (
+                providerModels.length > 1 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <label className="text-[12.5px] text-ink-muted">Model</label>
+                    <select
+                      value={slotPick}
+                      disabled={saving}
+                      onChange={(e) => onSelectModel(e.target.value)}
+                      className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-[13px] text-ink"
+                    >
+                      {providerModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
               )}
             </div>
           )}
