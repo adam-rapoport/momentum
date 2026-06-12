@@ -21,6 +21,17 @@ def test_llm_provider_for_model_maps_openai_prefixes():
     assert credentials.llm_provider_for_model("o3-mini") == "llm:openai"
 
 
+def test_llm_provider_for_model_maps_new_providers():
+    # Registry entries:
+    assert credentials.llm_provider_for_model("claude-sonnet-4-6") == "llm:anthropic"
+    assert credentials.llm_provider_for_model("mistral-large-latest") == "llm:mistral"
+    assert credentials.llm_provider_for_model("openai/gpt-5.5") == "llm:openrouter"
+    # Unregistered prefix-heuristic fallbacks:
+    assert credentials.llm_provider_for_model("claude-99-imaginary") == "llm:anthropic"
+    assert credentials.llm_provider_for_model("codestral-99") == "llm:mistral"
+    assert credentials.llm_provider_for_model("somelab/some-model") == "llm:openrouter"
+
+
 def test_llm_provider_for_model_defaults_to_groq():
     assert (
         credentials.llm_provider_for_model("meta-llama/llama-4-scout-17b-16e-instruct")
@@ -47,7 +58,14 @@ def test_llm_provider_for_model_consults_registry_first(monkeypatch):
 
 
 def test_known_providers_namespaced_and_disjoint():
-    assert set(credentials.LLM_PROVIDERS) == {"llm:groq", "llm:google_ai", "llm:openai"}
+    assert set(credentials.LLM_PROVIDERS) == {
+        "llm:groq",
+        "llm:google_ai",
+        "llm:openai",
+        "llm:anthropic",
+        "llm:openrouter",
+        "llm:mistral",
+    }
     assert set(credentials.SEARCH_PROVIDERS) == {"search:tavily", "search:perplexity"}
     # no overlap, and KEY_PROVIDERS is the union
     assert not (set(credentials.LLM_PROVIDERS) & set(credentials.SEARCH_PROVIDERS))

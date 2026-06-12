@@ -28,6 +28,8 @@ dependencies = [
     # F5: Google's native GenAI SDK — the second path to Gemini, required for
     # Gemini 3.x (the OpenAI-compat endpoint can't carry thought_signature).
     "google-genai>=2.7",
+    # Feedback round 4: Claude models via Anthropic's official SDK.
+    "anthropic>=0.49",
     # C8 onboarding document upload: multipart form parsing + PDF/DOCX text.
     "python-multipart>=0.0.9",
     "pypdf>=5.0",

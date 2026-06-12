@@ -238,6 +238,9 @@ def test_list_connections_reports_all_key_providers(client):
         "llm:groq",
         "llm:google_ai",
         "llm:openai",
+        "llm:anthropic",
+        "llm:openrouter",
+        "llm:mistral",
         "search:tavily",
         "search:perplexity",
     }

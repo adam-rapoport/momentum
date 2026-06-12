@@ -115,6 +115,18 @@ class Settings(BaseSettings):
     # OpenAI model (gpt-*) in Settings. Talks to api.openai.com directly.
     openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
 
+    # Anthropic API key (paid). Optional — only required if the user picks a
+    # Claude model in Settings. Served via the official anthropic SDK.
+    anthropic_api_key: str | None = Field(None, alias="ANTHROPIC_API_KEY")
+
+    # OpenRouter API key (pay-as-you-go aggregator). Optional — only required
+    # if the user picks an OpenRouter model (vendor/model ids) in Settings.
+    openrouter_api_key: str | None = Field(None, alias="OPENROUTER_API_KEY")
+
+    # Mistral API key. Optional — only required if the user picks a Mistral
+    # model (mistral-*-latest) in Settings.
+    mistral_api_key: str | None = Field(None, alias="MISTRAL_API_KEY")
+
     # Perplexity API key for the WebSearch tool's Perplexity provider option
     # (alternative to Tavily). Optional — only required if the user picks
     # Perplexity as their search provider (see app.core.search).

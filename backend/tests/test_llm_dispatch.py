@@ -30,6 +30,9 @@ def record_clients(monkeypatch):
     monkeypatch.setattr(llm.google_genai_client, "stream_message", make("google_genai"))
     monkeypatch.setattr(llm.openai_client, "stream_message", make("openai"))
     monkeypatch.setattr(llm.groq_client, "stream_message", make("groq"))
+    monkeypatch.setattr(llm.anthropic_client, "stream_message", make("anthropic"))
+    monkeypatch.setattr(llm.openrouter_client, "stream_message", make("openrouter"))
+    monkeypatch.setattr(llm.mistral_client, "stream_message", make("mistral"))
     return calls
 
 
@@ -95,6 +98,41 @@ async def test_unknown_other_model_falls_back_to_groq(record_clients):
     assert model_registry.get_model(model) is None
     await _drain(model)
     assert record_clients[0][0] == "groq"
+
+
+async def test_routes_anthropic_models_to_anthropic_client(record_clients):
+    model = _first_id(lambda m: m.provider == "anthropic")
+    assert model, "expected at least one Anthropic entry"
+    await _drain(model)
+    assert record_clients[0][0] == "anthropic"
+
+
+async def test_unknown_claude_model_falls_back_to_anthropic(record_clients):
+    model = "claude-99-imaginary"
+    assert model_registry.get_model(model) is None
+    await _drain(model)
+    assert record_clients[0][0] == "anthropic"
+
+
+async def test_routes_openrouter_models_to_openrouter_client(record_clients):
+    model = _first_id(lambda m: m.provider == "openrouter")
+    assert model, "expected at least one OpenRouter entry"
+    await _drain(model)
+    assert record_clients[0][0] == "openrouter"
+
+
+async def test_unknown_slash_model_falls_back_to_openrouter(record_clients):
+    model = "somelab/some-model"
+    assert model_registry.get_model(model) is None
+    await _drain(model)
+    assert record_clients[0][0] == "openrouter"
+
+
+async def test_routes_mistral_models_to_mistral_client(record_clients):
+    model = _first_id(lambda m: m.provider == "mistral")
+    assert model, "expected at least one Mistral entry"
+    await _drain(model)
+    assert record_clients[0][0] == "mistral"
 
 
 async def test_api_key_is_threaded_through(record_clients):

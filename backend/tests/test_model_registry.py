@@ -35,7 +35,9 @@ def test_every_entry_has_valid_role():
 
 def test_every_entry_has_known_provider():
     for m in REGISTRY:
-        assert m.provider in ("groq", "google", "openai"), m
+        assert m.provider in (
+            "groq", "google", "openai", "anthropic", "openrouter", "mistral",
+        ), m
 
 
 def test_get_available_models_unfiltered_returns_all_when_both_providers_on():
@@ -129,7 +131,22 @@ def test_infer_provider_prefix_heuristics_for_unknown_ids():
     assert model_registry.infer_provider("gemma-99-imaginary") == "google"
     assert model_registry.infer_provider("gpt-99-imaginary") == "openai"
     assert model_registry.infer_provider("o3-imaginary") == "openai"
+    assert model_registry.infer_provider("claude-99-imaginary") == "anthropic"
+    assert model_registry.infer_provider("mistral-99-imaginary") == "mistral"
+    assert model_registry.infer_provider("magistral-99-imaginary") == "mistral"
+    # Unregistered vendor/model ids -> OpenRouter (the registry's own
+    # slash-bearing Groq ids still win via the entry lookup, tested above).
+    assert model_registry.infer_provider("somelab/some-model") == "openrouter"
     assert model_registry.infer_provider("totally-unknown") == "groq"
+
+
+def test_registered_slash_ids_keep_their_provider():
+    # The "/" -> openrouter rule must NOT steal Groq's registered slash ids.
+    assert (
+        model_registry.infer_provider("meta-llama/llama-4-scout-17b-16e-instruct")
+        == "groq"
+    )
+    assert model_registry.infer_provider("openai/gpt-oss-120b") == "groq"
 
 
 def test_provider_available_honors_configured_set():

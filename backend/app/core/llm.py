@@ -1,15 +1,19 @@
 """Provider dispatch for chat-completion streaming.
 
 Routing is driven by the model registry (app.core.model_registry):
-  - provider "google" + client "genai_sdk" -> native google-genai SDK
-  - provider "google" (default client)      -> Google OpenAI-compat endpoint
-  - provider "openai"                        -> OpenAI (api.openai.com)
-  - provider "groq"                          -> Groq (our default provider)
+  - client "genai_sdk"      -> native google-genai SDK (Gemini 3.x)
+  - client "anthropic_sdk"  -> native anthropic SDK (Claude)
+  - provider "google"       -> Google OpenAI-compat endpoint
+  - provider "openai"       -> OpenAI (api.openai.com)
+  - provider "openrouter"   -> OpenRouter aggregator (vendor/model ids)
+  - provider "mistral"      -> Mistral (api.mistral.ai)
+  - provider "groq"         -> Groq (our default provider)
 
 When a model isn't in the registry (e.g. a raw env-var override), the
 registry's name-prefix heuristics decide (`model_registry.infer_provider`):
 `gemini-*`/`gemma-*` -> Google OpenAI-compat, `gpt-*`/`o1-*`/... -> OpenAI,
-everything else -> Groq.
+`claude-*` -> Anthropic, `mistral-*`/... -> Mistral, unregistered
+vendor/model -> OpenRouter, everything else -> Groq.
 
 Session engine imports `stream_message` from here instead of from any
 specific provider module, so routing decisions stay in one place.
@@ -29,11 +33,14 @@ from collections.abc import AsyncIterator
 import openai
 
 from app.core import (
+    anthropic_client,
     google_client,
     google_genai_client,
     groq_client,
+    mistral_client,
     model_registry,
     openai_client,
+    openrouter_client,
 )
 from app.core.llm_types import StreamChunk, StreamResult
 
@@ -41,6 +48,11 @@ try:  # google-genai is in the default install, but stay import-safe anyway
     from google.genai import errors as genai_errors
 except ImportError:  # pragma: no cover
     genai_errors = None  # type: ignore[assignment]
+
+try:  # anthropic is in the default install, but stay import-safe anyway
+    import anthropic as anthropic_sdk
+except ImportError:  # pragma: no cover
+    anthropic_sdk = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +72,13 @@ def _is_transient_error(e: BaseException) -> bool:
     if genai_errors is not None and isinstance(e, genai_errors.APIError):
         code = e.code or 0
         return code == 429 or code >= 500
+    if anthropic_sdk is not None:
+        if isinstance(
+            e, (anthropic_sdk.APIConnectionError, anthropic_sdk.RateLimitError)
+        ):
+            return True
+        if isinstance(e, anthropic_sdk.APIStatusError) and e.status_code >= 500:
+            return True
     return False
 
 
@@ -75,6 +94,8 @@ async def _dispatch(
     entry = model_registry.get_model(model)
     if entry is not None and entry.provider == "google" and entry.client == "genai_sdk":
         client = google_genai_client
+    elif entry is not None and entry.client == "anthropic_sdk":
+        client = anthropic_client
     else:
         # Registry entry first; prefix heuristics only for unknown
         # (env-override) ids — see model_registry.infer_provider.
@@ -82,6 +103,10 @@ async def _dispatch(
         client = {
             "google": google_client,
             "openai": openai_client,
+            # Unregistered claude-* ids (env overrides) still get the SDK.
+            "anthropic": anthropic_client,
+            "openrouter": openrouter_client,
+            "mistral": mistral_client,
         }.get(provider, groq_client)
     async for event in client.stream_message(
         messages, model=model, tools=tools, api_key=api_key

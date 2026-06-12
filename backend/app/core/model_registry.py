@@ -25,15 +25,15 @@ from app.config import settings
 @dataclass(frozen=True)
 class ModelEntry:
     id: str               # Model ID passed to the LLM client.
-    provider: str         # "groq" | "google" | "openai".
+    provider: str         # "groq" | "google" | "openai" | "anthropic" | "openrouter" | "mistral" | "ollama".
     display_name: str     # Shown in the Settings dropdown.
     role: str             # "light" | "heavy" | "either".
     notes: str = ""       # One-line note shown under the dropdown.
-    # Which client library serves this model. Only consulted for Google
-    # models: "openai_compat" goes through the OpenAI-compatible endpoint
-    # (app.core.google_client); "genai_sdk" goes through Google's native
-    # SDK (app.core.google_genai_client), which is required for Gemini 3.x.
-    # Groq/OpenAI models ignore this field.
+    # Which client library serves this model. "openai_compat" goes through an
+    # OpenAI-compatible endpoint (the default for every provider);
+    # "genai_sdk" goes through Google's native SDK (app.core.
+    # google_genai_client), required for Gemini 3.x; "anthropic_sdk" goes
+    # through the official anthropic SDK (app.core.anthropic_client).
     client: str = "openai_compat"
     # Max context size in tokens, per the provider's model docs. Used by the
     # session engine's history sliding window (Phase 1 item 10). The default
@@ -158,6 +158,97 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="light",
         notes="Fast, cheap OpenAI mini model — a solid light pick. Paid.",
     ),
+    # --- Anthropic (paid) — official anthropic SDK ---
+    # IDs/pricing per platform.claude.com (2026-06). Claude models go through
+    # the native SDK (app.core.anthropic_client), not an OpenAI-compat shim.
+    ModelEntry(
+        id="claude-haiku-4-5",
+        context_window=200_000,
+        provider="anthropic",
+        display_name="Claude Haiku 4.5 (Anthropic)",
+        role="light",
+        notes="Anthropic's fastest, cheapest model — a strong light pick. Paid.",
+        client="anthropic_sdk",
+    ),
+    ModelEntry(
+        id="claude-sonnet-4-6",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Sonnet 4.6 (Anthropic)",
+        role="either",
+        notes="Anthropic's best speed/quality balance — the recommended heavy pick. Paid.",
+        client="anthropic_sdk",
+    ),
+    ModelEntry(
+        id="claude-opus-4-8",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Opus 4.8 (Anthropic)",
+        role="heavy",
+        notes="Anthropic's most capable model for hard drafting/reasoning. Paid, pricier.",
+        client="anthropic_sdk",
+    ),
+    # --- OpenRouter (pay-as-you-go aggregator) ---
+    # One key unlocks models from many labs; ids are vendor/model. Curated
+    # picks below — re-check openrouter.ai/models when refreshing.
+    ModelEntry(
+        id="openai/gpt-5.4-mini",
+        context_window=400_000,
+        provider="openrouter",
+        display_name="GPT-5.4 mini (OpenRouter)",
+        role="light",
+        notes="Cheap, fast light pick via OpenRouter.",
+    ),
+    ModelEntry(
+        id="google/gemini-3.5-flash",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Gemini 3.5 Flash (OpenRouter)",
+        role="either",
+        notes="Fast all-rounder via OpenRouter.",
+    ),
+    ModelEntry(
+        id="anthropic/claude-sonnet-4.6",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Sonnet 4.6 (OpenRouter)",
+        role="either",
+        notes="Claude Sonnet served via OpenRouter — good heavy pick.",
+    ),
+    ModelEntry(
+        id="openai/gpt-5.5",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-5.5 (OpenRouter)",
+        role="heavy",
+        notes="OpenAI's flagship via OpenRouter.",
+    ),
+    # --- Mistral ---
+    # The -latest aliases track Mistral's current generation automatically.
+    ModelEntry(
+        id="mistral-small-latest",
+        context_window=128_000,
+        provider="mistral",
+        display_name="Mistral Small (Mistral)",
+        role="light",
+        notes="Fast, cheap Mistral — has a free tier.",
+    ),
+    ModelEntry(
+        id="mistral-medium-latest",
+        context_window=128_000,
+        provider="mistral",
+        display_name="Mistral Medium (Mistral)",
+        role="either",
+        notes="Mid-tier Mistral — balanced speed and quality.",
+    ),
+    ModelEntry(
+        id="mistral-large-latest",
+        context_window=128_000,
+        provider="mistral",
+        display_name="Mistral Large (Mistral)",
+        role="heavy",
+        notes="Strongest Mistral for drafting and reasoning.",
+    ),
 )
 
 
@@ -167,22 +258,35 @@ REGISTRY: tuple[ModelEntry, ...] = (
 # gets a sensible provider (findings A17/C6).
 _GOOGLE_PREFIXES = ("gemini-", "gemma-")
 _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-", "chatgpt-")
+_ANTHROPIC_PREFIXES = ("claude-",)
+_MISTRAL_PREFIXES = ("mistral-", "magistral-", "ministral-", "codestral-")
 
 
 def infer_provider(model_id: str) -> str:
-    """Provider name ("groq" | "google" | "openai") for `model_id`.
+    """Provider name ("groq", "google", "openai", ...) for `model_id`.
 
     Single source of provider truth: the registry entry decides when one
     exists; unknown (env-override) ids fall back to the name-prefix
-    heuristics, defaulting to groq — the original behavior.
+    heuristics, defaulting to groq — the original behavior. The bare-"/"
+    rule (vendor/model -> openrouter) runs LAST and only for unregistered
+    ids, so the slash-bearing Groq registry ids keep resolving to groq;
+    caveat: an unregistered slash-id env override now infers openrouter.
     """
     entry = get_model(model_id)
     if entry is not None:
         return entry.provider
+    if model_id.startswith("ollama:"):
+        return "ollama"
     if model_id.startswith(_GOOGLE_PREFIXES):
         return "google"
     if model_id.startswith(_OPENAI_PREFIXES):
         return "openai"
+    if model_id.startswith(_ANTHROPIC_PREFIXES):
+        return "anthropic"
+    if model_id.startswith(_MISTRAL_PREFIXES):
+        return "mistral"
+    if "/" in model_id:
+        return "openrouter"
     return "groq"
 
 
@@ -212,6 +316,12 @@ def _provider_available(
         return bool(settings.google_ai_api_key)
     if provider == "openai":
         return bool(settings.openai_api_key)
+    if provider == "anthropic":
+        return bool(settings.anthropic_api_key)
+    if provider == "openrouter":
+        return bool(settings.openrouter_api_key)
+    if provider == "mistral":
+        return bool(settings.mistral_api_key)
     return False
 
 

@@ -64,6 +64,24 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
+
+    # --- Anthropic (paid) ---
+    # Per platform.claude.com pricing, 2026-06.
+    "claude-haiku-4-5": ModelPricing("1.00", "5.00"),
+    "claude-sonnet-4-6": ModelPricing("3.00", "15.00"),
+    "claude-opus-4-8": ModelPricing("5.00", "25.00"),
+
+    # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
+    # small fee on credits, not per-token — close enough for display) ---
+    "openai/gpt-5.4-mini": ModelPricing("0.25", "2.00"),
+    "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),
+    "openai/gpt-5.5": ModelPricing("5.00", "30.00"),
+
+    # --- Mistral (per mistral.ai pricing; estimates — free tier is $0) ---
+    "mistral-small-latest": ModelPricing("0.10", "0.30"),
+    "mistral-medium-latest": ModelPricing("0.40", "2.00"),
+    "mistral-large-latest": ModelPricing("2.00", "6.00"),
 }
 
 _MILLION = Decimal("1000000")

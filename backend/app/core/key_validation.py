@@ -14,6 +14,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
+import httpx
 from openai import (
     AsyncOpenAI,
     APIStatusError,
@@ -25,12 +26,15 @@ from tavily import AsyncTavilyClient
 
 from app.config import settings
 from app.core.google_client import GOOGLE_BASE_URL
+from app.core.mistral_client import MISTRAL_BASE_URL
+from app.core.openrouter_client import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 5.0
 PERPLEXITY_BASE_URL = "https://api.perplexity.ai"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
+ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models"
 
 # Cheapest/fastest model per OpenAI-compatible provider, used only for the
 # 1-token validation ping.
@@ -38,12 +42,14 @@ _PING_MODEL = {
     "llm:groq": "llama-3.1-8b-instant",
     "llm:google_ai": "gemini-2.5-flash",
     "llm:openai": "gpt-5.4-mini",
+    "llm:openrouter": "openai/gpt-5.4-mini",
     "search:perplexity": "sonar",
 }
 _BASE_URL = {
     "llm:groq": settings.groq_base_url,
     "llm:google_ai": GOOGLE_BASE_URL,
     "llm:openai": OPENAI_BASE_URL,
+    "llm:openrouter": OPENROUTER_BASE_URL,
     "search:perplexity": PERPLEXITY_BASE_URL,
 }
 
@@ -71,6 +77,49 @@ async def _validate_openai_compatible(
         return ValidationResult(False, "Provider rejected this key (HTTP 401).")
     except RateLimitError:
         # Key authenticated fine; it's just throttled. Still a valid key.
+        return ValidationResult(True, "Key is valid (currently rate-limited).")
+    except APIStatusError as e:
+        if e.status_code in (401, 403):
+            return ValidationResult(False, "Provider rejected this key.")
+        if e.status_code == 429:
+            return ValidationResult(True, "Key is valid (currently rate-limited).")
+        return ValidationResult(False, f"Provider returned HTTP {e.status_code}.")
+    except Exception as e:  # noqa: BLE001 — network/timeout/etc.
+        logger.warning("key validation error (%s): %s", base_url, e)
+        return ValidationResult(False, f"Couldn't reach the provider: {e}")
+
+
+async def _validate_anthropic(api_key: str) -> ValidationResult:
+    """Anthropic: GET /v1/models is authenticated and free (no tokens spent)."""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            res = await client.get(
+                ANTHROPIC_MODELS_URL,
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            )
+    except Exception as e:  # noqa: BLE001 — network/timeout/etc.
+        logger.warning("anthropic key validation error: %s", e)
+        return ValidationResult(False, f"Couldn't reach Anthropic: {e}")
+    if res.status_code == 200:
+        return ValidationResult(True, "Key works.")
+    if res.status_code in (401, 403):
+        return ValidationResult(False, "Anthropic rejected this key (HTTP 401).")
+    if res.status_code == 429:
+        return ValidationResult(True, "Key is valid (currently rate-limited).")
+    return ValidationResult(False, f"Anthropic returned HTTP {res.status_code}.")
+
+
+async def _validate_models_list(api_key: str, base_url: str) -> ValidationResult:
+    """Bearer-auth GET /models — authenticated and free. Used for Mistral."""
+    client = AsyncOpenAI(
+        api_key=api_key, base_url=base_url, timeout=_TIMEOUT, max_retries=0
+    )
+    try:
+        await client.models.list()
+        return ValidationResult(True, "Key works.")
+    except (AuthenticationError, PermissionDeniedError):
+        return ValidationResult(False, "Provider rejected this key (HTTP 401).")
+    except RateLimitError:
         return ValidationResult(True, "Key is valid (currently rate-limited).")
     except APIStatusError as e:
         if e.status_code in (401, 403):
@@ -111,6 +160,10 @@ async def validate_key(provider: str, key: str) -> ValidationResult:
         return ValidationResult(False, "No key provided.")
     if provider == "search:tavily":
         return await _validate_tavily(key)
+    if provider == "llm:anthropic":
+        return await _validate_anthropic(key)
+    if provider == "llm:mistral":
+        return await _validate_models_list(key, MISTRAL_BASE_URL)
     if provider in _PING_MODEL:
         return await _validate_openai_compatible(
             key, _BASE_URL[provider], _PING_MODEL[provider]

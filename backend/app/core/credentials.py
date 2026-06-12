@@ -14,6 +14,9 @@ key rows never collide with the OAuth `google` row:
     llm:groq          -> GROQ_API_KEY
     llm:google_ai     -> GOOGLE_AI_API_KEY   (Google AI Studio key, AIza...)
     llm:openai        -> OPENAI_API_KEY      (OpenAI key, sk-..., paid)
+    llm:anthropic     -> ANTHROPIC_API_KEY   (Claude key, sk-ant-..., paid)
+    llm:openrouter    -> OPENROUTER_API_KEY  (sk-or-..., pay-as-you-go)
+    llm:mistral       -> MISTRAL_API_KEY
     search:tavily     -> TAVILY_API_KEY
     search:perplexity -> PERPLEXITY_API_KEY
 
@@ -44,6 +47,9 @@ LLM_PROVIDERS: dict[str, str] = {
     "llm:groq": "groq_api_key",
     "llm:google_ai": "google_ai_api_key",
     "llm:openai": "openai_api_key",
+    "llm:anthropic": "anthropic_api_key",
+    "llm:openrouter": "openrouter_api_key",
+    "llm:mistral": "mistral_api_key",
 }
 SEARCH_PROVIDERS: dict[str, str] = {
     "search:tavily": "tavily_api_key",
@@ -56,6 +62,9 @@ _REGISTRY_PROVIDER: dict[str, str] = {
     "llm:groq": "groq",
     "llm:google_ai": "google",
     "llm:openai": "openai",
+    "llm:anthropic": "anthropic",
+    "llm:openrouter": "openrouter",
+    "llm:mistral": "mistral",
 }
 _CREDENTIAL_PROVIDER = {v: k for k, v in _REGISTRY_PROVIDER.items()}
 
