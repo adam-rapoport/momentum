@@ -5,7 +5,7 @@ import { Btn, IconBtn, PixelIcon, PmLogo } from "@/components/pm";
 import { api, type KeyProvider, type ModelEntry } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { useChatStore } from "@/lib/store";
-import { PROVIDERS, validateKeyFormat, wizardProvidersForTier } from "@/lib/providers";
+import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
 import { DoneStep, ModelStep, ToolsStep, WelcomeStep, type ModelStepState } from "./steps";
 import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
 
@@ -29,7 +29,7 @@ const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
 };
 
 function initialModelState(tier: "light" | "heavy"): ModelStepState {
-  const list = wizardProvidersForTier(tier);
+  const list = providersForTier(tier);
   const preferred = list.find((p) => p.id === RECOMMENDED_PROVIDER[tier]) ?? list[0];
   return { providerId: preferred?.id ?? null, key: "", model: null };
 }
@@ -109,8 +109,10 @@ export function OnboardingWizard() {
   async function saveModel(state: ModelStepState, tier: "light" | "heavy"): Promise<boolean> {
     if (!state.providerId) return false;
     const provider = PROVIDERS[state.providerId];
-    const model = state.model ?? provider.defaultModel[tier];
-    if (!model) return false;
+    let model = state.model ?? provider.defaultModel[tier];
+    // Ollama has no static default — its models are whatever the user has
+    // pulled locally, discoverable only after the URL is saved (below).
+    if (!model && provider.id !== "ollama") return false;
     setSaving(true);
     setError(null);
     try {
@@ -121,6 +123,20 @@ export function OnboardingWizard() {
         await api.setConnection(provider.credProvider, state.key.trim());
       } else if (!isConfigured(state)) {
         return false;
+      }
+      if (!model) {
+        // Ollama: ask the (now-saved) server what's installed and pick the
+        // first tool-capable model; refinable later in Settings → Models.
+        const r = await api.listOllamaModels();
+        const pick = r.models.find((m) => m.supports_tools) ?? r.models[0];
+        if (!pick) {
+          setError(
+            "Ollama is reachable, but no models are installed yet — run " +
+              "`ollama pull llama3.1:8b` in Terminal, then continue.",
+          );
+          return false;
+        }
+        model = pick.id;
       }
       await api.setModelPreferences(
         tier === "light" ? { light_model: model } : { heavy_model: model },

@@ -4,7 +4,7 @@ import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
 import { GoogleCard } from "@/components/settings/IntegrationsPane";
 import { KeyInput } from "@/components/settings/KeyInput";
 import { api, type ModelEntry } from "@/lib/api";
-import { PROVIDERS, wizardProvidersForTier, type ProviderMeta, type Tier } from "@/lib/providers";
+import { providersForTier, PROVIDERS, type ProviderMeta, type Tier } from "@/lib/providers";
 
 export interface ModelStepState {
   providerId: string | null;
@@ -81,7 +81,7 @@ export function ModelStep({
    * Null while loading/unavailable: the dropdown hides, defaults apply. */
   registry: ModelEntry[] | null;
 }) {
-  const providers = wizardProvidersForTier(tier);
+  const providers = providersForTier(tier);
   const chosen: ProviderMeta | null = state.providerId ? PROVIDERS[state.providerId] : null;
   const providerModels = (registry ?? []).filter(
     (m) => chosen && m.provider === chosen.id && (m.role === tier || m.role === "either"),
@@ -139,6 +139,13 @@ export function ModelStep({
         })}
       </div>
 
+      {chosen?.id === "ollama" && (
+        <div className="text-[12.5px] text-ink-muted">
+          Local models are whatever you&apos;ve pulled with Ollama — we&apos;ll pick your first
+          tool-capable one automatically. You can change it any time in Settings → Models.
+        </div>
+      )}
+
       {chosen && providerModels.length > 1 && (
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="text-[12.5px] font-medium text-ink-muted">Model</label>
@@ -177,7 +184,10 @@ export function ModelStep({
           />
           {error && (
             <div className="mt-3.5">
-              <Banner kind="danger" title="Couldn't verify that key">
+              <Banner
+                kind="danger"
+                title={chosen.id === "ollama" ? "Couldn't set up Ollama" : "Couldn't verify that key"}
+              >
                 {error}
               </Banner>
             </div>

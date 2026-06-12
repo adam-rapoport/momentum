@@ -24,9 +24,6 @@ export interface ProviderMeta {
   secret?: boolean;
   // Label for the credential input when it isn't an API key (e.g. "Server URL").
   inputLabel?: string;
-  // false → hidden from the first-run onboarding wizard (Settings only), so
-  // onboarding stays a focused three-provider choice. Default true.
-  wizard?: boolean;
 }
 
 export const PROVIDERS: Record<string, ProviderMeta> = {
@@ -88,7 +85,6 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyPrefix: "sk-ant-",
     keyLength: [40, 200],
     defaultModel: { light: "claude-haiku-4-5", heavy: "claude-sonnet-4-6" },
-    wizard: false,
   },
   openrouter: {
     id: "openrouter",
@@ -103,7 +99,6 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyPrefix: "sk-or-",
     keyLength: [30, 200],
     defaultModel: { light: "openai/gpt-5.4-mini", heavy: "anthropic/claude-sonnet-4.6" },
-    wizard: false,
   },
   mistral: {
     id: "mistral",
@@ -118,7 +113,6 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyPrefix: "",
     keyLength: [20, 80],
     defaultModel: { light: "mistral-small-latest", heavy: "mistral-large-latest" },
-    wizard: false,
   },
   ollama: {
     id: "ollama",
@@ -137,18 +131,11 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     defaultModel: {},
     secret: false,
     inputLabel: "Server URL",
-    wizard: false,
   },
 };
 
 export function providersForTier(tier: Tier): ProviderMeta[] {
   return Object.values(PROVIDERS).filter((p) => p.tiers.includes(tier));
-}
-
-// Providers offered in the first-run wizard — the focused starter set.
-// Everything else stays reachable in Settings → Models.
-export function wizardProvidersForTier(tier: Tier): ProviderMeta[] {
-  return providersForTier(tier).filter((p) => p.wizard !== false);
 }
 
 // Search providers (for the Web Search connection). Same key-card shape as
