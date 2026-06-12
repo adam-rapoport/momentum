@@ -69,6 +69,39 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
+export interface DocumentUploadResult {
+  title: string;
+  memory_id: string;
+  char_count: number;
+  memories_created: number;
+}
+
+// Multipart upload to a document-ingestion endpoint. Note: do NOT set
+// Content-Type — the browser sets the multipart boundary. The auth header
+// still applies (these endpoints are not token-exempt). The long timeout
+// covers the backend's heavy-model extraction step.
+async function uploadFileTo(path: string, file: File): Promise<DocumentUploadResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      headers: token ? { "X-PMomentum-Token": token } : {},
+    });
+  } catch (err) {
+    throw timeoutError(err, UPLOAD_TIMEOUT_MS) ?? err;
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as DocumentUploadResult;
+}
+
 export const api = {
   listSessions: () => request<Session[]>("/api/v1/sessions"),
   getSession: (id: string) => request<SessionDetail>(`/api/v1/sessions/${id}`),
@@ -144,34 +177,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  uploadDocument: async (file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    // Note: do NOT set Content-Type — the browser sets the multipart boundary.
-    // The auth header still applies (this endpoint is not token-exempt).
-    const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
-    let res: Response;
-    try {
-      res = await fetch(`${base}/api/v1/onboarding/documents`, {
-        method: "POST",
-        body: form,
-        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-        headers: token ? { "X-PMomentum-Token": token } : {},
-      });
-    } catch (err) {
-      throw timeoutError(err, UPLOAD_TIMEOUT_MS) ?? err;
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
-    }
-    return (await res.json()) as {
-      title: string;
-      memory_id: string;
-      char_count: number;
-      memories_created: number;
-    };
-  },
+  uploadDocument: (file: File) => uploadFileTo("/api/v1/onboarding/documents", file),
+  // Same pipeline, triggered from the Memory panel after onboarding.
+  uploadMemoryDocument: (file: File) => uploadFileTo("/api/v1/memory/documents", file),
 
   // ── C8 Web search provider preference ──
   getSearchPreferences: () =>

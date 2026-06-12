@@ -1,14 +1,17 @@
 """REST endpoints for the memory panel in the frontend.
 
 List is served from the DB index; detail reads the markdown body from disk.
+Document upload reuses the onboarding ingestion pipeline (reference memory +
+heavy-model extraction) with panel-specific tags.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.default_user import get_default_project, get_default_user
+from app.core.doc_ingest import ingest_reference_document
 from app.core.memory.store import list_memories, read_memory_file
 from app.dependencies import get_db
 from app.models import MemoryRecord, Project
@@ -36,6 +39,28 @@ async def list_memory_records(
 ) -> list[MemoryRecord]:
     project = await _resolve_project(db, project_id)
     return await list_memories(db=db, project=project)
+
+
+@router.post("/documents")
+async def upload_memory_document(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Upload a document from the Memory panel: store its text as a
+    `reference` memory, then extract derived memories (best-effort)."""
+    user = await get_default_user(db)
+    project = await get_default_project(db, user.organization_id)
+    content = await file.read()
+    return await ingest_reference_document(
+        db,
+        user=user,
+        project=project,
+        filename=file.filename or "upload",
+        content=content,
+        reference_tags=["upload"],
+        extract_tags=["from-document"],
+        summary_note=f"Uploaded from the Memory panel ({file.filename})",
+    )
 
 
 @router.get("/{record_id}", response_model=MemoryRecordDetail)

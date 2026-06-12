@@ -125,12 +125,14 @@ async def extract_memories_from_document(
     project: Project,
     doc_title: str,
     doc_text: str,
+    tags: list[str] | None = None,
 ) -> list[MemoryRecord]:
     """Read `doc_text` with the heavy model and persist the facts it finds as
     memories. Returns the saved records (may be empty). Does NOT commit — the
-    caller owns the transaction."""
+    caller owns the transaction. `tags` defaults to the onboarding stamp."""
     reply = await _run_heavy(db, user, doc_title, doc_text)
     items = _parse_memory_json(reply)
+    record_tags = tags if tags is not None else ["onboarding", "from-document"]
 
     saved: list[MemoryRecord] = []
     for item in items[:MAX_MEMORIES]:
@@ -148,7 +150,7 @@ async def extract_memories_from_document(
             title=title,
             content=content,
             summary=(item.get("summary") or "").strip() or None,
-            tags=["onboarding", "from-document"],
+            tags=list(record_tags),
         )
         saved.append(record)
 

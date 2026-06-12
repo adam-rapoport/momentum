@@ -14,6 +14,7 @@ from fastapi import UploadFile
 
 from app.api import onboarding
 from app.config import settings
+from app.core import doc_ingest
 from app.core.llm_types import StreamResult
 from app.core.memory import extract as extract_mod
 from app.core.memory.extract import extract_memories_from_document
@@ -86,8 +87,9 @@ async def test_upload_keeps_reference_when_extraction_fails(db, seeded, monkeypa
     user, project = seeded["user"], seeded["project"]
     monkeypatch.setattr(onboarding, "get_default_user", _const_async(user))
     monkeypatch.setattr(onboarding, "get_default_project", _const_async(project))
+    # The extraction call lives in the shared doc_ingest core now.
     monkeypatch.setattr(
-        onboarding, "extract_memories_from_document", _const_async_raises()
+        doc_ingest, "extract_memories_from_document", _const_async_raises()
     )
 
     upload = UploadFile(BytesIO(b"# Notes\n\nSarah is VP Eng."), filename="ref.md")

@@ -14,14 +14,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import credentials
 from app.core.default_user import get_default_project, get_default_user
-from app.core.ingest import UnsupportedFileType, parse_upload
-from app.core.memory.extract import extract_memories_from_document
+from app.core.doc_ingest import MAX_UPLOAD_BYTES, ingest_reference_document
 from app.core.memory.store import save_memory
 from app.core.model_registry import get_available_models
 from app.dependencies import get_db
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
-MAX_UPLOAD_BYTES = 10_000_000  # 10 MB
+__all__ = ["MAX_UPLOAD_BYTES", "router"]  # MAX_UPLOAD_BYTES re-exported for compat
 
 
 class ProfilePayload(BaseModel):
@@ -112,70 +111,17 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Parse an uploaded PDF/Word/Markdown/text file and store its text as a
-    `reference` memory record."""
+    `reference` memory record, then extract derived memories (best-effort)."""
     user = await get_default_user(db)
     project = await get_default_project(db, user.organization_id)
-
     content = await file.read()
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large (max {MAX_UPLOAD_BYTES // 1_000_000} MB).",
-        )
-
-    try:
-        parsed = parse_upload(file.filename or "upload", content)
-    except UnsupportedFileType as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        ) from e
-
-    if not parsed.text.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Couldn't extract any text from that file.",
-        )
-
-    record = await save_memory(
-        db=db,
+    return await ingest_reference_document(
+        db,
+        user=user,
         project=project,
-        mem_type="reference",
-        title=parsed.title,
-        content=parsed.text,
-        summary=f"Uploaded during onboarding ({file.filename})",
-        tags=["onboarding", "upload"],
+        filename=file.filename or "upload",
+        content=content,
+        reference_tags=["onboarding", "upload"],
+        extract_tags=["onboarding", "from-document"],
+        summary_note=f"Uploaded during onboarding ({file.filename})",
     )
-    # Persist the reference doc first so it's never lost, even if the
-    # (best-effort) extraction step below fails.
-    await db.commit()
-    # Snapshot the id NOW: if extraction fails below, its rollback expires the
-    # ORM object, and a later `record.id` would lazy-load outside the async
-    # greenlet context (MissingGreenlet → the whole upload 500s even though
-    # the document was saved).
-    record_id = str(record.id)
-
-    # Have the user's heavy model read the doc and turn its durable facts into
-    # their own memories, so the agent has real context from message one — not
-    # just a doc it has to be asked to look up. Best-effort: a failure here
-    # leaves the reference memory (already committed) intact.
-    memories_created = 0
-    try:
-        derived = await extract_memories_from_document(
-            db,
-            user=user,
-            project=project,
-            doc_title=parsed.title,
-            doc_text=parsed.text,
-        )
-        await db.commit()
-        memories_created = len(derived)
-    except Exception:  # noqa: BLE001 — never let extraction break the upload
-        await db.rollback()
-        logger.exception("reference-doc memory extraction failed (reference saved)")
-
-    return {
-        "title": parsed.title,
-        "memory_id": record_id,
-        "char_count": len(parsed.text),
-        "memories_created": memories_created,
-    }

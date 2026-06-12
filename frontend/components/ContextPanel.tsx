@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ExternalLink } from "@/components/ExternalLink";
 import { Chip, IconBtn, PixelIcon, PxLabel, Segmented, type PixelIconName } from "@/components/pm";
 import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { isTauri, openLocalPath, revealInFolder } from "@/lib/desktop";
 import { useChatStore } from "@/lib/store";
 import { useUiStore } from "@/lib/uiStore";
@@ -54,6 +55,38 @@ function MemoryTab() {
   const [detail, setDetail] = useState<MemoryRecordDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadNote, setUploadNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  async function handleFilePicked(file: File | undefined) {
+    if (!file || uploading) return;
+    setUploading(true);
+    setUploadNote(null);
+    try {
+      const r = await api.uploadMemoryDocument(file);
+      setUploadNote({
+        kind: "ok",
+        text: `${r.memories_created} ${r.memories_created === 1 ? "memory" : "memories"} created from “${r.title}”`,
+      });
+      const fresh = await api.listMemories();
+      setMemories(fresh);
+    } catch (err) {
+      setUploadNote({ kind: "err", text: errorMessage(err) });
+    } finally {
+      setUploading(false);
+      // Reset so picking the same file again re-fires onChange.
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  // Success notes fade out on their own; errors stay until the next attempt.
+  useEffect(() => {
+    if (uploadNote?.kind !== "ok") return;
+    const timer = setTimeout(() => setUploadNote(null), 6000);
+    return () => clearTimeout(timer);
+  }, [uploadNote]);
 
   // Initial load. BootGate already waits for the backend before this mounts,
   // but retry a few times anyway so a single transient failure can't leave the
@@ -116,12 +149,40 @@ function MemoryTab() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.md,.markdown,.txt"
+        className="hidden"
+        onChange={(e) => handleFilePicked(e.target.files?.[0])}
+      />
+      <div className="flex items-center justify-between gap-2 border-b border-line-faint px-4 py-2">
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-[7px] border border-line bg-surface px-2.5 py-1 text-[11.5px] font-medium text-ink-muted shadow-card transition-colors duration-100 hover:border-accent hover:text-ink disabled:cursor-default disabled:opacity-60"
+        >
+          <PixelIcon name="plus" size={10} />
+          {uploading ? "Analyzing…" : "Add from document…"}
+        </button>
+      </div>
+      {uploadNote && (
+        <div
+          className={`px-4 py-1.5 text-[11.5px] leading-snug ${
+            uploadNote.kind === "ok" ? "text-ok" : "text-danger"
+          }`}
+        >
+          {uploadNote.text}
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto py-2.5">
         {memories.length === 0 ? (
           <div className="px-4 py-2 text-xs leading-relaxed text-ink-dim">
             No memories yet. When you tell the agent something worth remembering (a
             stakeholder&apos;s preferences, a decision, a goal), it will save it here and have it
-            available across sessions.
+            available across sessions. You can also add memories from a document — a PRD, a
+            strategy doc, meeting notes — with the button above.
           </div>
         ) : (
           TYPE_ORDER.filter((t) => grouped[t]?.length).map((t) => {
