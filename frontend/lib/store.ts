@@ -14,6 +14,16 @@ export interface SessionError {
   message: string;
 }
 
+/**
+ * What the model is visibly doing during a live turn:
+ * - "thinking": working with nothing on screen (before the first token, and
+ *   again after every tool finishes while it reasons over the results)
+ * - "responding": streaming text
+ * - "tool": at least one tool call is still running (its card shows progress)
+ * Absent key = no live turn.
+ */
+export type LiveActivity = "thinking" | "responding" | "tool";
+
 interface ChatState {
   sessions: Session[];
   messagesBySession: Record<string, Message[]>;
@@ -21,6 +31,7 @@ interface ChatState {
   isStreamingBySession: Record<string, boolean>;
   totalCostBySession: Record<string, string>;
   liveToolCallsBySession: Record<string, LiveToolCall[]>;
+  activityBySession: Record<string, LiveActivity>;
   awaitingReviewBySession: Record<string, AwaitingReview>;
   lastErrorBySession: Record<string, SessionError>;
   lastModelBySession: Record<string, string>;
@@ -102,6 +113,7 @@ export const useChatStore = create<ChatState>((set) => ({
   isStreamingBySession: {},
   totalCostBySession: {},
   liveToolCallsBySession: {},
+  activityBySession: {},
   awaitingReviewBySession: {},
   lastErrorBySession: {},
   lastModelBySession: {},
@@ -200,6 +212,7 @@ export const useChatStore = create<ChatState>((set) => ({
       streamingBySession: { ...state.streamingBySession, [sessionId]: "" },
       isStreamingBySession: { ...state.isStreamingBySession, [sessionId]: true },
       liveToolCallsBySession: { ...state.liveToolCallsBySession, [sessionId]: [] },
+      activityBySession: { ...state.activityBySession, [sessionId]: "thinking" },
       turnEpochBySession: {
         ...state.turnEpochBySession,
         [sessionId]: (state.turnEpochBySession[sessionId] ?? 0) + 1,
@@ -213,6 +226,7 @@ export const useChatStore = create<ChatState>((set) => ({
         ...state.streamingBySession,
         [sessionId]: (state.streamingBySession[sessionId] ?? "") + text,
       },
+      activityBySession: { ...state.activityBySession, [sessionId]: "responding" },
     })),
 
   toolStart: (sessionId, { call_id, name, input }) =>
@@ -224,21 +238,30 @@ export const useChatStore = create<ChatState>((set) => ({
           ...state.liveToolCallsBySession,
           [sessionId]: [...prev, next],
         },
+        activityBySession: { ...state.activityBySession, [sessionId]: "tool" },
       };
     }),
 
   toolResult: (sessionId, { call_id, output, is_error }) =>
     set((state) => {
       const prev = state.liveToolCallsBySession[sessionId] ?? [];
+      const next: LiveToolCall[] = prev.map((tc) =>
+        tc.call_id === call_id
+          ? { ...tc, output, isError: is_error, status: is_error ? "error" : "done" }
+          : tc,
+      );
+      // Once every tool has finished, the model is reasoning over the results
+      // with nothing visible on screen — back to "thinking" until the next
+      // text chunk or tool call. With parallel calls, wait for all of them.
+      const allDone = next.every((tc) => tc.status !== "running");
       return {
         liveToolCallsBySession: {
           ...state.liveToolCallsBySession,
-          [sessionId]: prev.map((tc) =>
-            tc.call_id === call_id
-              ? { ...tc, output, isError: is_error, status: is_error ? "error" : "done" }
-              : tc,
-          ),
+          [sessionId]: next,
         },
+        activityBySession: allDone
+          ? { ...state.activityBySession, [sessionId]: "thinking" }
+          : state.activityBySession,
       };
     }),
 
@@ -247,20 +270,25 @@ export const useChatStore = create<ChatState>((set) => ({
   // content (tool_use + tool_result blocks with real IDs) replaces the
   // live view. This keeps tool pairing consistent.
   finalizeStream: (sessionId, totalCost, cancelled) =>
-    set((state) => ({
-      streamingBySession: { ...state.streamingBySession, [sessionId]: "" },
-      isStreamingBySession: { ...state.isStreamingBySession, [sessionId]: false },
-      liveToolCallsBySession: { ...state.liveToolCallsBySession, [sessionId]: [] },
-      // Error/cancel paths pass no cost — keep showing the last known value
-      // instead of resetting the header to $0.
-      totalCostBySession:
-        totalCost === undefined
-          ? state.totalCostBySession
-          : { ...state.totalCostBySession, [sessionId]: totalCost },
-      stoppedBySession: cancelled
-        ? { ...state.stoppedBySession, [sessionId]: true }
-        : state.stoppedBySession,
-    })),
+    set((state) => {
+      const activityBySession = { ...state.activityBySession };
+      delete activityBySession[sessionId];
+      return {
+        activityBySession,
+        streamingBySession: { ...state.streamingBySession, [sessionId]: "" },
+        isStreamingBySession: { ...state.isStreamingBySession, [sessionId]: false },
+        liveToolCallsBySession: { ...state.liveToolCallsBySession, [sessionId]: [] },
+        // Error/cancel paths pass no cost — keep showing the last known value
+        // instead of resetting the header to $0.
+        totalCostBySession:
+          totalCost === undefined
+            ? state.totalCostBySession
+            : { ...state.totalCostBySession, [sessionId]: totalCost },
+        stoppedBySession: cancelled
+          ? { ...state.stoppedBySession, [sessionId]: true }
+          : state.stoppedBySession,
+      };
+    }),
 
   setTotalCost: (sessionId, totalCost) =>
     set((state) => ({

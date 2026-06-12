@@ -95,6 +95,7 @@ export function ChatView({ sessionId }: Props) {
   );
   const lastError = useChatStore((s) => s.lastErrorBySession[sessionId]);
   const stopped = useChatStore((s) => s.stoppedBySession[sessionId]) ?? false;
+  const activity = useChatStore((s) => s.activityBySession[sessionId]);
   const setMessages = useChatStore((s) => s.setMessages);
   const appendUserMessage = useChatStore((s) => s.appendUserMessage);
   const removeMessage = useChatStore((s) => s.removeMessage);
@@ -208,7 +209,7 @@ export function ChatView({ sessionId }: Props) {
     const el = scrollRef.current;
     if (!el || !pinnedRef.current) return;
     el.scrollTop = el.scrollHeight;
-  }, [items.length, streaming, liveTools.length]);
+  }, [items.length, streaming, liveTools.length, activity]);
 
   function handleScroll() {
     const el = scrollRef.current;
@@ -262,8 +263,11 @@ export function ChatView({ sessionId }: Props) {
     handleSend("/restart");
   }
 
-  const waitingForFirstToken =
-    isStreaming && !streaming && liveTools.length === 0;
+  // "thinking…" shows whenever the model is working with nothing visible on
+  // screen: before the first token, and again after tools finish while it
+  // reasons over their results (the old check vanished for the whole rest of
+  // the turn as soon as any tool had started).
+  const showThinking = isStreaming && activity === "thinking";
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -350,7 +354,7 @@ export function ChatView({ sessionId }: Props) {
             <div className="pl-[38px] font-mono text-[11px] text-ink-dim">■ Stopped by you</div>
           )}
 
-          {waitingForFirstToken && (
+          {showThinking && (
             <div className="flex items-center gap-3">
               <AssistantAvatar pulse />
               <span className="font-mono text-[12px] text-ink-dim">thinking…</span>
