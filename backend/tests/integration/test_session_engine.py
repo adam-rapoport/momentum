@@ -327,6 +327,77 @@ async def test_tool_call_turn_events_persistence_and_followup(
     assert second[-1] == {"role": "tool", "tool_call_id": "call_1", "content": "echo:ping"}
 
 
+async def test_tool_call_written_as_text_triggers_one_retry(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Finding #1: a weak model sometimes writes a tool call as plain text with
+    no real tool_call. Instead of silently dropping it, the engine retries the
+    turn ONCE with a corrective nudge so the tool actually runs."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        # Iteration 1: the model writes the call as TEXT — no tool_calls.
+        # (streamed as a chunk, the way real text arrives)
+        [
+            StreamChunk(text='TestEcho(value="oops")'),
+            _result(text='TestEcho(value="oops")'),
+        ],
+        # Iteration 2 (the retry): it calls the tool properly this time.
+        [
+            _result(
+                tool_calls=[
+                    ToolCall(id="call_1", name="TestEcho",
+                             arguments_json='{"value": "real"}')
+                ]
+            )
+        ],
+        # Iteration 3: final answer after the tool result.
+        [StreamChunk(text="done"), _result(text="done")],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "remember this")
+
+    # The tool actually executed (the retry fired) rather than being dropped.
+    starts = [e for e in events if isinstance(e, ToolStartEvent)]
+    results = [e for e in events if isinstance(e, ToolResultEvent)]
+    assert len(results) == 1
+    assert (starts[0].name, starts[0].input) == ("TestEcho", {"value": "real"})
+    assert (results[0].output, results[0].is_error) == ("echo:real", False)
+
+    # Exactly three model iterations: bogus-text, retry, final answer.
+    assert len(stub.calls) == 3
+
+    # The retry request carried the corrective nudge as a trailing user message.
+    retry_messages = stub.calls[1]["messages"]
+    assert retry_messages[-1]["role"] == "user"
+    assert "plain text" in retry_messages[-1]["content"].lower()
+
+    # A real tool result is persisted (the save/echo happened, not a no-op).
+    messages = await _messages_for(db, session.id)
+    assert any(
+        m.role == "tool" and m.content and m.content[0].get("output") == "echo:real"
+        for m in messages
+    )
+
+
+async def test_plain_text_answer_does_not_trigger_a_retry(
+    db, seeded, kv, monkeypatch, echo_tool
+):
+    """Guard against false positives: a normal answer that merely mentions a
+    tool name in prose must NOT trigger the tool-call-as-text retry."""
+    session = await _make_session(db, seeded)
+    stub = _scripted_stream(
+        [_result(text="You can use TestEcho to repeat a value back to you.")],
+    )
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+
+    events = await _run_turn(db, kv, session.id, "what does the echo tool do?")
+
+    # Single model call — no retry — and no tool ever executed.
+    assert len(stub.calls) == 1
+    assert not [e for e in events if isinstance(e, ToolResultEvent)]
+
+
 async def test_thought_signature_persists_and_replays_in_history(
     db, seeded, kv, monkeypatch, echo_tool
 ):

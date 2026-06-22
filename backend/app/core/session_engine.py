@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -50,6 +51,25 @@ logger = logging.getLogger(__name__)
 _load_builtin_tools()
 
 MAX_TOOL_ITERATIONS = 8
+
+# A weak model (e.g. Groq's Scout) sometimes EMITS a tool call as plain text —
+# `SaveMemory("...", "...", "decision")` — instead of using the function-calling
+# interface. The call never runs, nothing is saved, and there's no error: the
+# user just sees a confusing line of pseudo-code. We detect that shape (a line
+# starting with a REGISTERED tool name followed by `(`) and retry the turn once
+# with a corrective nudge so the intended tool actually fires.
+_TEXT_TOOL_CALL_RE = re.compile(r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def _looks_like_text_tool_call(text: str, tool_names: set[str]) -> bool:
+    """True when `text` looks like a tool call written as prose — a line begins
+    with `KnownToolName(`. Matching requires an EXACT registered tool name, so
+    ordinary prose that merely mentions a tool by name does not trip it."""
+    if not text:
+        return False
+    return any(
+        m.group(1) in tool_names for m in _TEXT_TOOL_CALL_RE.finditer(text)
+    )
 
 
 def _split_concatenated_json_args(raw: str) -> list[dict] | None:
@@ -939,10 +959,19 @@ async def _process_message_locked(
     ctx_token = set_context(tool_ctx)
 
     tool_specs = to_openai_tools(all_tools())
+    known_tool_names = {
+        spec["function"]["name"]
+        for spec in tool_specs
+        if isinstance(spec, dict) and isinstance(spec.get("function"), dict)
+    }
     total_input_tokens = 0
     total_output_tokens = 0
     total_cost_usd = Decimal("0")
     cancelled = False
+    # One-shot guard for the tool-call-as-text quirk (see _looks_like_text_tool_call):
+    # if a turn ends with a tool call written as plain text, we retry once with a
+    # corrective nudge. The flag stops that from looping on a model that repeats it.
+    text_toolcall_retry_used = False
     # Assistant text streamed before a mid-stream cancel. Persisted (with an
     # interruption marker) at the end of the turn so a reload doesn't lose
     # text the user already saw (finding A9/A10).
@@ -1073,8 +1102,32 @@ async def _process_message_locked(
                 ]
             llm_messages.append(assistant_entry)
 
-            # No tool calls → we're done for this turn
+            # No tool calls → we're done for this turn — UNLESS the model wrote
+            # a tool call as plain text (weak-model quirk). Retry once with a
+            # corrective nudge so the intended tool actually runs instead of
+            # silently dropping it (the user would otherwise see a bogus
+            # `SaveMemory(...)` line and nothing saved).
             if not parsed_calls:
+                if (
+                    assistant_text
+                    and not text_toolcall_retry_used
+                    and _looks_like_text_tool_call(assistant_text, known_tool_names)
+                ):
+                    text_toolcall_retry_used = True
+                    logger.info(
+                        "detected tool-call-as-text; retrying turn with a corrective nudge"
+                    )
+                    llm_messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "That looks like a tool call written as plain text. "
+                                "Do not write tool calls as text — actually invoke the "
+                                "tool now using the function-calling interface."
+                            ),
+                        }
+                    )
+                    continue
                 await _safe_commit(db, session_id, stage="persist_assistant_text")
                 break
 

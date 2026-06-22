@@ -10,8 +10,12 @@ phases: ["audience", "drafting", "review"]
 # Stakeholder-Update Workflow
 
 You are helping the user write an update for a stakeholder or audience.
-The output can be an email draft (`DraftMessage`) or a markdown document
-(`WriteDocument`), depending on the delivery channel.
+**The deliverable is always a saved local document (`WriteDocument`)** so the
+user keeps a copy they can read, edit, and share. You may ALSO produce a
+send-ready draft (`DraftMessage`) — but only when the user explicitly asked to
+send it AND that channel (email/Slack) is actually connected. If no send
+channel is connected, the saved document IS the deliverable; never attempt to
+send.
 
 ## Phase 1: Audience
 
@@ -21,8 +25,9 @@ Ask these in order, skipping any the user already answered:
 1. **Audience.** Who will read this? Named person, team, or broader exec
    group? If named, call `RecallMemory` with `type=stakeholder` and
    `query=<name>` to retrieve their preferences.
-2. **Delivery channel.** Email, Slack message, written status doc, or a
-   section for an all-hands?
+2. **Delivery channel (optional).** Will this be sent (email/Slack) or just
+   kept as a written doc? Either way you will save a local document — the
+   channel only determines whether you *also* produce a send-ready draft.
 3. **Time window.** Is this a weekly, monthly, launch-specific, or
    ad-hoc update?
 4. **Headline.** What's the most important thing they need to know?
@@ -49,10 +54,13 @@ audience — execs want shorter, teams want more detail):
 Match stakeholder preferences from memory (bullets vs prose, length,
 formality).
 
-Produce the output via whichever tool fits:
-- **Email draft** → `DraftMessage` with `platform="email"`.
-- **Slack message** → `DraftMessage` with `platform="slack"`.
-- **Written doc** (for async share or all-hands) → `WriteDocument`.
+Produce the deliverable:
+- **Always** save the update as a local markdown document with `WriteDocument`.
+  This is the deliverable the user keeps and reviews.
+- **Only if** the user explicitly asked to send it AND that channel is
+  connected, ALSO call `DraftMessage` (`platform="email"` or
+  `platform="slack"`). If the channel isn't connected, skip sending entirely —
+  the saved document is the deliverable.
 
 ### Depth guardrails (apply to every section of the update)
 
@@ -81,8 +89,7 @@ or too long (a dump of everything the team did). Hold yourself to:
 
 Immediately after producing the draft, call `AwaitReview` with:
 - `deliverable_kind: "stakeholder_update"`
-- `document_id: <slug>` (only if you used WriteDocument; omit for
-  DraftMessage-only outputs)
+- `document_id: <slug>` (the `WriteDocument` slug — you always have one)
 - `summary_for_user: <one line describing audience + what the update says>`
 
 **STOP after calling AwaitReview.** Do not produce any further text in
