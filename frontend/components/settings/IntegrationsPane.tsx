@@ -22,7 +22,10 @@ export function IntegrationsPane() {
         </div>
       )}
       <div className="flex flex-col gap-3">
-        <GoogleCard />
+        {/* Google is deferred to a post-V1 add-on — shown "coming soon" like the
+            others. The GoogleCard component below is retained (unrendered) so the
+            integration can be re-enabled without rebuilding it. */}
+        <SoonCard name="Google" blurb="Draft Docs, summarize Gmail, check your calendar" />
         <SoonCard name="Slack" blurb="Post updates, summarize channels" />
         <SoonCard name="Linear" blurb="Create and triage issues" />
         <SoonCard name="Jira" blurb="Sync tickets and sprints" />

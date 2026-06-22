@@ -6,16 +6,18 @@ import { api, type KeyProvider, type ModelEntry } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { useChatStore } from "@/lib/store";
 import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
-import { DoneStep, ModelStep, ToolsStep, WelcomeStep, type ModelStepState } from "./steps";
+import { DoneStep, ModelStep, WelcomeStep, type ModelStepState } from "./steps";
 import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
 
-type StepKey = "welcome" | "light" | "heavy" | "tools" | "gtky" | "done";
+// NOTE: the "Tools (Google)" step was removed for V1 (Google deferred to a
+// post-release add-on). Restore it here + the ToolsStep in steps.tsx when the
+// Google integration is re-enabled — see the F-Google roadmap backlog item.
+type StepKey = "welcome" | "light" | "heavy" | "gtky" | "done";
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "welcome", label: "Welcome" },
   { key: "light", label: "Light model" },
   { key: "heavy", label: "Heavy model" },
-  { key: "tools", label: "Tools" },
   { key: "gtky", label: "About you" },
   { key: "done", label: "Done" },
 ];
@@ -34,8 +36,8 @@ function initialModelState(tier: "light" | "heavy"): ModelStepState {
   return { providerId: preferred?.id ?? null, key: "", model: null };
 }
 
-// First-run wizard: Welcome → Light model → Heavy model → Tools (Google) →
-// About you (profile + reference docs) → Done. Full-window takeover.
+// First-run wizard: Welcome → Light model → Heavy model → About you
+// (profile + reference docs) → Done. Full-window takeover.
 export function OnboardingWizard() {
   const router = useRouter();
   const [idx, setIdx] = useState(0);
@@ -197,12 +199,8 @@ export function OnboardingWizard() {
       if (await saveModel(heavy, "heavy")) setIdx(3);
       return;
     }
-    if (step.key === "tools") {
-      setIdx(4); // optional — GoogleCard manages its own connection state
-      return;
-    }
     if (step.key === "gtky") {
-      if (await saveProfileStep()) setIdx(5);
+      if (await saveProfileStep()) setIdx(4);
       return;
     }
   }
@@ -299,10 +297,9 @@ export function OnboardingWizard() {
               registry={registry}
             />
           )}
-          {step.key === "tools" && <ToolsStep stepNumber={4} />}
           {step.key === "gtky" && (
             <GtkyStep
-              stepNumber={5}
+              stepNumber={4}
               state={gtky}
               setState={setGtky}
               uploads={uploads}
@@ -327,7 +324,7 @@ export function OnboardingWizard() {
               ← Back
             </Btn>
             <div className="flex gap-2">
-              {(step.key === "heavy" || step.key === "tools" || step.key === "gtky") && (
+              {(step.key === "heavy" || step.key === "gtky") && (
                 <Btn onClick={() => setIdx(idx + 1)} disabled={saving}>
                   Skip for now
                 </Btn>

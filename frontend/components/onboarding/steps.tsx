@@ -1,9 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
 import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
-import { GoogleCard } from "@/components/settings/IntegrationsPane";
 import { KeyInput } from "@/components/settings/KeyInput";
-import { api, type ModelEntry } from "@/lib/api";
+import { type ModelEntry } from "@/lib/api";
 import { providersForTier, PROVIDERS, type ProviderMeta, type Tier } from "@/lib/providers";
 
 export interface ModelStepState {
@@ -198,25 +196,6 @@ export function ModelStep({
   );
 }
 
-export function ToolsStep({ stepNumber }: { stepNumber: number }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <PxLabel>Step {stepNumber} · Tools</PxLabel>
-        <h1 className="mt-2 text-[20px] font-bold text-ink">Connect your tools</h1>
-        <p className="mt-1 text-[13px] text-ink-muted">
-          Optional — connect Google so pMomentum can draft Docs, summarize Gmail, and check your
-          calendar. You can always do this later from Settings.
-        </p>
-      </div>
-      <GoogleCard />
-      <div className="flex items-center gap-3 rounded-[12px] border border-line bg-surface p-4 opacity-60 shadow-card">
-        <span className="text-[12.5px] text-ink-muted">Slack, Linear, and Jira are coming soon.</span>
-      </div>
-    </div>
-  );
-}
-
 export function DoneStep({
   lightName,
   heavyName,
@@ -232,14 +211,6 @@ export function DoneStep({
   finishing: boolean;
   error?: string | null;
 }) {
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  useEffect(() => {
-    api
-      .googleStatus()
-      .then((s) => setGoogleEmail(s.status === "connected" ? (s.google_email ?? "connected") : null))
-      .catch(() => setGoogleEmail(null));
-  }, []);
-
   return (
     <div className="py-3 text-center">
       <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-fg">
@@ -253,7 +224,6 @@ export function DoneStep({
       <div className="mx-auto mb-6 flex max-w-md flex-col gap-2.5 rounded-[12px] border border-line bg-surface p-4 text-left shadow-card">
         <SummaryLine label="Light model" value={lightName} />
         <SummaryLine label="Heavy model" value={heavyName} />
-        <SummaryLine label="Google" value={googleEmail ?? "not connected"} dim={!googleEmail} />
         <SummaryLine
           label="Memory & data"
           value={
