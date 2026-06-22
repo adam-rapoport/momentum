@@ -55,12 +55,12 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gemini-2.5-flash-lite": ModelPricing("0.10", "0.40"),
 
     # --- OpenAI (paid) ---
-    # gpt-5.5 per the June 2026 API pricing page; the 5.4 tiers mirror
-    # OpenAI's long-stable mid/mini pricing as a display estimate until
-    # live-verified with a billed key.
-    "gpt-5.5": ModelPricing("5.00", "30.00"),
-    "gpt-5.4": ModelPricing("1.25", "10.00"),
-    "gpt-5.4-mini": ModelPricing("0.25", "2.00"),
+    # GPT-5 family per OpenAI's published pricing; ids verified against a live
+    # key (2026-06-21). gpt-5-pro is the premium reasoning tier.
+    "gpt-5": ModelPricing("1.25", "10.00"),
+    "gpt-5-mini": ModelPricing("0.25", "2.00"),
+    "gpt-5-nano": ModelPricing("0.05", "0.40"),
+    "gpt-5-pro": ModelPricing("15.00", "120.00"),
     # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
@@ -73,10 +73,10 @@ GROQ_PRICING: dict[str, ModelPricing] = {
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
-    "openai/gpt-5.4-mini": ModelPricing("0.25", "2.00"),
+    "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
     "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
     "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),
-    "openai/gpt-5.5": ModelPricing("5.00", "30.00"),
+    "openai/gpt-5": ModelPricing("1.25", "10.00"),
 
     # --- Mistral (per mistral.ai pricing; estimates — free tier is $0) ---
     "mistral-small-latest": ModelPricing("0.10", "0.30"),

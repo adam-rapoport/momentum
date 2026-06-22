@@ -67,17 +67,41 @@ async def test_validate_key_routes_mistral_to_models_list(monkeypatch):
     assert seen["base_url"] == kv.MISTRAL_BASE_URL
 
 
-async def test_validate_key_routes_openrouter_to_chat_ping(monkeypatch):
+async def test_validate_key_routes_openrouter_to_key_endpoint(monkeypatch):
     seen = {}
 
-    async def _fake(key, base_url, model):
-        seen.update(key=key, base_url=base_url, model=model)
+    async def _fake(key):
+        seen["key"] = key
         return kv.ValidationResult(True, "ok")
 
-    monkeypatch.setattr(kv, "_validate_openai_compatible", _fake)
+    monkeypatch.setattr(kv, "_validate_openrouter", _fake)
     result = await kv.validate_key("llm:openrouter", "sk-or-x")
+    assert result.ok and seen["key"] == "sk-or-x"
+
+
+async def test_validate_key_routes_openai_to_models_list(monkeypatch):
+    seen = {}
+
+    async def _fake(key, base_url):
+        seen.update(key=key, base_url=base_url)
+        return kv.ValidationResult(True, "ok")
+
+    monkeypatch.setattr(kv, "_validate_models_list", _fake)
+    result = await kv.validate_key("llm:openai", "sk-x")
     assert result.ok
-    assert seen["base_url"] == kv.OPENROUTER_BASE_URL
+    assert seen["base_url"] == kv.OPENAI_BASE_URL
+
+
+async def test_validate_openrouter_ok(monkeypatch):
+    _mock_async_client(monkeypatch, 200)
+    result = await kv._validate_openrouter("sk-or-test")
+    assert result.ok
+
+
+async def test_validate_openrouter_rejected(monkeypatch):
+    _mock_async_client(monkeypatch, 401)
+    result = await kv._validate_openrouter("sk-or-bad")
+    assert not result.ok
 
 
 async def test_validate_key_rejects_empty_key():

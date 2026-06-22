@@ -3,7 +3,7 @@ implementation (app.core.openai_compat) at OpenRouter.
 
 OpenRouter serves the OpenAI Chat Completions API at
 https://openrouter.ai/api/v1 and aggregates models from many labs behind one
-key. Model ids are vendor/model (e.g. "openai/gpt-5.5").
+key. Model ids are vendor/model (e.g. "openai/gpt-5").
 """
 from collections.abc import AsyncIterator
 

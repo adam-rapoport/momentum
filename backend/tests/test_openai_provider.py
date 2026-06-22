@@ -12,8 +12,8 @@ from app.core import model_registry, openai_client
 
 def test_openai_models_registered():
     openai_ids = {m.id for m in model_registry.REGISTRY if m.provider == "openai"}
-    assert "gpt-5.5" in openai_ids
-    assert "gpt-5.4-mini" in openai_ids
+    assert "gpt-5" in openai_ids
+    assert "gpt-5-nano" in openai_ids
 
 
 def test_openai_models_visible_only_when_provider_configured():
@@ -23,7 +23,7 @@ def test_openai_models_visible_only_when_provider_configured():
             configured_providers={"openai"}
         )
     }
-    assert "gpt-5.5" in visible
+    assert "gpt-5" in visible
     # Other providers' models are hidden when only OpenAI is configured.
     assert all(
         m.id not in visible

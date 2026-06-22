@@ -37,19 +37,16 @@ OPENAI_BASE_URL = "https://api.openai.com/v1"
 ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models"
 
 # Cheapest/fastest model per OpenAI-compatible provider, used only for the
-# 1-token validation ping.
+# validation ping. (OpenAI and OpenRouter are validated via free, model-less
+# endpoints instead — see validate_key — so they're not listed here.)
 _PING_MODEL = {
     "llm:groq": "llama-3.1-8b-instant",
     "llm:google_ai": "gemini-2.5-flash",
-    "llm:openai": "gpt-5.4-mini",
-    "llm:openrouter": "openai/gpt-5.4-mini",
     "search:perplexity": "sonar",
 }
 _BASE_URL = {
     "llm:groq": settings.groq_base_url,
     "llm:google_ai": GOOGLE_BASE_URL,
-    "llm:openai": OPENAI_BASE_URL,
-    "llm:openrouter": OPENROUTER_BASE_URL,
     "search:perplexity": PERPLEXITY_BASE_URL,
 }
 
@@ -70,7 +67,8 @@ async def _validate_openai_compatible(
         await client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "ping"}],
-            max_tokens=1,
+            # >= 16: some providers (e.g. Perplexity) reject a smaller cap.
+            max_tokens=16,
         )
         return ValidationResult(True, "Key works.")
     except (AuthenticationError, PermissionDeniedError):
@@ -186,6 +184,28 @@ async def _validate_tavily(api_key: str) -> ValidationResult:
         return ValidationResult(False, f"Couldn't validate with Tavily: {e}")
 
 
+async def _validate_openrouter(api_key: str) -> ValidationResult:
+    """OpenRouter: GET /key is authenticated and free. (GET /models is public,
+    so it can't tell a good key from a bad one — and a chat ping depends on a
+    specific model id, which we'd rather not couple validation to.)"""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            res = await client.get(
+                f"{OPENROUTER_BASE_URL}/key",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    except Exception as e:  # noqa: BLE001 — network/timeout/etc.
+        logger.warning("openrouter key validation error: %s", e)
+        return ValidationResult(False, f"Couldn't reach OpenRouter: {e}")
+    if res.status_code == 200:
+        return ValidationResult(True, "Key works.")
+    if res.status_code in (401, 403):
+        return ValidationResult(False, "OpenRouter rejected this key (HTTP 401).")
+    if res.status_code == 429:
+        return ValidationResult(True, "Key is valid (currently rate-limited).")
+    return ValidationResult(False, f"OpenRouter returned HTTP {res.status_code}.")
+
+
 async def validate_key(provider: str, key: str) -> ValidationResult:
     """Validate `key` against `provider` with a real call. Returns a
     ValidationResult; never raises for provider-side failures (only for an
@@ -201,6 +221,12 @@ async def validate_key(provider: str, key: str) -> ValidationResult:
         return await _validate_anthropic(key)
     if provider == "llm:mistral":
         return await _validate_models_list(key, MISTRAL_BASE_URL)
+    if provider == "llm:openai":
+        # Free, model-less auth check (GET /v1/models). Avoids the GPT-5
+        # max_completion_tokens rename and the min-reply-length floor.
+        return await _validate_models_list(key, OPENAI_BASE_URL)
+    if provider == "llm:openrouter":
+        return await _validate_openrouter(key)
     if provider in _PING_MODEL:
         return await _validate_openai_compatible(
             key, _BASE_URL[provider], _PING_MODEL[provider]

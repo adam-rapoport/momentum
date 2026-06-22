@@ -132,31 +132,39 @@ REGISTRY: tuple[ModelEntry, ...] = (
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
-    # IDs checked against developers.openai.com/api/docs/models (2026-06-11).
+    # IDs verified live against the OpenAI API (2026-06-21).
     # The gpt-4o generation is deprecated upstream and was removed here.
     ModelEntry(
-        id="gpt-5.5",
-        context_window=1_000_000,
-        provider="openai",
-        display_name="GPT-5.5 (OpenAI)",
-        role="either",
-        notes="OpenAI's current flagship. Paid — needs billing on your OpenAI key.",
-    ),
-    ModelEntry(
-        id="gpt-5.4",
+        id="gpt-5",
         context_window=400_000,
         provider="openai",
-        display_name="GPT-5.4 (OpenAI)",
+        display_name="GPT-5 (OpenAI)",
         role="either",
-        notes="More affordable previous flagship. Paid — needs billing.",
+        notes="OpenAI's flagship. Paid — needs billing on your OpenAI key.",
     ),
     ModelEntry(
-        id="gpt-5.4-mini",
+        id="gpt-5-mini",
         context_window=400_000,
         provider="openai",
-        display_name="GPT-5.4 mini (OpenAI)",
+        display_name="GPT-5 mini (OpenAI)",
+        role="either",
+        notes="Faster, cheaper GPT-5 — a balanced everyday pick. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5-nano",
+        context_window=400_000,
+        provider="openai",
+        display_name="GPT-5 nano (OpenAI)",
         role="light",
-        notes="Fast, cheap OpenAI mini model — a solid light pick. Paid.",
+        notes="Cheapest, fastest GPT-5 — a solid light pick. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5-pro",
+        context_window=400_000,
+        provider="openai",
+        display_name="GPT-5 pro (OpenAI)",
+        role="heavy",
+        notes="OpenAI's most capable model for hard drafting/reasoning. Paid, pricey.",
     ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
@@ -192,10 +200,10 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # One key unlocks models from many labs; ids are vendor/model. Curated
     # picks below — re-check openrouter.ai/models when refreshing.
     ModelEntry(
-        id="openai/gpt-5.4-mini",
+        id="openai/gpt-5-mini",
         context_window=400_000,
         provider="openrouter",
-        display_name="GPT-5.4 mini (OpenRouter)",
+        display_name="GPT-5 mini (OpenRouter)",
         role="light",
         notes="Cheap, fast light pick via OpenRouter.",
     ),
@@ -216,10 +224,10 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Claude Sonnet served via OpenRouter — good heavy pick.",
     ),
     ModelEntry(
-        id="openai/gpt-5.5",
-        context_window=1_000_000,
+        id="openai/gpt-5",
+        context_window=400_000,
         provider="openrouter",
-        display_name="GPT-5.5 (OpenRouter)",
+        display_name="GPT-5 (OpenRouter)",
         role="heavy",
         notes="OpenAI's flagship via OpenRouter.",
     ),
