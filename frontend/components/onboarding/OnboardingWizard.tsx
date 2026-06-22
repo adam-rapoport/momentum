@@ -23,7 +23,7 @@ const STEPS: { key: StepKey; label: string }[] = [
 ];
 
 // Every provider can fill either slot; these are just the recommended
-// defaults to pre-select (Groq for fast light work, Google/Gemma for stronger
+// defaults to pre-select (Groq for fast light work, Google/Gemini for stronger
 // heavy drafting). The user can switch to any other provider from the cards.
 const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
   light: "groq",

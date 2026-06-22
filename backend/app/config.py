@@ -58,22 +58,16 @@ class Settings(BaseSettings):
     # Name kept as `groq_heavy_model` for compatibility; the value can now
     # be ANY provider's model ID (Groq, Google, ...). Provider is inferred
     # from the model-name prefix by app.core.llm.
-    # Sprint 4 sequence: Groq free-tier heavy models all hit per-model TPM
-    # ceilings on our ~9k token drafting prompt. Gemini 3 Flash Preview
-    # works for single turns but Gemini 3 preview models require a
-    # `thought_signature` on tool-call history that the OpenAI-compat
-    # endpoint doesn't surface — breaks on the second turn of any
-    # tool-using skill workflow. Landed on gemini-2.5-flash: stable (not
-    # preview), no thought_signature requirement, still a real quality
-    # step up over Scout for drafting.
-    # Upgrade path for later:
-    # - gemini-2.5-pro (stable, stronger writing, free tier)
-    # - gemini-3.x models (would need native Gen AI SDK, ~1 day of work
-    #   to replace the OpenAI-compat client — see chunk writeup)
+    # Default heavy model: gemini-3.5-flash via the native Gen AI SDK path
+    # (app.core.google_genai_client). Replaces the earlier gemma-4-31b-it
+    # default, which the OpenAI-compat endpoint couldn't drive reliably for
+    # structured output — doc memory-extraction returned 0 items and some
+    # skills produced no deliverable (2026-06 testing). Gemini 3.5 Flash is
+    # stable, fast, cheap, and handles the tool-using skill workflows well.
     # Env var alias stays GROQ_HEAVY_MODEL to avoid breaking existing .env
     # files; rename on next sprint if we keep accumulating providers.
     groq_heavy_model: str = Field(
-        "gemma-4-31b-it", alias="GROQ_HEAVY_MODEL"
+        "gemini-3.5-flash", alias="GROQ_HEAVY_MODEL"
     )
     groq_base_url: str = Field("https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
 
