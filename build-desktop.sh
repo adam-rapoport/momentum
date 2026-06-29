@@ -46,6 +46,13 @@ BACKEND="$ROOT/backend"
 FRONTEND="$ROOT/frontend"
 SIDECAR="pmomentum-backend"
 
+# Which Tauri bundle targets to produce. Default = app + dmg (the local
+# one-command experience). CI sets PM_BUNDLES=app: Tauri's bundle_dmg.sh needs
+# a Finder/GUI session to lay out the .dmg window and fails on headless
+# runners, so CI builds the .app here and wraps its own plain, headless-safe
+# .dmg with hdiutil instead (see .github/workflows/desktop-build.yml).
+BUNDLES="${PM_BUNDLES:-app,dmg}"
+
 # Derive the target triple from the host toolchain so the sidecar name and the
 # Tauri target always match what PyInstaller actually built (PyInstaller has no
 # cross-compile — it freezes for the host arch, full stop).
@@ -81,10 +88,10 @@ echo "==> [2/4] Place the sidecar where Tauri expects it (target-triple suffix)"
 mkdir -p "$FRONTEND/src-tauri/binaries"
 cp -p "dist/$SIDECAR" "$FRONTEND/src-tauri/binaries/$SIDECAR-$TARGET_TRIPLE"
 
-echo "==> [3/4] Build the Tauri app + .dmg (release; outer app left unsigned — see header)"
+echo "==> [3/4] Build the Tauri bundle(s): $BUNDLES (release; outer app left unsigned — see header)"
 cd "$FRONTEND"
 export PATH="$HOME/.cargo/bin:$PATH"
-npx tauri build --target "$TARGET_TRIPLE"
+npx tauri build --target "$TARGET_TRIPLE" --bundles "$BUNDLES"
 
 echo "==> [4/4] Artifacts:"
 BUNDLE="$FRONTEND/src-tauri/target/$TARGET_TRIPLE/release/bundle"

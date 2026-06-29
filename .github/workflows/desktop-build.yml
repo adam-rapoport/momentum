@@ -65,12 +65,35 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Build the .app only (PM_BUNDLES=app). Tauri's bundle_dmg.sh needs a
+      # Finder/GUI session to lay out the DMG window and fails on headless
+      # runners, so we build the app here and wrap a plain (headless-safe) DMG
+      # with hdiutil below.
       - name: Build desktop app (unsigned, native arm64)
+        env:
+          PM_BUNDLES: app
         run: ./build-desktop.sh
+
+      # hdiutil create -srcfolder is a pure CLI op (no Finder/GUI) — reliable on
+      # headless runners. Produces a drag-to-Applications DMG (app + an
+      # Applications symlink), just without bundle_dmg.sh's background styling.
+      - name: Package a headless-safe .dmg (drag-to-Applications)
+        run: |
+          set -euo pipefail
+          APP="frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pMomentum.app"
+          test -d "$APP" || { echo "ERROR: $APP not found"; exit 1; }
+          VERSION="$(node -p "require('./frontend/src-tauri/tauri.conf.json').version")"
+          DMG="pMomentum_${VERSION}_aarch64.dmg"
+          STAGING="$(mktemp -d)"
+          cp -R "$APP" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "pMomentum" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          rm -rf "$STAGING"
+          echo "Built $DMG"; ls -lh "$DMG"
 
       - name: Upload arm64 .dmg artifact
         uses: actions/upload-artifact@v4
         with:
           name: pmomentum-macos-arm64-dmg
-          path: frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          path: pMomentum_*_aarch64.dmg
           if-no-files-found: error
