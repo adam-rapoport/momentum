@@ -82,8 +82,10 @@ export function Toolbar({ sessionId, title }: ToolbarProps) {
           }
         >
           <StatusDot tone={wsConnected ? "ok" : "danger"} size={6} />
+          {/* Reflects the backend connection, not where the model runs —
+              "local" read as "local model" when on a cloud provider. */}
           <span className="font-mono text-[10.5px] text-ink-dim">
-            {wsConnected ? "local" : "offline"}
+            {wsConnected ? "connected" : "reconnecting"}
           </span>
         </span>
         <IconBtn

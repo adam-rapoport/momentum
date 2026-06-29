@@ -2,7 +2,7 @@
 name: write-prd
 description: Guided Product Requirements Document authoring workflow.
 slash_command: write-prd
-trigger_keywords: ["write a prd", "draft a prd", "create a prd", "write the prd"]
+trigger_keywords: ["write a prd", "draft a prd", "create a prd", "write the prd", "write a spec", "draft a spec", "create a spec", "product requirements doc", "product requirements document"]
 required_tools: ["RecallMemory", "SearchMemories", "WriteDocument", "EditDocument", "ReadDocument", "AwaitReview"]
 phases: ["intake", "drafting", "review"]
 ---

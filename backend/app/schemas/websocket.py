@@ -16,6 +16,9 @@ class InboundMessage(BaseModel):
     type: Literal["session.message"]
     session_id: UUID
     content: str
+    # IDs from POST /chat/attachments — docs the user attached to this message.
+    # The engine pulls their cached text from the KV store for this turn.
+    attachment_ids: list[str] = []
 
 
 class InboundCancel(BaseModel):
@@ -79,6 +82,14 @@ class OutboundStreamDone(BaseModel):
     session_id: UUID
     usage: StreamUsage
     metadata: StreamDoneMetadata
+
+
+class OutboundSessionRenamed(BaseModel):
+    # Sent after the first turn when the engine generates a short AI title for
+    # the session, so the sidebar/toolbar update without a refetch.
+    type: Literal["session.renamed"] = "session.renamed"
+    session_id: UUID
+    title: str
 
 
 class OutboundError(BaseModel):

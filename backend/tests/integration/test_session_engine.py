@@ -588,17 +588,148 @@ async def test_revise_keeps_skill_active_and_carries_detail(db, seeded, kv, monk
     assert "add a non-goals section" in note["content"]
 
 
-async def test_restart_clears_skill_state(db, seeded, kv, monkeypatch):
+async def test_restart_reenters_skill_from_top(db, seeded, kv, monkeypatch):
+    """`/restart` during a deliverable review re-runs the skill from the top:
+    the active skill is KEPT (its SKILL.md stays injected), the prior draft is
+    dropped, and the model is told to begin again from the first step."""
     session, _ = await _pause_on_deliverable(db, seeded, kv, monkeypatch)
 
-    stub = _scripted_stream([_result(text="Fresh start.")])
+    stub = _scripted_stream([_result(text="Starting over.")])
     monkeypatch.setattr(session_engine, "stream_message", stub)
     await _run_turn(db, kv, session.id, "/restart")
 
     await db.refresh(session)
     assert session.status == "active"
+    # Skill stays active so the workflow re-runs (was: cleared).
+    assert session.session_metadata.get("active_skill") == "write-prd"
+    assert "pending_deliverable" not in session.session_metadata
+    note = stub.calls[0]["messages"][-1]
+    assert note["role"] == "system"
+    assert "restart" in note["content"].lower()
+
+
+async def test_cancel_clears_skill_state(db, seeded, kv, monkeypatch):
+    """`cancel` (distinct from `restart`) abandons the skill outright."""
+    session, _ = await _pause_on_deliverable(db, seeded, kv, monkeypatch)
+
+    stub = _scripted_stream([_result(text="Cancelled.")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+    await _run_turn(db, kv, session.id, "cancel")
+
+    await db.refresh(session)
+    assert session.status == "active"
     assert "active_skill" not in session.session_metadata
     assert "pending_deliverable" not in session.session_metadata
+
+
+# ---------- Chat attachments (C2) ----------
+
+
+async def test_resolve_attachments_marker_and_context(kv):
+    await kv.set(
+        "attachment:a1",
+        json.dumps({"filename": "plan.pdf", "text": "roadmap details"}),
+        ex=60,
+    )
+    marker, context = await session_engine._resolve_attachments(kv, ["a1", "missing"])
+    assert marker.startswith("📎 Attached:") and "plan.pdf" in marker
+    assert "roadmap details" in context
+    # No ids → empty.
+    assert await session_engine._resolve_attachments(kv, []) == ("", "")
+    assert await session_engine._resolve_attachments(kv, None) == ("", "")
+
+
+async def test_attachment_text_injected_into_turn(db, seeded, kv, monkeypatch):
+    session = await _make_session(db, seeded)
+    await kv.set(
+        "attachment:doc1",
+        json.dumps({"filename": "spec.md", "text": "SECRET ROADMAP TEXT"}),
+        ex=60,
+    )
+    stub = _scripted_stream([_result(text="ok")])
+    monkeypatch.setattr(session_engine, "stream_message", stub)
+    [
+        e
+        async for e in process_message(
+            db=db,
+            kv=kv,
+            session_id=session.id,
+            user_text="summarize this",
+            attachment_ids=["doc1"],
+        )
+    ]
+    # The model saw the full doc text in its user message…
+    sent = stub.calls[0]["messages"]
+    user_msgs = [m for m in sent if m["role"] == "user"]
+    assert any("SECRET ROADMAP TEXT" in m["content"] for m in user_msgs)
+    # …but the persisted user message keeps only the compact marker.
+    msgs = await _messages_for(db, session.id)
+    persisted = next(m for m in msgs if m.role == "user")
+    text = "".join(
+        b.get("text", "") for b in persisted.content if b.get("type") == "text"
+    )
+    assert "📎 Attached: spec.md" in text
+    assert "SECRET ROADMAP TEXT" not in text
+
+
+# ---------- AI-generated session titles (C3) ----------
+
+
+async def test_maybe_generate_title_replaces_prefix(db, seeded, kv, monkeypatch):
+    session = await _make_session(db, seeded)
+    # The first turn auto-titles the session with the message prefix.
+    monkeypatch.setattr(session_engine, "stream_message", _scripted_stream([_result(text="ok")]))
+    await _run_turn(db, kv, session.id, "help me plan the Q3 onboarding revamp")
+    await db.refresh(session)
+    assert session.title.startswith("help me plan")
+
+    # The light model returns a concise title; it replaces the prefix.
+    monkeypatch.setattr(
+        session_engine, "stream_message", _scripted_stream([_result(text="Q3 Onboarding Revamp")])
+    )
+    new_title = await session_engine.maybe_generate_title(db, session.id)
+    assert new_title == "Q3 Onboarding Revamp"
+    await db.refresh(session)
+    assert session.title == "Q3 Onboarding Revamp"
+
+
+async def test_maybe_generate_title_skips_after_first_turn(db, seeded, kv, monkeypatch):
+    session = await _make_session(db, seeded)
+    monkeypatch.setattr(session_engine, "stream_message", _scripted_stream([_result(text="ok")]))
+    await _run_turn(db, kv, session.id, "first message here")
+    # A second turn bumps turn_count past 1 → title generation is skipped.
+    monkeypatch.setattr(session_engine, "stream_message", _scripted_stream([_result(text="ok2")]))
+    await _run_turn(db, kv, session.id, "second message")
+    new_title = await session_engine.maybe_generate_title(db, session.id)
+    assert new_title is None
+
+
+async def test_maybe_generate_title_retitles_home_screen_title(db, seeded, kv, monkeypatch):
+    # The home screen pre-sets a derived title (not None); the first-turn
+    # auto-titler must still replace it (the regression: it used to no-op).
+    session = await _make_session(db, seeded, title="Help me plan the q3 onb")
+    monkeypatch.setattr(session_engine, "stream_message", _scripted_stream([_result(text="ok")]))
+    await _run_turn(db, kv, session.id, "help me plan the Q3 onboarding revamp")
+    monkeypatch.setattr(
+        session_engine, "stream_message", _scripted_stream([_result(text="Q3 Onboarding Revamp")])
+    )
+    new_title = await session_engine.maybe_generate_title(db, session.id)
+    assert new_title == "Q3 Onboarding Revamp"
+
+
+async def test_maybe_generate_title_keeps_locked_title(db, seeded, kv, monkeypatch):
+    # A title the user renamed (title_locked) is never clobbered.
+    session = await _make_session(
+        db, seeded, session_metadata={"title_locked": True}
+    )
+    session.title = "My Custom Title"
+    await db.commit()
+    monkeypatch.setattr(session_engine, "stream_message", _scripted_stream([_result(text="ok")]))
+    await _run_turn(db, kv, session.id, "hello there")
+    new_title = await session_engine.maybe_generate_title(db, session.id)
+    assert new_title is None
+    await db.refresh(session)
+    assert session.title == "My Custom Title"
 
 
 async def test_free_text_reply_leaves_pause_in_place(db, seeded, kv, monkeypatch):

@@ -12,7 +12,13 @@ import type {
 // refetch, the boot poll, a panel load) hangs with it. 15s is generous for
 // localhost; uploads get longer (the backend runs LLM extraction on them).
 const DEFAULT_TIMEOUT_MS = 15_000;
-const UPLOAD_TIMEOUT_MS = 120_000;
+// Uploads wait on a *synchronous* heavy-model extraction pass, and the slower
+// models (GPT-5 / GPT-5-Pro and other reasoning models) can take minutes on a
+// long doc. The old 120s ceiling made those uploads report a false "failed"
+// even though the backend finished and saved the reference + memories. 5
+// minutes covers the realistic worst case while keeping the inline
+// "N memories created" confirmation.
+const UPLOAD_TIMEOUT_MS = 300_000;
 
 function timeoutError(err: unknown, timeoutMs: number): Error | null {
   if (
@@ -80,7 +86,7 @@ export interface DocumentUploadResult {
 // Content-Type — the browser sets the multipart boundary. The auth header
 // still applies (these endpoints are not token-exempt). The long timeout
 // covers the backend's heavy-model extraction step.
-async function uploadFileTo(path: string, file: File): Promise<DocumentUploadResult> {
+async function uploadFileTo<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
   const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
@@ -99,11 +105,23 @@ async function uploadFileTo(path: string, file: File): Promise<DocumentUploadRes
     const text = await res.text().catch(() => "");
     throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
   }
-  return (await res.json()) as DocumentUploadResult;
+  return (await res.json()) as T;
+}
+
+// Result of POST /chat/attachments — a doc parsed and cached for the next turn.
+export interface ChatAttachmentResult {
+  attachment_id: string;
+  filename: string;
+  char_count: number;
 }
 
 export const api = {
-  listSessions: () => request<Session[]>("/api/v1/sessions"),
+  // `q` searches titles AND message contents (server-side); omit for the full
+  // list.
+  listSessions: (q?: string) =>
+    request<Session[]>(
+      `/api/v1/sessions${q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`,
+    ),
   getSession: (id: string) => request<SessionDetail>(`/api/v1/sessions/${id}`),
   createSession: (body: { title?: string }) =>
     request<Session>("/api/v1/sessions", {
@@ -182,9 +200,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  uploadDocument: (file: File) => uploadFileTo("/api/v1/onboarding/documents", file),
+  uploadDocument: (file: File) =>
+    uploadFileTo<DocumentUploadResult>("/api/v1/onboarding/documents", file),
   // Same pipeline, triggered from the Memory panel after onboarding.
-  uploadMemoryDocument: (file: File) => uploadFileTo("/api/v1/memory/documents", file),
+  uploadMemoryDocument: (file: File) =>
+    uploadFileTo<DocumentUploadResult>("/api/v1/memory/documents", file),
+  // Parse + cache a doc to attach to the next chat message (no permanent memory).
+  uploadChatAttachment: (file: File) =>
+    uploadFileTo<ChatAttachmentResult>("/api/v1/chat/attachments", file),
 
   // ── C8 Web search provider preference ──
   getSearchPreferences: () =>

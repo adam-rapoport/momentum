@@ -32,6 +32,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # Llama 4 Scout is our Sprint 2 default after the model hedge.
     "meta-llama/llama-4-scout-17b-16e-instruct": ModelPricing("0.11", "0.34"),
     "qwen/qwen3-32b": ModelPricing("0.29", "0.59"),
+    "qwen/qwen3.6-27b": ModelPricing("0.29", "0.59"),
     "openai/gpt-oss-120b": ModelPricing("0.15", "0.75"),
     "openai/gpt-oss-20b": ModelPricing("0.10", "0.50"),
 
@@ -74,9 +75,13 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
     "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
+    "anthropic/claude-haiku-4.5": ModelPricing("1.00", "5.00"),
     "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
     "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),
     "openai/gpt-5": ModelPricing("1.25", "10.00"),
+    "deepseek/deepseek-chat-v3.1": ModelPricing("0.21", "0.79"),
+    "deepseek/deepseek-r1": ModelPricing("0.70", "2.50"),
+    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
 
     # --- Mistral (per mistral.ai pricing; estimates — free tier is $0) ---
     "mistral-small-latest": ModelPricing("0.10", "0.30"),

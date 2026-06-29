@@ -2,7 +2,13 @@
 import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
 import { KeyInput } from "@/components/settings/KeyInput";
 import { type ModelEntry } from "@/lib/api";
-import { providersForTier, PROVIDERS, type ProviderMeta, type Tier } from "@/lib/providers";
+import {
+  providersForTier,
+  PROVIDERS,
+  SEARCH_PROVIDERS,
+  type ProviderMeta,
+  type Tier,
+} from "@/lib/providers";
 
 export interface ModelStepState {
   providerId: string | null;
@@ -106,92 +112,193 @@ export function ModelStep({
         {providers.map((p) => {
           const selected = state.providerId === p.id;
           return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setState({ providerId: p.id, key: "", model: null })}
-              className={`rounded-[12px] border p-3.5 text-left transition-colors ${
-                selected
-                  ? "border-accent bg-accent-tint-2 shadow-[0_0_0_3px_var(--accent-tint)]"
-                  : "border-line bg-surface hover:border-line-strong"
-              }`}
-            >
-              <span className="flex items-center gap-2.5">
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    selected ? "border-accent" : "border-line-strong"
-                  }`}
-                >
-                  {selected && <span className="h-2 w-2 rounded-full bg-accent" />}
+            <div key={p.id} className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setState({ providerId: p.id, key: "", model: null })}
+                className={`rounded-[12px] border p-3.5 text-left transition-colors ${
+                  selected
+                    ? "border-accent bg-accent-tint-2 shadow-[0_0_0_3px_var(--accent-tint)]"
+                    : "border-line bg-surface hover:border-line-strong"
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? "border-accent" : "border-line-strong"
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-accent" />}
+                  </span>
+                  <span className="text-[14px] font-semibold text-ink">{p.name}</span>
                 </span>
-                <span className="text-[14px] font-semibold text-ink">{p.name}</span>
-              </span>
-              <span className="mt-1 block pl-[26px] text-[12.5px] text-ink-muted">
-                {p.description}
-              </span>
-              <span className="mt-1 block pl-[26px] font-mono text-[11px] text-ink-dim">
-                {p.pricing}
-              </span>
-            </button>
+                <span className="mt-1 block pl-[26px] text-[12.5px] text-ink-muted">
+                  {p.description}
+                </span>
+                <span className="mt-1 block pl-[26px] font-mono text-[11px] text-ink-dim">
+                  {p.pricing}
+                </span>
+              </button>
+
+              {/* Model picker + key input render INLINE under the selected
+                  provider (was: stacked below the entire provider list, so the
+                  key box for a top provider landed at the very bottom). */}
+              {selected && chosen && (
+                <div className="flex flex-col gap-3 pl-[26px]">
+                  {chosen.id === "ollama" && (
+                    <div className="text-[12.5px] text-ink-muted">
+                      Local models are whatever you&apos;ve pulled with Ollama — we&apos;ll pick your
+                      first tool-capable one automatically. You can change it any time in Settings →
+                      Models.
+                    </div>
+                  )}
+
+                  {providerModels.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="text-[12.5px] font-medium text-ink-muted">Model</label>
+                      <select
+                        value={modelPick}
+                        onChange={(e) => setState({ ...state, model: e.target.value })}
+                        className="rounded-[7px] border border-line-strong bg-surface px-2 py-1.5 text-[13px] text-ink"
+                      >
+                        {providerModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="rounded-[12px] border border-line bg-surface p-4">
+                    {configured && (
+                      <div className="mb-3.5">
+                        <Banner kind="success" title={`${chosen.name} is already connected`}>
+                          Leave the field blank to keep using your saved key, or paste a new one to
+                          replace it.
+                        </Banner>
+                      </div>
+                    )}
+                    <KeyInput
+                      provider={chosen}
+                      value={state.key}
+                      onChange={(k) => setState({ ...state, key: k })}
+                      autoFocus
+                    />
+                    {error && (
+                      <div className="mt-3.5">
+                        <Banner
+                          kind="danger"
+                          title={
+                            chosen.id === "ollama"
+                              ? "Couldn't set up Ollama"
+                              : "Couldn't verify that key"
+                          }
+                        >
+                          {error}
+                        </Banner>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      {chosen?.id === "ollama" && (
-        <div className="text-[12.5px] text-ink-muted">
-          Local models are whatever you&apos;ve pulled with Ollama — we&apos;ll pick your first
-          tool-capable one automatically. You can change it any time in Settings → Models.
-        </div>
-      )}
+export interface WebSearchStepState {
+  providerId: "tavily" | "perplexity";
+  key: string;
+}
 
-      {chosen && providerModels.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <label className="text-[12.5px] font-medium text-ink-muted">Model</label>
-          <select
-            value={modelPick}
-            onChange={(e) => setState({ ...state, model: e.target.value })}
-            className="rounded-[7px] border border-line-strong bg-surface px-2 py-1.5 text-[13px] text-ink"
-          >
-            {providerModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name}
-              </option>
-            ))}
-          </select>
-          {state.model === null && (
-            <span className="font-mono text-[10.5px] text-ink-dim">recommended</span>
-          )}
-        </div>
-      )}
+// Optional web-search setup. Mirrors ModelStep's layout (provider cards with an
+// inline key input under the selected one) but every path is skippable.
+export function WebSearchStep({
+  stepNumber,
+  state,
+  setState,
+  error,
+}: {
+  stepNumber: number;
+  state: WebSearchStepState;
+  setState: (s: WebSearchStepState) => void;
+  error?: string | null;
+}) {
+  const providers = Object.values(SEARCH_PROVIDERS);
+  const chosen = SEARCH_PROVIDERS[state.providerId];
 
-      {chosen && (
-        <div className="rounded-[12px] border border-line bg-surface p-4">
-          {configured && (
-            <div className="mb-3.5">
-              <Banner kind="success" title={`${chosen.name} is already connected`}>
-                Leave the field blank to keep using your saved key, or paste a new one to replace
-                it.
-              </Banner>
-            </div>
-          )}
-          <KeyInput
-            provider={chosen}
-            value={state.key}
-            onChange={(k) => setState({ ...state, key: k })}
-            autoFocus
-          />
-          {error && (
-            <div className="mt-3.5">
-              <Banner
-                kind="danger"
-                title={chosen.id === "ollama" ? "Couldn't set up Ollama" : "Couldn't verify that key"}
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <PxLabel>Step {stepNumber} · Web search · Optional</PxLabel>
+        <h1 className="mt-2 text-[20px] font-bold text-ink">Let pMomentum search the web</h1>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Optional. Adds live web search to research-style asks and the <code>/deep</code> command.
+          Skip and add it any time in Settings → Web search.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        {providers.map((p) => {
+          const selected = state.providerId === p.id;
+          return (
+            <div key={p.id} className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setState({ providerId: p.id as "tavily" | "perplexity", key: "" })
+                }
+                className={`rounded-[12px] border p-3.5 text-left transition-colors ${
+                  selected
+                    ? "border-accent bg-accent-tint-2 shadow-[0_0_0_3px_var(--accent-tint)]"
+                    : "border-line bg-surface hover:border-line-strong"
+                }`}
               >
-                {error}
-              </Banner>
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? "border-accent" : "border-line-strong"
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-accent" />}
+                  </span>
+                  <span className="text-[14px] font-semibold text-ink">{p.name}</span>
+                </span>
+                <span className="mt-1 block pl-[26px] text-[12.5px] text-ink-muted">
+                  {p.description}
+                </span>
+                <span className="mt-1 block pl-[26px] font-mono text-[11px] text-ink-dim">
+                  {p.pricing}
+                </span>
+              </button>
+
+              {selected && (
+                <div className="flex flex-col gap-3 pl-[26px]">
+                  <div className="rounded-[12px] border border-line bg-surface p-4">
+                    <KeyInput
+                      provider={chosen}
+                      value={state.key}
+                      onChange={(k) => setState({ ...state, key: k })}
+                      autoFocus
+                    />
+                    {error && (
+                      <div className="mt-3.5">
+                        <Banner kind="danger" title="Couldn't verify that key">
+                          {error}
+                        </Banner>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

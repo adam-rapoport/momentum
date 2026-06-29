@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import Text, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.default_user import get_default_project, get_default_user
@@ -40,13 +40,26 @@ async def create_session(payload: SessionCreate, db: AsyncSession = Depends(get_
 
 
 @router.get("", response_model=list[SessionRead])
-async def list_sessions(db: AsyncSession = Depends(get_db)) -> list[Session]:
+async def list_sessions(
+    q: str | None = None, db: AsyncSession = Depends(get_db)
+) -> list[Session]:
     user = await get_default_user(db)
-    stmt = (
-        select(Session)
-        .where(Session.user_id == user.id, Session.status != "archived")
-        .order_by(Session.updated_at.desc())
+    stmt = select(Session).where(
+        Session.user_id == user.id, Session.status != "archived"
     )
+    if q and q.strip():
+        # Search the title OR any message's content. Message.content is a JSON
+        # list of blocks; casting it to text lets a single LIKE find phrases
+        # inside the conversation (portable across SQLite + Postgres). ilike()
+        # compiles to a case-insensitive match on both dialects.
+        pattern = f"%{q.strip()}%"
+        msg_match = select(Message.session_id).where(
+            cast(Message.content, Text).ilike(pattern)
+        )
+        stmt = stmt.where(
+            or_(Session.title.ilike(pattern), Session.id.in_(msg_match))
+        )
+    stmt = stmt.order_by(Session.updated_at.desc())
     return list((await db.scalars(stmt)).all())
 
 
@@ -87,6 +100,11 @@ async def update_session(
         raise HTTPException(status_code=404, detail="session not found")
     if payload.title is not None:
         session.title = payload.title
+        # A manual rename locks the title so the engine's first-turn auto-titler
+        # won't overwrite it (JSONB needs a whole-dict reassign to be tracked).
+        meta = dict(session.session_metadata or {})
+        meta["title_locked"] = True
+        session.session_metadata = meta
     if payload.status is not None:
         session.status = payload.status
     await db.commit()

@@ -34,10 +34,8 @@ def test_llm_provider_for_model_maps_new_providers():
 
 
 def test_llm_provider_for_model_defaults_to_groq():
-    assert (
-        credentials.llm_provider_for_model("meta-llama/llama-4-scout-17b-16e-instruct")
-        == "llm:groq"
-    )
+    # A registered Groq slash-id resolves to groq, not openrouter.
+    assert credentials.llm_provider_for_model("openai/gpt-oss-20b") == "llm:groq"
     assert credentials.llm_provider_for_model("llama-3.1-8b-instant") == "llm:groq"
 
 

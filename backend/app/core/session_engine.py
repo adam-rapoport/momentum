@@ -25,7 +25,11 @@ from app.core import credentials, model_registry
 from app.core.documents import router as docs_router
 from app.core.llm import stream_message
 from app.core.llm_types import StreamChunk, StreamResult
-from app.core.model_router import parse_deep_flag, select_model
+from app.core.model_router import (
+    NoProviderConfiguredError,
+    parse_deep_flag,
+    select_model,
+)
 from app.core.pending_actions import (
     clear_pending_action,
     execute_pending_action,
@@ -254,9 +258,16 @@ _APPROVE_WORDS = {
     "/approve", "approve", "approved", "looks good", "lgtm",
     "yes", "yes send it", "send it", "go ahead", "yes go ahead",
 }
+# True "do it again" intent — restarts the skill workflow from the top.
 _RESTART_WORDS = {
-    "/restart", "restart", "start over", "cancel",
-    "no", "dont", "do not", "stop",
+    "/restart", "restart", "start over", "start again",
+    "redo", "do it again", "do over", "from scratch",
+}
+# "Stop / drop it" intent — cancels the skill (or a staged send) outright.
+# Kept separate from restart so "restart" re-runs the workflow while
+# "cancel"/"no"/"stop" still abandons it.
+_CANCEL_WORDS = {
+    "/cancel", "cancel", "no", "dont", "do not", "stop",
     "dont send", "do not send", "dont send it", "do not send it",
     "no dont", "never mind", "nevermind",
 }
@@ -271,12 +282,12 @@ def _normalize_review_reply(text: str) -> str:
 
 
 def _classify_review_response(text: str) -> str | None:
-    """Decide whether a reply during awaiting_review is approve/revise/restart.
+    """Decide whether a reply during awaiting_review is approve/revise/restart/cancel.
 
-    Returns one of 'approve', 'revise', 'restart', or None (free text —
-    leave the pause in place). We lean strict on approve/restart (slash or
-    exact phrase from the lists above) and require an explicit `/revise`
-    prefix for revisions.
+    Returns one of 'approve', 'revise', 'restart', 'cancel', or None (free
+    text — leave the pause in place). We lean strict on these (slash or exact
+    phrase from the lists above) and require an explicit `/revise` prefix for
+    revisions. 'restart' re-runs the skill from the top; 'cancel' abandons it.
     """
     stripped = text.strip()
     lower = stripped.lower()
@@ -288,6 +299,8 @@ def _classify_review_response(text: str) -> str | None:
         return "approve"
     if normalized in _RESTART_WORDS or lower.startswith("/restart "):
         return "restart"
+    if normalized in _CANCEL_WORDS or lower.startswith("/cancel "):
+        return "cancel"
     if lower == "/revise" or lower.startswith("/revise ") or lower.startswith("/revise\n"):
         return "revise"
     return None
@@ -337,13 +350,26 @@ async def _apply_review_resolution(
             "involved), then call `AwaitReview` again with an updated summary. "
             "Keep free-form text minimal — let the tool calls do the work."
         )
-    else:  # restart
+    elif intent == "restart":
+        # Re-enter the skill from the top instead of cancelling it. Keep
+        # `active_skill` so its SKILL.md stays injected as Section 15; we
+        # already dropped `pending_deliverable` above, so the prior draft is
+        # gone and the model begins the workflow's first step again.
+        note = (
+            "[SYSTEM] The user asked to restart"
+            + (f" the `{skill_name}` workflow" if skill_name else " the workflow")
+            + ". Discard the previous draft entirely and begin the workflow "
+            "AGAIN from its FIRST step — re-run the opening intake/questions as "
+            "if it were just invoked. Do not reuse or reference the prior "
+            "deliverable."
+        )
+    else:  # cancel
         meta.pop("active_skill", None)
         meta.pop("active_skill_phase", None)
         note = (
-            "[SYSTEM] The user requested to restart. Drop any pending draft "
-            "work and treat the next message as a fresh conversation. The "
-            "skill has been cancelled."
+            "[SYSTEM] The user cancelled. Drop any pending draft work and treat "
+            "the next message as a fresh conversation. The skill has been "
+            "cancelled."
         )
 
     session.status = "active"
@@ -460,7 +486,7 @@ async def _resolve_pending_action(
             "version will be staged for approval again. Keep free-form text minimal."
         )
 
-    # restart
+    # restart or cancel — both mean "don't send this staged action".
     clear_pending_action(session)
     session.status = "active"
     await _rewrite_staged_tool_result(
@@ -721,12 +747,56 @@ def _truncate_history_to_budget(
     return kept, omitted
 
 
+async def _resolve_attachments(
+    kv: LocalKVStore, attachment_ids: list[str] | None
+) -> tuple[str, str]:
+    """Pull chat-attachment text out of the KV store (see app.api.attachments).
+
+    Returns `(marker, context)`:
+      - `marker`: a compact "📎 Attached: a.pdf, b.docx" line for the persisted
+        user message,
+      - `context`: the full doc-text block injected into the model's view of
+        this turn only.
+    Both are "" when there are no still-cached attachments. Never raises —
+    attachments are best-effort context."""
+    if not attachment_ids:
+        return "", ""
+    names: list[str] = []
+    blocks: list[str] = []
+    for aid in attachment_ids:
+        try:
+            raw = await kv.get(f"attachment:{aid}")
+        except Exception:  # noqa: BLE001
+            raw = None
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        filename = (data.get("filename") or "document").strip()
+        text = (data.get("text") or "").strip()
+        if not text:
+            continue
+        names.append(filename)
+        blocks.append(f"--- Attached document: {filename} ---\n{text}")
+    if not names:
+        return "", ""
+    marker = "📎 Attached: " + ", ".join(names)
+    context = (
+        "The user attached the following document(s) to their message. Use "
+        "them as the primary context for this turn:\n\n" + "\n\n".join(blocks)
+    )
+    return marker, context
+
+
 async def process_message(
     *,
     db: AsyncSession,
     kv: LocalKVStore,
     session_id: UUID,
     user_text: str,
+    attachment_ids: list[str] | None = None,
 ) -> AsyncIterator[
     TextEvent | ToolStartEvent | ToolResultEvent | AwaitingReviewEvent | DoneEvent
 ]:
@@ -735,7 +805,11 @@ async def process_message(
     cleanup in its finally block when the consumer aclose()s us."""
     async with _turn_lock(session_id):
         agen = _process_message_locked(
-            db=db, kv=kv, session_id=session_id, user_text=user_text
+            db=db,
+            kv=kv,
+            session_id=session_id,
+            user_text=user_text,
+            attachment_ids=attachment_ids,
         )
         try:
             async for event in agen:
@@ -753,6 +827,7 @@ async def _process_message_locked(
     kv: LocalKVStore,
     session_id: UUID,
     user_text: str,
+    attachment_ids: list[str] | None = None,
 ) -> AsyncIterator[
     TextEvent | ToolStartEvent | ToolResultEvent | AwaitingReviewEvent | DoneEvent
 ]:
@@ -764,6 +839,15 @@ async def _process_message_locked(
     # we classify, persist, and send to the model; `is_deep` forces this turn
     # to the heavy model below.
     is_deep, user_text = parse_deep_flag(user_text)
+
+    # Chat attachments: pull the cached text for any docs attached to this
+    # message. The persisted user message gets a compact "📎 Attached: …"
+    # marker; the full doc text is injected into the model's view of this turn
+    # only (below) so the transcript stays lean. `attach_context` is "" when
+    # there are no (still-cached) attachments.
+    attach_marker, attach_context = await _resolve_attachments(kv, attachment_ids)
+    if attach_marker:
+        user_text = f"{attach_marker}\n\n{user_text}" if user_text.strip() else attach_marker
 
     # If the session was paused (status=awaiting_review from a prior
     # AwaitReview call), classify this reply as approve/revise/restart. If
@@ -777,6 +861,7 @@ async def _process_message_locked(
     # message is persisted.
     resume_note: str | None = None
     next_staged_action: dict | None = None
+    intent: str | None = None
     if session.status == "awaiting_review":
         intent = _classify_review_response(user_text)
         if intent is None and get_pending_action(session) is not None:
@@ -818,7 +903,13 @@ async def _process_message_locked(
     #   - slash command at start or multi-word keyword -> activate
     #   - /cancel-skill, /exit-skill, /restart -> clear
     #   - otherwise leave whatever's already in session_metadata
-    _apply_skill_detection(session, user_text)
+    # Skip it entirely when this turn was a review resolution (approve / revise
+    # / restart / cancel): the message is a control reply, not new content, and
+    # `_apply_review_resolution` already set the right skill state. (In
+    # particular a "restart" re-enters the skill — letting detect_skill see a
+    # bare "/restart" here would clear it right back out.)
+    if intent is None:
+        _apply_skill_detection(session, user_text)
 
     # Per-turn model selection. Runs AFTER skill detection so that a turn
     # that just activated a skill (slash command) is routed to the heavy
@@ -884,6 +975,7 @@ async def _process_message_locked(
         _context_window_for(turn_model)
         - _estimate_tokens(system_prompt)
         - _estimate_tokens(user_text)
+        - _estimate_tokens(attach_context)
         - RESPONSE_TOKEN_RESERVE
     )
     window, omitted_turns = _truncate_history_to_budget(list(history), budget)
@@ -906,7 +998,12 @@ async def _process_message_locked(
             }
         )
     llm_messages.extend(_history_to_llm_messages(window))
-    llm_messages.append({"role": "user", "content": user_text})
+    # Attached docs ride along with the user message to the model (this turn
+    # only) — the persisted message keeps just the compact marker.
+    llm_user_content = (
+        f"{attach_context}\n\n{user_text}" if attach_context else user_text
+    )
+    llm_messages.append({"role": "user", "content": llm_user_content})
     if resume_note:
         llm_messages.append({"role": "system", "content": resume_note})
 
@@ -1434,6 +1531,112 @@ async def _process_message_locked(
     finally:
         reset_context(ctx_token)
         await kv.delete(_cancel_key(session_id))
+
+
+_TITLE_SYSTEM_PROMPT = (
+    "You write a very short title for a chat, like the titles in a chat app's "
+    "sidebar. Read the user's first message and reply with a 3-6 word title "
+    "that captures the topic. Reply with ONLY the title — Title Case, no "
+    "surrounding quotes, no trailing punctuation, no 'Title:' prefix."
+)
+
+
+def _clean_title(text: str) -> str:
+    """Tidy the model's title reply into a short single line."""
+    t = (text or "").strip()
+    # Strip surrounding quotes and a leading "Title:" the model sometimes adds.
+    t = t.strip('"').strip("'").strip()
+    t = re.sub(r"^(chat\s+)?title\s*[:\-]\s*", "", t, flags=re.IGNORECASE)
+    t = " ".join(t.split())  # collapse newlines/extra spaces
+    return t[:60].strip()
+
+
+def _first_user_text(message: Message) -> str:
+    return "".join(
+        b.get("text", "")
+        for b in (message.content or [])
+        if isinstance(b, dict) and b.get("type") == "text"
+    ).strip()
+
+
+async def maybe_generate_title(db: AsyncSession, session_id: UUID) -> str | None:
+    """Best-effort: after a session's first turn, replace the auto-derived
+    first-message-prefix title with a short AI-generated summary using the
+    cheap light model.
+
+    Returns the new title (so the caller can push it to the client) or None
+    when it shouldn't or can't retitle — wrong turn, no usable provider, a
+    user-set title, or any failure. Never raises; title quality is
+    non-critical and must not affect the turn.
+    """
+    try:
+        session = await db.scalar(select(Session).where(Session.id == session_id))
+        # Only on the first completed turn — later turns keep the title.
+        if session is None or session.turn_count != 1:
+            return None
+
+        first_user = await db.scalar(
+            select(Message)
+            .where(Message.session_id == session_id, Message.role == "user")
+            .order_by(Message.turn_id, Message.seq)
+            .limit(1)
+        )
+        if first_user is None:
+            return None
+        user_text = _first_user_text(first_user)
+        if not user_text:
+            return None
+        # Don't clobber a title the user set themselves — a manual rename stamps
+        # `title_locked` (see sessions.update_session). Otherwise always retitle
+        # on the first turn: the current title is an auto guess (the home
+        # screen's message-prefix, or the message prefix), which a short AI
+        # summary improves on. (The old check compared against the prefix, but
+        # the home screen sets a *different* truncated title, so it almost
+        # never matched and the retitle silently no-op'd.)
+        if (session.session_metadata or {}).get("title_locked"):
+            return None
+
+        turn_user = await db.scalar(select(User).where(User.id == session.user_id))
+        configured = await credentials.configured_llm_providers(db, session.user_id)
+        try:
+            model = select_model(
+                "",
+                {},
+                user_preferences=(turn_user.preferences if turn_user else None),
+                configured_providers=configured,
+            )
+        except NoProviderConfiguredError:
+            return None
+        api_key = await credentials.resolve_api_key(
+            db, session.user_id, credentials.llm_provider_for_model(model)
+        )
+        if api_key is None:
+            return None
+
+        messages = [
+            {"role": "system", "content": _TITLE_SYSTEM_PROMPT},
+            {"role": "user", "content": user_text[:1500]},
+        ]
+        final_text = ""
+        async for event in stream_message(messages, model=model, api_key=api_key):
+            if isinstance(event, StreamResult):
+                final_text = event.text
+            elif isinstance(event, StreamChunk):
+                final_text += event.text
+
+        title = _clean_title(final_text)
+        if not title:
+            return None
+        session.title = title
+        await db.commit()
+        return title
+    except Exception:  # noqa: BLE001 — title is best-effort, never fatal
+        logger.info("session title generation failed", exc_info=True)
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return None
 
 
 async def cancel_session(kv: LocalKVStore, session_id: UUID) -> None:

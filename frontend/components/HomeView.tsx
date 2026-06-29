@@ -59,13 +59,19 @@ export function HomeView() {
 
   // Create the session on first send (no more eager empty sessions), queue
   // the message, and let ChatView send it once its initial load resolves.
-  async function handleSend(text: string) {
+  async function handleSend(
+    text: string,
+    attachments: { id: string; filename: string }[] = [],
+  ) {
     if (creating) return;
     setCreating(true);
     try {
-      const session = await api.createSession({ title: deriveTitle(text) });
+      // Title is a placeholder — the engine generates a real one after the
+      // first turn (C3). Fall back to an attachment name for an image-only send.
+      const title = deriveTitle(text) || attachments[0]?.filename || "New chat";
+      const session = await api.createSession({ title });
       upsertSession(session);
-      setQueuedFirstMessage({ sessionId: session.id, content: text });
+      setQueuedFirstMessage({ sessionId: session.id, content: text, attachments });
       router.push(`/chat?s=${session.id}`);
     } catch (err) {
       console.error("failed to create session:", err);

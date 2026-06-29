@@ -51,9 +51,10 @@ class Settings(BaseSettings):
     # startup — so a fresh desktop user with no key can still boot to the
     # onboarding wizard and enter it there.
     groq_api_key: str | None = Field(None, alias="GROQ_API_KEY")
-    groq_model: str = Field(
-        "meta-llama/llama-4-scout-17b-16e-instruct", alias="GROQ_MODEL"
-    )
+    # Default light model. Must be on Groq's FREE tier (gpt-oss-* need a paid
+    # developer tier; Llama 4 Scout was deprecated 2026-06-17). llama-3.1-8b-
+    # instant is free, fast, and reliable for tool-using turns.
+    groq_model: str = Field("llama-3.1-8b-instant", alias="GROQ_MODEL")
     # "Heavy" model used for drafting turns (see app.core.model_router).
     # Name kept as `groq_heavy_model` for compatibility; the value can now
     # be ANY provider's model ID (Groq, Google, ...). Provider is inferred

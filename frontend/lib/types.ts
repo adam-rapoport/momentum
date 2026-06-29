@@ -93,7 +93,13 @@ export interface SessionDetail extends Session {
 }
 
 export type WsInbound =
-  | { type: "session.message"; session_id: string; content: string }
+  | {
+      type: "session.message";
+      session_id: string;
+      content: string;
+      // Attachment ids from POST /chat/attachments (docs attached to this message).
+      attachment_ids?: string[];
+    }
   | { type: "session.cancel"; session_id: string };
 
 export type AwaitingReviewKind = "deliverable" | PendingActionKind;
@@ -144,6 +150,7 @@ export type WsOutbound =
       };
       metadata: { cancelled: boolean; model?: string | null };
     }
+  | { type: "session.renamed"; session_id: string; title: string }
   | { type: "error"; code: string; message: string; session_id?: string };
 
 export interface LiveToolCall {

@@ -2,9 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Kbd, PixelIcon, PxLabel } from "@/components/pm";
 import { api, type CommandSummary } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+
+interface ChatAttachment {
+  id: string;
+  filename: string;
+}
 
 interface Props {
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments: ChatAttachment[]) => void;
   onCancel: () => void;
   isStreaming: boolean;
   // Home-screen variant: larger type, autofocus, and external seeding from
@@ -23,7 +29,34 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
   const [commands, setCommands] = useState<CommandSummary[]>([]);
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [uploadCount, setUploadCount] = useState(0);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function addFiles(files: FileList | File[] | null | undefined) {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
+    setAttachError(null);
+    setUploadCount((n) => n + list.length);
+    for (const file of list) {
+      try {
+        const r = await api.uploadChatAttachment(file);
+        setAttachments((prev) => [...prev, { id: r.attachment_id, filename: r.filename }]);
+      } catch (e) {
+        setAttachError(errorMessage(e));
+      } finally {
+        setUploadCount((n) => n - 1);
+      }
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
 
   // Load the available slash commands once. The backend is already up by the
   // time the chat renders (BootGate), so this normally succeeds; on failure we
@@ -101,13 +134,18 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
 
   function submit() {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming) return;
-    onSend(trimmed);
+    const uploading = uploadCount > 0;
+    if ((!trimmed && attachments.length === 0) || isStreaming || uploading) return;
+    onSend(trimmed, attachments);
     setValue("");
+    setAttachments([]);
+    setAttachError(null);
     setDismissed(false);
   }
 
-  const canSend = Boolean(value.trim()) && !isStreaming;
+  const uploading = uploadCount > 0;
+  const canSend =
+    (Boolean(value.trim()) || attachments.length > 0) && !isStreaming && !uploading;
 
   return (
     <div className="relative">
@@ -150,11 +188,63 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
         </div>
       ) : null}
 
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,.docx,.md,.markdown,.txt"
+        multiple
+        className="hidden"
+        onChange={(e) => void addFiles(e.target.files)}
+      />
+
       <div
         className={`rounded-[20px] border bg-surface shadow-composer transition-colors duration-150 ${
-          isCommand ? "border-accent" : "border-line"
+          dragOver
+            ? "border-accent ring-2 ring-accent"
+            : isCommand
+              ? "border-accent"
+              : "border-line"
         }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!isStreaming) setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget === e.target) setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          void addFiles(e.dataTransfer.files);
+        }}
       >
+        {(attachments.length > 0 || uploading) && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+            {attachments.map((a) => (
+              <span
+                key={a.id}
+                className="inline-flex items-center gap-1.5 rounded-[7px] border border-line bg-raised px-2 py-1 text-[11.5px] text-ink"
+              >
+                <PixelIcon name="doc" size={10} />
+                <span className="max-w-[160px] truncate">{a.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(a.id)}
+                  title="Remove attachment"
+                  aria-label={`Remove ${a.filename}`}
+                  className="text-ink-dim hover:text-ink"
+                >
+                  <PixelIcon name="x" size={9} />
+                </button>
+              </span>
+            ))}
+            {uploading && (
+              <span className="inline-flex items-center rounded-[7px] border border-line bg-raised px-2 py-1 text-[11.5px] text-ink-dim">
+                Analyzing…
+              </span>
+            )}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -172,6 +262,15 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
           } ${isCommand ? "font-mono text-accent-text" : "text-ink"}`}
         />
         <div className="flex items-center gap-2 px-3 pb-2.5 pt-1.5">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            title="Attach a document (PDF, Word, Markdown, text)"
+            aria-label="Attach a document"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-dim transition-colors hover:bg-inset hover:text-ink"
+          >
+            <PixelIcon name="plus" size={13} />
+          </button>
           {isCommand ? (
             <span className="font-mono text-[11px] text-ink-dim">
               skill turn → routes to heavy model
@@ -211,6 +310,9 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
           )}
         </div>
       </div>
+      {attachError && (
+        <div className="mt-1.5 px-3 text-[11.5px] text-danger">{attachError}</div>
+      )}
     </div>
   );
 }

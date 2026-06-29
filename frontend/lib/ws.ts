@@ -336,6 +336,10 @@ class WsClient {
         .catch((err) =>
           console.error("[ws] failed to refresh documents:", err),
         );
+    } else if (event.type === "session.renamed") {
+      // The engine generated a short AI title for a new session — reflect it
+      // in the sidebar + toolbar without waiting for a refetch.
+      store.renameSession(event.session_id, event.title);
     } else if (event.type === "error") {
       // Use warn (not error) so Next.js's dev overlay doesn't pop. The
       // message surfaces inline via the lastErrorBySession store slice +

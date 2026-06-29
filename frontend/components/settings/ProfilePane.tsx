@@ -46,11 +46,24 @@ export function ProfilePane({ onChanged }: { onChanged: () => void }) {
   async function wipe() {
     setWiping(true);
     try {
-      await Promise.all(
-        (
-          ["llm:groq", "llm:google_ai", "llm:openai", "search:tavily", "search:perplexity"] as KeyProvider[]
-        ).map((p) => api.deleteConnection(p).catch(() => undefined)),
-      );
+      // Every provider we can store a key for — the old list omitted
+      // Anthropic/OpenRouter/Mistral/Ollama, so those keys survived a "wipe".
+      const allKeyProviders: KeyProvider[] = [
+        "llm:groq",
+        "llm:google_ai",
+        "llm:openai",
+        "llm:anthropic",
+        "llm:openrouter",
+        "llm:mistral",
+        "llm:ollama",
+        "search:tavily",
+        "search:perplexity",
+      ];
+      await Promise.all(allKeyProviders.map((p) => api.deleteConnection(p).catch(() => undefined)));
+      // Clear the selected light/heavy model picks too — otherwise the slots
+      // keep pointing at a provider whose key we just deleted (the model the
+      // user was "in use" stays selected but unusable).
+      await api.setModelPreferences({ light_model: null, heavy_model: null }).catch(() => undefined);
       onChanged();
       setConfirming(false);
     } finally {

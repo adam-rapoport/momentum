@@ -121,7 +121,11 @@ function SearchKeyCard({
   }
 
   return (
-    <div className={`rounded-[12px] border bg-surface p-4 shadow-card ${active ? "border-accent" : "border-line"}`}>
+    <div
+      className={`rounded-[12px] border bg-surface p-4 shadow-card ${
+        active && configured ? "border-accent" : "border-line"
+      }`}
+    >
       <div className="flex items-center gap-3.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-raised font-mono text-[13px] font-semibold text-ink-muted">
           {title[0]}
@@ -130,7 +134,10 @@ function SearchKeyCard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[14px] font-semibold text-ink">{title}</span>
             <span className="text-[12.5px] text-ink-dim">· {subtitle}</span>
-            {active && <Chip tone="accent">active</Chip>}
+            {/* "active" only counts when a key is actually present — the
+                selected provider defaults to Tavily even with no key. */}
+            {active && configured && <Chip tone="accent">active</Chip>}
+            {active && !configured && <Chip>needs key</Chip>}
           </div>
           <div className="mt-0.5 font-mono text-[12px] text-ink-muted">
             {stored

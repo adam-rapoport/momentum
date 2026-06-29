@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ExternalLink } from "@/components/ExternalLink";
 import { DitherRule, PmLogo } from "@/components/pm";
 import { isTauri } from "@/lib/desktop";
+
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0";
+const CONTACT_EMAIL = "rapoport.apps@gmail.com";
 
 export function AboutPane() {
   const [shell, setShell] = useState("web");
@@ -10,7 +14,7 @@ export function AboutPane() {
   }, []);
 
   const lines: [string, string][] = [
-    ["Version", "0.1.0"],
+    ["Version", APP_VERSION],
     ["Shell", shell],
     ["Backend", "FastAPI · localhost"],
     ["Data", "SQLite + local files · keys encrypted (Fernet)"],
@@ -47,7 +51,18 @@ export function AboutPane() {
         routes through a pMomentum server.
       </p>
 
-      <p className="mt-3 font-mono text-[11px] text-ink-dim">App by Adam Rapoport</p>
+      <div className="mt-4 flex items-center gap-3 rounded-[10px] border border-line bg-raised px-3.5 py-3">
+        <PmLogo size={26} />
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold text-ink">App by Adam Rapoport</div>
+          <ExternalLink
+            href={`mailto:${CONTACT_EMAIL}`}
+            className="font-mono text-[11.5px] text-accent-text no-underline hover:underline"
+          >
+            {CONTACT_EMAIL}
+          </ExternalLink>
+        </div>
+      </div>
     </div>
   );
 }

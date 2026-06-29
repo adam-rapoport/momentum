@@ -46,6 +46,36 @@ function groupByType(records: MemoryRecordSummary[]): Record<string, MemoryRecor
   return out;
 }
 
+// Render a memory's tags. A `source:<doc>` tag (stamped by the doc-extraction
+// pipeline) is surfaced as an explicit "From: <document>" line instead of a raw
+// chip, and the now-redundant generic "from-document" chip is hidden.
+function MemoryTags({ tags }: { tags: string[] }) {
+  const sourceTag = tags.find((t) => t.startsWith("source:"));
+  const sourceDoc = sourceTag?.slice("source:".length).trim();
+  const chips = tags.filter((t) => !t.startsWith("source:") && t !== "from-document");
+  return (
+    <div className="mb-2 flex flex-col gap-1.5">
+      {sourceDoc && (
+        <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted">
+          <PixelIcon name="doc" size={10} />
+          <span>
+            From: <span className="font-medium text-ink">{sourceDoc}</span>
+          </span>
+        </div>
+      )}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-[5px]">
+          {chips.map((tag) => (
+            <Chip key={tag} mono>
+              {tag}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MemoryTab() {
   const memories = useChatStore((s) => s.memories);
   const memoriesLoadedAt = useChatStore((s) => s.memoriesLoadedAt);
@@ -58,17 +88,26 @@ function MemoryTab() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [uploadNote, setUploadNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  async function handleFilePicked(file: File | undefined) {
-    if (!file || uploading) return;
+  async function handleFilesPicked(files: FileList | File[] | null | undefined) {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0 || uploading) return;
     setUploading(true);
     setUploadNote(null);
     try {
-      const r = await api.uploadMemoryDocument(file);
+      let totalMemories = 0;
+      let lastTitle = "";
+      for (const file of list) {
+        const r = await api.uploadMemoryDocument(file);
+        totalMemories += r.memories_created;
+        lastTitle = r.title;
+      }
+      const from = list.length === 1 ? `“${lastTitle}”` : `${list.length} documents`;
       setUploadNote({
         kind: "ok",
-        text: `${r.memories_created} ${r.memories_created === 1 ? "memory" : "memories"} created from “${r.title}”`,
+        text: `${totalMemories} ${totalMemories === 1 ? "memory" : "memories"} created from ${from}`,
       });
       const fresh = await api.listMemories();
       setMemories(fresh);
@@ -148,14 +187,35 @@ function MemoryTab() {
   const grouped = useMemo(() => groupByType(memories), [memories]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className={`relative flex min-h-0 flex-1 flex-col ${dragOver ? "ring-2 ring-inset ring-accent" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!uploading) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // Only clear when leaving the panel itself, not crossing a child.
+        if (e.currentTarget === e.target) setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        void handleFilesPicked(e.dataTransfer.files);
+      }}
+    >
       <input
         ref={fileInputRef}
         type="file"
         accept=".pdf,.docx,.md,.markdown,.txt"
+        multiple
         className="hidden"
-        onChange={(e) => handleFilePicked(e.target.files?.[0])}
+        onChange={(e) => handleFilesPicked(e.target.files)}
       />
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-panel/80 text-[12.5px] font-medium text-accent-text">
+          Drop documents to add them to memory
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2 border-b border-line-faint px-4 py-2">
         <button
           type="button"
@@ -164,7 +224,7 @@ function MemoryTab() {
           className="inline-flex items-center gap-1.5 rounded-[7px] border border-line bg-surface px-2.5 py-1 text-[11.5px] font-medium text-ink-muted shadow-card transition-colors duration-100 hover:border-accent hover:text-ink disabled:cursor-default disabled:opacity-60"
         >
           <PixelIcon name="plus" size={10} />
-          {uploading ? "Analyzing…" : "Add from document…"}
+          {uploading ? "Analyzing…" : "Add from documents…"}
         </button>
       </div>
       {uploadNote && (
@@ -241,13 +301,7 @@ function MemoryTab() {
             {detail && !detailLoading && (
               <>
                 {detail.tags && detail.tags.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-[5px]">
-                    {detail.tags.map((tag) => (
-                      <Chip key={tag} mono>
-                        {tag}
-                      </Chip>
-                    ))}
-                  </div>
+                  <MemoryTags tags={detail.tags} />
                 )}
                 {detail.summary && (
                   <div className="mb-2 text-[11.5px] italic text-ink-muted">{detail.summary}</div>

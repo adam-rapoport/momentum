@@ -65,6 +65,7 @@ export function GtkyStep({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFiles(files: FileList | null) {
@@ -144,10 +145,28 @@ export function GtkyStep({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="w-full rounded-[12px] border border-dashed border-line-strong bg-raised px-4 py-6 text-center transition-colors hover:border-accent"
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!uploading) setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragOver(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            void handleFiles(e.dataTransfer.files);
+          }}
+          className={`w-full rounded-[12px] border border-dashed bg-raised px-4 py-6 text-center transition-colors ${
+            dragOver ? "border-accent bg-accent-tint" : "border-line-strong hover:border-accent"
+          }`}
         >
           <div className="text-sm text-ink-muted">
-            {uploading ? "Analyzing your document…" : "Click to upload PDF, Word, Markdown, or text"}
+            {uploading
+              ? "Analyzing your document…"
+              : dragOver
+                ? "Drop to upload"
+                : "Click to upload, or drag & drop — PDF, Word, Markdown, or text"}
           </div>
           <div className="mt-1 text-[11.5px] text-ink-dim">
             We read it and pull out what&apos;s worth remembering — stored as private context in

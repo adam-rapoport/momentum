@@ -37,6 +37,7 @@ from app.core.session_engine import (
     ToolResultEvent,
     ToolStartEvent,
     cancel_session,
+    maybe_generate_title,
     process_message,
 )
 from app.dependencies import SessionLocal, kv_store
@@ -45,6 +46,7 @@ from app.schemas.websocket import (
     InboundMessage,
     OutboundAwaitingReview,
     OutboundError,
+    OutboundSessionRenamed,
     OutboundStreamDone,
     OutboundStreamText,
     OutboundToolResult,
@@ -192,6 +194,30 @@ _turn_tasks: dict[UUID, asyncio.Task] = {}
 # sessions, same socket) must not interleave their ASGI send calls.
 _send_locks: "WeakKeyDictionary[WebSocket, asyncio.Lock]" = WeakKeyDictionary()
 
+# Detached, best-effort background tasks (e.g. post-turn title generation).
+# Held in a module set so they aren't garbage-collected mid-run; the
+# done-callback discards them. Not tied to a connection's `own_tasks` — they're
+# short-lived and a send to a closed socket just no-ops.
+_bg_tasks: set[asyncio.Task] = set()
+
+
+async def _retitle_after_turn(ws: WebSocket, session_id: UUID) -> None:
+    """Generate a short AI title for a new session (its own DB session) and,
+    if one is produced, push a session.renamed frame. Best-effort: never
+    raises out, never blocks the turn task."""
+    try:
+        async with SessionLocal() as db:
+            new_title = await maybe_generate_title(db, session_id)
+        if new_title:
+            await _send(
+                ws,
+                OutboundSessionRenamed(
+                    session_id=session_id, title=new_title
+                ).model_dump(mode="json"),
+            )
+    except Exception:  # noqa: BLE001 — title is non-critical
+        logger.info("retitle task failed for session %s", session_id, exc_info=True)
+
 
 async def _send(ws: WebSocket, payload: dict) -> bool:
     """Send a JSON frame, guarding against a socket that closed mid-turn.
@@ -262,7 +288,11 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 # Reject messages that are empty once the /deep flag is
                 # stripped (finding A29) — the engine would otherwise persist
                 # an empty user message and run an assistant turn against it.
-                if not parse_deep_flag(payload.content)[1].strip():
+                # An attachment-only message (no text) is allowed.
+                if (
+                    not parse_deep_flag(payload.content)[1].strip()
+                    and not payload.attachment_ids
+                ):
                     await _send(
                         ws,
                         _error_frame(
@@ -286,7 +316,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     )
                     continue
                 task = asyncio.create_task(
-                    _handle_user_message(ws, payload.session_id, payload.content),
+                    _handle_user_message(
+                        ws,
+                        payload.session_id,
+                        payload.content,
+                        payload.attachment_ids,
+                    ),
                     name=f"turn-{payload.session_id}",
                 )
                 _turn_tasks[payload.session_id] = task
@@ -395,12 +430,22 @@ def _event_frame(event, session_id: UUID) -> dict | None:
     return model.model_dump(mode="json")
 
 
-async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) -> None:
+async def _handle_user_message(
+    ws: WebSocket,
+    session_id: UUID,
+    content: str,
+    attachment_ids: list[str] | None = None,
+) -> None:
     try:
         async with SessionLocal() as db:
             agen = process_message(
-                db=db, kv=kv_store, session_id=session_id, user_text=content
+                db=db,
+                kv=kv_store,
+                session_id=session_id,
+                user_text=content,
+                attachment_ids=attachment_ids,
             )
+            disconnected = False
             try:
                 async for event in agen:
                     frame = _event_frame(event, session_id)
@@ -415,9 +460,21 @@ async def _handle_user_message(ws: WebSocket, session_id: UUID, content: str) ->
                             "client disconnected mid-stream for session %s",
                             session_id,
                         )
+                        disconnected = True
                         break
             finally:
                 await agen.aclose()
+
+        # Post-turn, best-effort: give a brand-new session a short AI title
+        # (replaces the first-message prefix). Spawned as a DETACHED task with
+        # its own DB session so the turn task finishes immediately — otherwise
+        # the ~1s title call would keep the session "in flight" and bounce a
+        # quick follow-up message with TURN_IN_PROGRESS. Skipped if the client
+        # already left mid-stream.
+        if not disconnected:
+            t = asyncio.create_task(_retitle_after_turn(ws, session_id))
+            _bg_tasks.add(t)
+            t.add_done_callback(_bg_tasks.discard)
     except asyncio.CancelledError:
         # Connection went away and the read loop cancelled us — the finally
         # above already closed the engine generator. Re-raise so the task is

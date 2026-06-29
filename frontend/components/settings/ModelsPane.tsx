@@ -129,6 +129,39 @@ function SlotCard({
     };
   }, [expanded, showingOllama, shownConnected]);
 
+  // Persist the first installed Ollama model the moment the user picks Ollama
+  // for this slot. The model dropdown's onChange only fires on a *change*, so
+  // if the wanted model is already the one shown, nothing would save and the
+  // slot silently reverts on "Done" (the Settings-only Ollama bug; onboarding
+  // saved the pick explicitly). `selectedId === "ollama"` means an explicit
+  // pill click this session; `!isOllamaActive` guards against re-saving when
+  // the slot is already on Ollama.
+  useEffect(() => {
+    if (selectedId !== "ollama" || !ollamaModels || ollamaModels.length === 0 || isOllamaActive) {
+      return;
+    }
+    let cancelled = false;
+    setSaving(true);
+    const modelId = ollamaModels[0].id;
+    api
+      .setModelPreferences(tier === "light" ? { light_model: modelId } : { heavy_model: modelId })
+      .then(() => {
+        if (cancelled) return;
+        loadPrefs();
+        onChanged();
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setSaving(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, ollamaModels, isOllamaActive, tier]);
+
   const providerModels = shown ? available.filter((m) => m.provider === shown.id) : [];
   const slotPick = showingOllama
     ? (isOllamaActive ? effectiveId : (ollamaModels?.[0]?.id ?? ""))
@@ -282,12 +315,15 @@ function SlotCard({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" />
+                  {/* A key entered in the app (source "stored") always
+                      overrides any .env key — spell that out so it's verifiable
+                      (testing item D3). */}
                   {showingOllama
                     ? `Ollama connected · ${ollamaBase ?? "local server"}`
                     : shownStatus?.source === "env"
                       ? `${shown.name} connected · from .env`
-                      : shownStatus?.key_suffix
-                        ? `${shown.name} connected · ••••${shownStatus.key_suffix}`
+                      : shownStatus?.source === "stored"
+                        ? `${shown.name} · ••••${shownStatus.key_suffix ?? ""} · Stored encrypted on this Mac`
                         : `${shown.name} connected`}
                 </span>
                 <Btn

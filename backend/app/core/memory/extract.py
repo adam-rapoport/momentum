@@ -132,7 +132,13 @@ async def extract_memories_from_document(
     caller owns the transaction. `tags` defaults to the onboarding stamp."""
     reply = await _run_heavy(db, user, doc_title, doc_text)
     items = _parse_memory_json(reply)
-    record_tags = tags if tags is not None else ["onboarding", "from-document"]
+    record_tags = list(tags) if tags is not None else ["onboarding", "from-document"]
+    # Stamp each derived memory with the document it came from so the UI can
+    # show "From: <document>" instead of a generic "from-document" chip. The
+    # `source:` prefix is what the frontend keys off (ContextPanel).
+    source_tag = f"source:{doc_title}"
+    if source_tag not in record_tags:
+        record_tags.append(source_tag)
 
     saved: list[MemoryRecord] = []
     for item in items[:MAX_MEMORIES]:

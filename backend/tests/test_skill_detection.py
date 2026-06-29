@@ -44,6 +44,21 @@ def test_keyword_trigger_fires_only_on_fresh_session():
     assert detect_skill("help me write a prd for onboarding", {}) == "write-prd"
 
 
+def test_keyword_trigger_is_filler_tolerant():
+    # Natural phrasings that aren't an exact substring of a trigger keyword
+    # should still activate the skill (intent-based invocation, C1).
+    assert detect_skill("write me a PRD", {}) == "write-prd"
+    assert detect_skill("can you write up a quick prd for this", {}) == "write-prd"
+    assert detect_skill("draft a spec for the new dashboard", {}) == "write-prd"
+    assert detect_skill("put together a stakeholder update", {}) == "stakeholder-update"
+
+
+def test_keyword_trigger_does_not_overfire_on_questions():
+    # A bare mention without the action verb shouldn't hijack the turn.
+    assert detect_skill("what is a prd anyway?", {}) is None
+    assert detect_skill("remind me what a stakeholder is", {}) is None
+
+
 def test_keyword_trigger_ignored_when_skill_already_active():
     # Don't let natural-language mentions of "write a prd" flip sessions
     # that are already mid-workflow.
@@ -75,7 +90,14 @@ def test_classify_approve_variants():
 def test_classify_restart_variants():
     assert _classify_review_response("/restart") == "restart"
     assert _classify_review_response("start over") == "restart"
-    assert _classify_review_response("cancel") == "restart"
+    assert _classify_review_response("redo") == "restart"
+
+
+def test_classify_cancel_variants():
+    # Cancel is distinct from restart: restart re-runs the skill, cancel drops it.
+    assert _classify_review_response("/cancel") == "cancel"
+    assert _classify_review_response("cancel") == "cancel"
+    assert _classify_review_response("stop") == "cancel"
 
 
 def test_classify_revise_requires_explicit_prefix():

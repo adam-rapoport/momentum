@@ -173,13 +173,23 @@ export function ChatView({ sessionId }: Props) {
           useUiStore.getState().setQueuedFirstMessage(null);
           const store = useChatStore.getState();
           store.clearLastError(sessionId);
-          store.appendUserMessage(sessionId, queued.content);
+          const atts = queued.attachments ?? [];
+          const marker = atts.length
+            ? `📎 Attached: ${atts.map((a) => a.filename).join(", ")}`
+            : "";
+          const optimistic = marker
+            ? queued.content
+              ? `${marker}\n\n${queued.content}`
+              : marker
+            : queued.content;
+          store.appendUserMessage(sessionId, optimistic);
           store.bumpSession(sessionId);
           store.startStreaming(sessionId);
           getWsClient().send({
             type: "session.message",
             session_id: sessionId,
             content: queued.content,
+            attachment_ids: atts.map((a) => a.id),
           });
         }
       })
@@ -227,14 +237,28 @@ export function ChatView({ sessionId }: Props) {
     el.scrollTop = el.scrollHeight;
   }
 
-  function handleSend(content: string) {
+  function handleSend(
+    content: string,
+    attachments: { id: string; filename: string }[] = [],
+  ) {
     // Clear any stale error banner from a previous failed turn so the UI
     // doesn't nag about a message the user is already retrying.
     clearLastError(sessionId);
-    appendUserMessage(sessionId, content);
+    // Show the attachment marker in the optimistic bubble; the backend persists
+    // the same marker, so the stream.done refetch matches seamlessly.
+    const marker = attachments.length
+      ? `📎 Attached: ${attachments.map((a) => a.filename).join(", ")}`
+      : "";
+    const optimistic = marker ? (content ? `${marker}\n\n${content}` : marker) : content;
+    appendUserMessage(sessionId, optimistic);
     bumpSession(sessionId);
     startStreaming(sessionId);
-    getWsClient().send({ type: "session.message", session_id: sessionId, content });
+    getWsClient().send({
+      type: "session.message",
+      session_id: sessionId,
+      content,
+      attachment_ids: attachments.map((a) => a.id),
+    });
   }
 
   function handleCancel() {

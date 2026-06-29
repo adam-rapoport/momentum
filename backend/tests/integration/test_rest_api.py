@@ -56,6 +56,16 @@ def test_create_session_with_title_then_list(client):
     assert listed[0]["title"] == "My session"
 
 
+def test_list_sessions_search_filters_by_title(client):
+    a = client.post(f"{API}/sessions", json={"title": "Quarterly planning"}).json()
+    client.post(f"{API}/sessions", json={"title": "Random chat"}).json()
+    # ?q= filters; case-insensitive title match returns only the planning one.
+    hits = client.get(f"{API}/sessions", params={"q": "planning"}).json()
+    assert [s["id"] for s in hits] == [a["id"]]
+    # No query → both come back.
+    assert len(client.get(f"{API}/sessions").json()) == 2
+
+
 def test_get_session_detail_includes_messages_and_metadata(client):
     created = client.post(f"{API}/sessions", json={"title": "detail"}).json()
     resp = client.get(f"{API}/sessions/{created['id']}")

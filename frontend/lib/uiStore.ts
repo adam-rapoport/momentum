@@ -15,6 +15,8 @@ export interface UiProfile {
 interface QueuedFirstMessage {
   sessionId: string;
   content: string;
+  // Docs attached on the home screen, sent with the first message.
+  attachments?: { id: string; filename: string }[];
 }
 
 export interface GoogleBanner {

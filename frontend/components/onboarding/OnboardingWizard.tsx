@@ -5,19 +5,32 @@ import { Btn, IconBtn, PixelIcon, PmLogo } from "@/components/pm";
 import { api, type KeyProvider, type ModelEntry } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { useChatStore } from "@/lib/store";
-import { PROVIDERS, providersForTier, validateKeyFormat } from "@/lib/providers";
-import { DoneStep, ModelStep, WelcomeStep, type ModelStepState } from "./steps";
+import {
+  PROVIDERS,
+  providersForTier,
+  SEARCH_PROVIDERS,
+  validateKeyFormat,
+} from "@/lib/providers";
+import {
+  DoneStep,
+  ModelStep,
+  WebSearchStep,
+  WelcomeStep,
+  type ModelStepState,
+  type WebSearchStepState,
+} from "./steps";
 import { GtkyStep, emptyGtky, type GtkyState, type UploadedDoc } from "./GtkyStep";
 
 // NOTE: the "Tools (Google)" step was removed for V1 (Google deferred to a
 // post-release add-on). Restore it here + the ToolsStep in steps.tsx when the
 // Google integration is re-enabled — see the F-Google roadmap backlog item.
-type StepKey = "welcome" | "light" | "heavy" | "gtky" | "done";
+type StepKey = "welcome" | "light" | "heavy" | "search" | "gtky" | "done";
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "welcome", label: "Welcome" },
   { key: "light", label: "Light model" },
   { key: "heavy", label: "Heavy model" },
+  { key: "search", label: "Web search" },
   { key: "gtky", label: "About you" },
   { key: "done", label: "Done" },
 ];
@@ -43,6 +56,10 @@ export function OnboardingWizard() {
   const [idx, setIdx] = useState(0);
   const [light, setLight] = useState<ModelStepState>(() => initialModelState("light"));
   const [heavy, setHeavy] = useState<ModelStepState>(() => initialModelState("heavy"));
+  const [search, setSearch] = useState<WebSearchStepState>({
+    providerId: "tavily",
+    key: "",
+  });
   const [gtky, setGtky] = useState<GtkyState>(emptyGtky);
   const [uploads, setUploads] = useState<UploadedDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +101,13 @@ export function OnboardingWizard() {
     const t = document.documentElement.dataset.theme;
     if (t === "dark" || t === "light") setTheme(t);
   }, []);
+
+  // Reset scroll to the top on every step change. A long step (the model step
+  // with its inline key box) otherwise leaves the next step scrolled to where
+  // the last one ended — confusing when moving light → heavy.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [idx]);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
@@ -186,21 +210,44 @@ export function OnboardingWizard() {
     }
   }
 
+  async function saveSearchStep(): Promise<boolean> {
+    // Optional: only persist when the user actually entered a key.
+    const key = search.key.trim();
+    if (!key) return true;
+    const meta = SEARCH_PROVIDERS[search.providerId];
+    setSaving(true);
+    setError(null);
+    try {
+      await api.setConnection(meta.credProvider, key);
+      await api.setSearchProvider(search.providerId);
+      return true;
+    } catch (e) {
+      setError(errorMessage(e));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function advance() {
     if (step.key === "welcome") {
-      setIdx(1);
+      setIdx(idx + 1);
       return;
     }
     if (step.key === "light") {
-      if (await saveModel(light, "light")) setIdx(2);
+      if (await saveModel(light, "light")) setIdx(idx + 1);
       return;
     }
     if (step.key === "heavy") {
-      if (await saveModel(heavy, "heavy")) setIdx(3);
+      if (await saveModel(heavy, "heavy")) setIdx(idx + 1);
+      return;
+    }
+    if (step.key === "search") {
+      if (await saveSearchStep()) setIdx(idx + 1);
       return;
     }
     if (step.key === "gtky") {
-      if (await saveProfileStep()) setIdx(4);
+      if (await saveProfileStep()) setIdx(idx + 1);
       return;
     }
   }
@@ -278,7 +325,7 @@ export function OnboardingWizard() {
           {step.key === "light" && (
             <ModelStep
               tier="light"
-              stepNumber={2}
+              stepNumber={idx + 1}
               state={light}
               setState={setLight}
               error={error}
@@ -289,7 +336,7 @@ export function OnboardingWizard() {
           {step.key === "heavy" && (
             <ModelStep
               tier="heavy"
-              stepNumber={3}
+              stepNumber={idx + 1}
               state={heavy}
               setState={setHeavy}
               error={error}
@@ -297,9 +344,17 @@ export function OnboardingWizard() {
               registry={registry}
             />
           )}
+          {step.key === "search" && (
+            <WebSearchStep
+              stepNumber={idx + 1}
+              state={search}
+              setState={setSearch}
+              error={error}
+            />
+          )}
           {step.key === "gtky" && (
             <GtkyStep
-              stepNumber={4}
+              stepNumber={idx + 1}
               state={gtky}
               setState={setGtky}
               uploads={uploads}
@@ -324,7 +379,7 @@ export function OnboardingWizard() {
               ← Back
             </Btn>
             <div className="flex gap-2">
-              {(step.key === "heavy" || step.key === "gtky") && (
+              {(step.key === "heavy" || step.key === "search" || step.key === "gtky") && (
                 <Btn onClick={() => setIdx(idx + 1)} disabled={saving}>
                   Skip for now
                 </Btn>

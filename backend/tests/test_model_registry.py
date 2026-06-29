@@ -160,10 +160,7 @@ def test_ollama_models_available_iff_connection_configured():
 
 def test_registered_slash_ids_keep_their_provider():
     # The "/" -> openrouter rule must NOT steal Groq's registered slash ids.
-    assert (
-        model_registry.infer_provider("meta-llama/llama-4-scout-17b-16e-instruct")
-        == "groq"
-    )
+    assert model_registry.infer_provider("openai/gpt-oss-20b") == "groq"
     assert model_registry.infer_provider("openai/gpt-oss-120b") == "groq"
 
 

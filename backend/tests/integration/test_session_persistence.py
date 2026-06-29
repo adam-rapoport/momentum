@@ -15,7 +15,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import Text, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Message, Session
@@ -96,6 +96,51 @@ async def test_message_persists_under_session(
     assert len(msgs) == 1
     assert msgs[0].role == "user"
     assert msgs[0].content == [{"type": "text", "text": "hello"}]
+
+
+async def test_session_search_matches_title_and_message_content(
+    db: AsyncSession, seeded: dict
+):
+    """The C4 search expression (title OR CAST(content AS TEXT) ILIKE) must run
+    on the test DB (SQLite) and match phrases inside message content, not just
+    titles."""
+    user = seeded["user"]
+    project = seeded["project"]
+    s1, s2 = uuid4(), uuid4()
+    db.add_all(
+        [
+            Session(id=s1, user_id=user.id, project_id=project.id, title="Planning doc"),
+            Session(id=s2, user_id=user.id, project_id=project.id, title="Misc notes"),
+        ]
+    )
+    await db.flush()
+    db.add(
+        Message(
+            id=uuid4(),
+            session_id=s1,
+            turn_id=1,
+            role="user",
+            content=[{"type": "text", "text": "let's discuss the kangaroo roadmap"}],
+        )
+    )
+    await db.commit()
+
+    def search(q: str):
+        pattern = f"%{q}%"
+        msg_match = select(Message.session_id).where(
+            cast(Message.content, Text).ilike(pattern)
+        )
+        return select(Session).where(
+            Session.user_id == user.id,
+            or_(Session.title.ilike(pattern), Session.id.in_(msg_match)),
+        )
+
+    # Content match, case-insensitive — only s1 has "kangaroo" in a message.
+    res = list((await db.scalars(search("KANGAROO"))).all())
+    assert [s.id for s in res] == [s1]
+    # Title match — only s2.
+    res2 = list((await db.scalars(search("misc"))).all())
+    assert [s.id for s in res2] == [s2]
 
 
 async def test_truncate_isolates_tests(db: AsyncSession, seeded: dict):

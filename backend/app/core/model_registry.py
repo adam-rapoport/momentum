@@ -42,38 +42,24 @@ class ModelEntry:
     context_window: int = 128_000
 
 
-# Model IDs below were verified against each provider's live model-list API in
-# June 2026 (Groq /v1/models, Google /v1beta/models). When refreshing, re-check
-# those endpoints rather than trusting docs — providers retire IDs on their own
-# schedule. Gemini 2.5 was dropped here because Google has it scheduled for
-# shutdown in Oct 2026.
+# Model IDs below were verified against each provider's live model-list API
+# (Groq /v1/models, Google /v1beta/models). When refreshing, re-check those
+# endpoints rather than trusting docs — providers retire IDs on their own
+# schedule. Removed June 2026: Gemini 2.5 (Google shutdown Oct 2026) and Llama 4
+# Scout (Groq deprecated it 2026-06-17 → openai/gpt-oss-* are the recommended
+# replacements — but gpt-oss-* turned out to need a PAID Groq developer tier,
+# NOT the free tier, so the default light model is the free llama-3.1-8b-instant.
+# Model IDs below were re-verified against Groq's live /v1/models (2026-06-28).
 REGISTRY: tuple[ModelEntry, ...] = (
-    # --- Groq (free tier) ---
-    ModelEntry(
-        id="meta-llama/llama-4-scout-17b-16e-instruct",
-        context_window=131_072,
-        provider="groq",
-        display_name="Llama 4 Scout (Groq)",
-        # "either" so Groq can be picked for the heavy slot too — it's fast and
-        # free, though weaker than Gemma/Gemini for long-form drafting.
-        role="either",
-        notes="Default light model. Fast, cheap, reliable for chat and tool-heavy turns. Usable as a fast (lower-quality) heavy model too.",
-    ),
+    # --- Groq (fast inference; free tier gated only by rate limits) ---
     ModelEntry(
         id="llama-3.1-8b-instant",
         context_window=131_072,
         provider="groq",
         display_name="Llama 3.1 8B Instant (Groq)",
-        role="light",
-        notes="Smaller alternative — even faster, slightly weaker on multi-turn tool use.",
-    ),
-    ModelEntry(
-        id="openai/gpt-oss-20b",
-        context_window=131_072,
-        provider="groq",
-        display_name="GPT-OSS 20B (Groq)",
-        role="light",
-        notes="Very fast open model served on Groq's production tier. A stable light pick.",
+        # "either" so Groq can fill the heavy slot too — fast and free.
+        role="either",
+        notes="Default light model. Very fast and free on Groq — reliable for chat and tool-heavy turns.",
     ),
     ModelEntry(
         id="llama-3.3-70b-versatile",
@@ -84,12 +70,36 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Larger Llama — stronger for drafting, still fast and free on Groq.",
     ),
     ModelEntry(
+        id="qwen/qwen3-32b",
+        context_window=131_072,
+        provider="groq",
+        display_name="Qwen3 32B (Groq)",
+        role="either",
+        notes="Capable mid-size open model, free on Groq. Strong all-rounder with tool use.",
+    ),
+    ModelEntry(
+        id="qwen/qwen3.6-27b",
+        context_window=131_072,
+        provider="groq",
+        display_name="Qwen3.6 27B (Groq)",
+        role="either",
+        notes="Newer Qwen — Groq's recommended replacement for the retired Llama 4 Scout. Free.",
+    ),
+    ModelEntry(
+        id="openai/gpt-oss-20b",
+        context_window=131_072,
+        provider="groq",
+        display_name="GPT-OSS 20B (Groq)",
+        role="either",
+        notes="Fast open model — needs a PAID Groq developer tier (not available on the free tier).",
+    ),
+    ModelEntry(
         id="openai/gpt-oss-120b",
         context_window=131_072,
         provider="groq",
         display_name="GPT-OSS 120B (Groq)",
         role="heavy",
-        notes="Largest open model on Groq — strong reasoning/drafting, still free.",
+        notes="Largest open model on Groq, strong reasoning — needs a PAID Groq developer tier.",
     ),
     # --- Google: Gemma (open model, free tier) ---
     ModelEntry(
@@ -208,6 +218,14 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Cheap, fast light pick via OpenRouter.",
     ),
     ModelEntry(
+        id="anthropic/claude-haiku-4.5",
+        context_window=200_000,
+        provider="openrouter",
+        display_name="Claude Haiku 4.5 (OpenRouter)",
+        role="light",
+        notes="Anthropic's fast, cheap model via OpenRouter — a strong light pick.",
+    ),
+    ModelEntry(
         id="google/gemini-3.5-flash",
         context_window=1_000_000,
         provider="openrouter",
@@ -230,6 +248,31 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="GPT-5 (OpenRouter)",
         role="heavy",
         notes="OpenAI's flagship via OpenRouter.",
+    ),
+    # Popular open-model picks via OpenRouter (live-verified 2026-06-28).
+    ModelEntry(
+        id="deepseek/deepseek-chat-v3.1",
+        context_window=163_840,
+        provider="openrouter",
+        display_name="DeepSeek V3.1 (OpenRouter)",
+        role="either",
+        notes="Popular, very cheap workhorse — strong general chat + drafting.",
+    ),
+    ModelEntry(
+        id="deepseek/deepseek-r1",
+        context_window=163_840,
+        provider="openrouter",
+        display_name="DeepSeek R1 (OpenRouter)",
+        role="heavy",
+        notes="DeepSeek's reasoning model — good for hard, multi-step drafting.",
+    ),
+    ModelEntry(
+        id="meta-llama/llama-3.3-70b-instruct",
+        context_window=131_072,
+        provider="openrouter",
+        display_name="Llama 3.3 70B (OpenRouter)",
+        role="either",
+        notes="Popular open Llama — solid, low-cost all-rounder.",
     ),
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.

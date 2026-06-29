@@ -39,9 +39,11 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with gsk_, ~56 chars",
     keyPrefix: "gsk_",
     keyLength: [40, 100],
+    // Free-tier defaults: gpt-oss-* need a PAID Groq developer tier, so the
+    // free Llama models are the defaults (8B light, 70B heavy).
     defaultModel: {
-      light: "meta-llama/llama-4-scout-17b-16e-instruct",
-      heavy: "meta-llama/llama-4-scout-17b-16e-instruct",
+      light: "llama-3.1-8b-instant",
+      heavy: "llama-3.3-70b-versatile",
     },
   },
   google: {

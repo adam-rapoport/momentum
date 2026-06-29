@@ -31,6 +31,35 @@ _SLASH_RE = re.compile(r"^/([a-z][a-z0-9-]*)\b", re.IGNORECASE)
 CLEAR_SENTINEL = "__CLEAR__"
 EXIT_COMMANDS = {"cancel-skill", "exit-skill", "restart"}
 
+# Filler words dropped from a trigger phrase before matching, so a phrase like
+# "write a prd" reduces to the essential verb+noun ("write", "prd") and also
+# fires on "write me a prd", "write up a quick prd", etc.
+_FILLER_WORDS = frozenset(
+    {"a", "an", "the", "my", "our", "your", "us", "me", "for", "to", "of",
+     "some", "please", "can", "you", "could", "up", "out", "new"}
+)
+# Between the kept tokens, allow at most this many words (so the verb and noun
+# can be a few words apart but still on the same intent — e.g.
+# "write up a quick prd").
+_TRIGGER_GAP = r"(?:\s+\w+){0,3}\s+"
+
+
+def _keyword_matches(keyword: str, text: str) -> bool:
+    """Conservative, filler-tolerant match of a trigger phrase against `text`.
+
+    The phrase's essential tokens (filler words removed) must appear in order,
+    separated by at most a couple of words, on word boundaries. A single-token
+    phrase (e.g. an acronym like "qbr"/"adr") matches as a whole word. `text`
+    is expected to already be lowercased.
+    """
+    tokens = [t for t in keyword.split() if t not in _FILLER_WORDS] or keyword.split()
+    if not tokens:
+        return False
+    if len(tokens) == 1:
+        return re.search(rf"\b{re.escape(tokens[0])}\b", text) is not None
+    pattern = r"\b" + _TRIGGER_GAP.join(re.escape(t) for t in tokens) + r"\b"
+    return re.search(pattern, text) is not None
+
 
 @dataclass
 class Skill:
@@ -129,8 +158,10 @@ def detect_skill(user_text: str, session_metadata: dict | None) -> str | None:
     Rules (first match wins):
       1. Explicit exit (`/cancel-skill`, `/exit-skill`, `/restart`) -> CLEAR_SENTINEL
       2. Slash command at start (`/write-prd ...`) matching a known skill -> skill.name
-      3. No skill currently active + user message contains a multi-word
-         trigger_keyword -> skill.name
+      3. No skill currently active + user message matches a skill's
+         trigger_keyword (intent) -> skill.name. Matching is filler-tolerant
+         (see `_keyword_matches`) so natural phrasings like "write me a PRD"
+         behave like the `/write-prd` slash command.
       4. Otherwise -> None (no change to active_skill)
 
     Returning None means "don't touch whatever's already in session metadata."
@@ -155,6 +186,6 @@ def detect_skill(user_text: str, session_metadata: dict | None) -> str | None:
     lowered = stripped.lower()
     for skill in load_skills().values():
         for keyword in skill.trigger_keywords:
-            if " " in keyword and keyword in lowered:
+            if _keyword_matches(keyword, lowered):
                 return skill.name
     return None

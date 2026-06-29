@@ -138,6 +138,9 @@ export function Sidebar() {
   const openSettings = useUiStore((s) => s.openSettings);
 
   const [query, setQuery] = useState("");
+  // Server-side search hits (title AND message content). null = not searching;
+  // populated by the debounced effect below.
+  const [searchResults, setSearchResults] = useState<Session[] | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   // Theme is read from <html data-theme> after mount (set pre-paint by the
@@ -159,6 +162,29 @@ export function Sidebar() {
     const t = document.documentElement.dataset.theme;
     if (t === "dark" || t === "light") setTheme(t);
   }, []);
+
+  // Debounced server-side search over titles + message contents. Empty query
+  // clears it (the full store list shows instead).
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setSearchResults(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .listSessions(q)
+        .then((r) => {
+          if (!cancelled) setSearchResults(r);
+        })
+        .catch((err) => console.error("session search failed:", err));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
@@ -200,8 +226,10 @@ export function Sidebar() {
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // While searching: use server results (title + content matches) once they
+    // arrive; until then fall back to an instant client-side title filter.
     const filtered = q
-      ? sessions.filter((s) => (s.title ?? "").toLowerCase().includes(q))
+      ? (searchResults ?? sessions.filter((s) => (s.title ?? "").toLowerCase().includes(q)))
       : sessions;
     const byGroup: Partial<Record<RecencyGroup, Session[]>> = {};
     for (const s of filtered) {
@@ -211,7 +239,7 @@ export function Sidebar() {
       name: g,
       items: byGroup[g] as Session[],
     }));
-  }, [sessions, query]);
+  }, [sessions, query, searchResults]);
 
   const displayName = profile?.display_name ?? "You";
 
@@ -240,8 +268,8 @@ export function Sidebar() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search chats"
-            aria-label="Search chats"
+            placeholder="Search chats & messages"
+            aria-label="Search chats and messages"
             className="h-[30px] w-full rounded-[7px] border border-line bg-app pl-7 pr-2.5 text-[12.5px] text-ink outline-none placeholder:text-ink-dim focus:border-line-strong"
           />
         </div>

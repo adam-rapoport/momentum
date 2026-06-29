@@ -56,6 +56,9 @@ interface ChatState {
 
   setSessions: (s: Session[]) => void;
   upsertSession: (s: Session) => void;
+  /** Update a session's title in place (e.g. the engine's AI-generated title
+   * arriving via a session.renamed frame). Never reorders the list. */
+  renameSession: (id: string, title: string) => void;
   /** Move a session to the top of the list. Only called when a message is
    * actually sent or a turn completes — opening a session must NOT reorder. */
   bumpSession: (id: string) => void;
@@ -135,6 +138,14 @@ export const useChatStore = create<ChatState>((set) => ({
       if (idx === -1) return { sessions: [s, ...state.sessions] };
       const sessions = [...state.sessions];
       sessions[idx] = s;
+      return { sessions };
+    }),
+  renameSession: (id, title) =>
+    set((state) => {
+      const idx = state.sessions.findIndex((x) => x.id === id);
+      if (idx === -1) return state;
+      const sessions = [...state.sessions];
+      sessions[idx] = { ...sessions[idx], title };
       return { sessions };
     }),
   bumpSession: (id) =>

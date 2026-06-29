@@ -71,8 +71,13 @@ def test_classify_approve_words():
 
 
 def test_classify_restart_words():
-    for text in ["/restart", "cancel", "start over"]:
+    for text in ["/restart", "restart", "start over", "redo"]:
         assert _classify_review_response(text) == "restart", text
+
+
+def test_classify_cancel_words():
+    for text in ["/cancel", "cancel", "stop"]:
+        assert _classify_review_response(text) == "cancel", text
 
 
 def test_classify_revise_requires_slash():
@@ -93,9 +98,9 @@ def test_classify_lenient_approve_phrases():
         assert _classify_review_response(text) == "approve", text
 
 
-def test_classify_lenient_restart_phrases():
+def test_classify_lenient_cancel_phrases():
     for text in ["No", "don't", "stop", "Don't send it.", "never mind", "do not send"]:
-        assert _classify_review_response(text) == "restart", text
+        assert _classify_review_response(text) == "cancel", text
 
 
 def test_classify_free_text_stays_none():
