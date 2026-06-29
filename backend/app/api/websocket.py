@@ -91,6 +91,15 @@ _RATE_LIMIT_HINTS = (
     "resource_exhausted",
     "quota",
 )
+# A rate-limit error that's specifically Groq's tight free-tier TPM cap. The
+# app's per-turn context exceeds Groq free's ~6k tokens/min, so these users get
+# a tailored hint pointing at Gemini's roomier free tier (Groq's 429 body reads
+# "...on tokens per minute (TPM): Limit 6000, Used ...").
+_GROQ_RATE_LIMIT_HINTS = (
+    "groq",
+    "tokens per minute",
+    "(tpm)",
+)
 _CONTEXT_TOO_LONG_HINTS = (
     "context_length_exceeded",
     "maximum context length",
@@ -165,6 +174,19 @@ def _model_error_frame(e: BaseException, session_id: UUID) -> dict | None:
             f"provider. Provider said: {e}",
         )
     if status == 429 or any(hint in msg for hint in _RATE_LIMIT_HINTS):
+        # Groq's free tier caps tokens-per-minute below this app's per-turn
+        # context, so retrying won't help — steer the user to Gemini's roomier
+        # free tier rather than the generic "wait and retry".
+        if any(hint in msg for hint in _GROQ_RATE_LIMIT_HINTS):
+            return frame(
+                "MODEL_RATE_LIMITED",
+                "Groq's free tier limits how many tokens you can send per "
+                "minute, and this app's context is larger than that limit, so "
+                "retrying won't help. For a reliable free experience, open "
+                "Settings → Models and set the light model to a Google Gemini "
+                "model (e.g. Gemini 3.1 Flash Lite) — its free tier is far more "
+                "generous. Otherwise, upgrade to a paid Groq tier.",
+            )
         return frame(
             "MODEL_RATE_LIMITED",
             "The model provider is rate-limiting requests (free-tier quota "

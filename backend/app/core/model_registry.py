@@ -48,7 +48,10 @@ class ModelEntry:
 # schedule. Removed June 2026: Gemini 2.5 (Google shutdown Oct 2026) and Llama 4
 # Scout (Groq deprecated it 2026-06-17 → openai/gpt-oss-* are the recommended
 # replacements — but gpt-oss-* turned out to need a PAID Groq developer tier,
-# NOT the free tier, so the default light model is the free llama-3.1-8b-instant.
+# NOT the free tier). The default LIGHT model is now gemini-3.1-flash-lite, not
+# a Groq model: Groq's free tier ~6k tokens/min cap is smaller than the app's
+# per-turn context, so every Groq free turn 429s (see app.config.groq_model).
+# Groq models remain here and stay user-selectable (good on a paid Groq tier).
 # Model IDs below were re-verified against Groq's live /v1/models (2026-06-28).
 REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
@@ -59,7 +62,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Llama 3.1 8B Instant (Groq)",
         # "either" so Groq can fill the heavy slot too — fast and free.
         role="either",
-        notes="Default light model. Very fast and free on Groq — reliable for chat and tool-heavy turns.",
+        notes="Very fast and free on Groq, but the free tier's ~6k tokens/min cap is too small for this app's context — best on a paid Groq tier.",
     ),
     ModelEntry(
         id="llama-3.3-70b-versatile",

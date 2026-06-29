@@ -103,6 +103,24 @@ async def test_openai_rate_limit_routes_to_model_rate_limited():
 
     frame = await _run_case(_status_error(openai.RateLimitError, 429, "slow down"))
     assert frame["code"] == "MODEL_RATE_LIMITED"
+    # A generic 429 keeps the provider-neutral guidance — no Groq/Gemini steer.
+    assert "Gemini" not in frame["message"]
+
+
+async def test_groq_free_tier_tpm_429_recommends_gemini():
+    import openai
+
+    # Groq's free-tier 429 body names the per-minute token cap. Because the
+    # app's context exceeds that cap, retrying won't help — the message should
+    # steer the user to Gemini's roomier free tier instead.
+    msg = (
+        "Rate limit reached for model `llama-3.1-8b-instant` in organization "
+        "`org_x` on tokens per minute (TPM): Limit 6000, Used 5980. Visit "
+        "https://console.groq.com to upgrade."
+    )
+    frame = await _run_case(_status_error(openai.RateLimitError, 429, msg))
+    assert frame["code"] == "MODEL_RATE_LIMITED"
+    assert "Gemini" in frame["message"]
 
 
 async def test_context_length_message_routes_to_context_too_long():
