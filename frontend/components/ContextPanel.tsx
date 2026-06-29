@@ -86,6 +86,15 @@ function MemoryTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  const memoryCollapsed = useUiStore((s) => s.memoryCollapsed);
+  const toggleMemoryCategory = useUiStore((s) => s.toggleMemoryCategory);
+
+  // Search over memory names + contents. Mirrors the sidebar chat search:
+  // instant client-side name filter while typing, debounced server query for
+  // content matches.
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<MemoryRecordSummary[] | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -184,7 +193,46 @@ function MemoryTab() {
     };
   }, [selectedId]);
 
-  const grouped = useMemo(() => groupByType(memories), [memories]);
+  // Debounced server-side search over names + contents (search_text). Empty
+  // query clears it; the full grouped list shows instead.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setSearchResults(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .listMemories(undefined, q)
+        .then((r) => {
+          if (!cancelled) setSearchResults(r);
+        })
+        .catch((err) => console.error("memory search failed:", err));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  const searching = query.trim().length > 0;
+  const grouped = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    // While searching: use the server results (name + content matches) once
+    // they arrive; until then fall back to an instant client-side filter over
+    // the already-loaded names/summaries.
+    const visible = q
+      ? (searchResults ??
+          memories.filter(
+            (m) =>
+              m.title.toLowerCase().includes(q) ||
+              (m.summary ?? "").toLowerCase().includes(q),
+          ))
+      : memories;
+    return groupByType(visible);
+  }, [memories, query, searchResults]);
+  const hasMatches = TYPE_ORDER.some((t) => grouped[t]?.length);
 
   return (
     <div
@@ -227,6 +275,22 @@ function MemoryTab() {
           {uploading ? "Analyzing…" : "Add from documents…"}
         </button>
       </div>
+      {memories.length > 0 && (
+        <div className="px-3 pb-1.5 pt-2">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-dim">
+              <PixelIcon name="search" size={11} />
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search memories"
+              aria-label="Search memories by name or content"
+              className="h-[30px] w-full rounded-[7px] border border-line bg-app pl-7 pr-2.5 text-[12.5px] text-ink outline-none placeholder:text-ink-dim focus:border-line-strong"
+            />
+          </div>
+        </div>
+      )}
       {uploadNote && (
         <div
           className={`px-4 py-1.5 text-[11.5px] leading-snug ${
@@ -244,17 +308,36 @@ function MemoryTab() {
             available across sessions. You can also add memories from a document — a PRD, a
             strategy doc, meeting notes — with the button above.
           </div>
+        ) : !hasMatches ? (
+          <div className="px-4 py-3 text-xs leading-relaxed text-ink-dim">
+            No memories match “{query.trim()}”.
+          </div>
         ) : (
           TYPE_ORDER.filter((t) => grouped[t]?.length).map((t) => {
             const group = grouped[t] ?? [];
+            // Collapse applies only in the normal browse view; during an active
+            // search every matching category stays open so results are visible.
+            const collapsed = !searching && memoryCollapsed[t];
             return (
               <div key={t} className="mb-3.5">
-                <div className="flex items-center gap-1.5 px-4 pb-1 text-ink-dim">
+                <button
+                  type="button"
+                  disabled={searching}
+                  onClick={() => toggleMemoryCategory(t)}
+                  aria-expanded={!collapsed}
+                  className="flex w-full items-center gap-1.5 px-4 pb-1 text-ink-dim transition-colors duration-100 hover:text-ink-muted disabled:cursor-default disabled:hover:text-ink-dim"
+                >
                   <PixelIcon name={TYPE_ICONS[t]} size={10} />
                   <PxLabel>{TYPE_LABELS[t]}</PxLabel>
                   <span className="font-mono text-[10.5px] text-ink-dim">{group.length}</span>
-                </div>
-                {group.map((r) => {
+                  {!searching && (
+                    <span className="ml-auto text-ink-dim">
+                      <PixelIcon name={collapsed ? "chevR" : "chevD"} size={9} />
+                    </span>
+                  )}
+                </button>
+                {!collapsed &&
+                  group.map((r) => {
                   const active = r.id === selectedId;
                   return (
                     <button

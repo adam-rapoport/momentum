@@ -254,10 +254,16 @@ async def list_memories(
     db: AsyncSession,
     project: Project,
     mem_type: str | None = None,
+    q: str | None = None,
 ) -> list[MemoryRecord]:
     stmt = select(MemoryRecord).where(MemoryRecord.project_id == project.id)
     if mem_type is not None:
         stmt = stmt.where(MemoryRecord.type == mem_type)
+    if q and q.strip():
+        # search_text holds "title + summary + body", so one ILIKE matches a
+        # keyword in a memory's NAME or its CONTENT. SQLAlchemy renders ilike
+        # portably (lower(col) LIKE lower(?)) on both SQLite and Postgres.
+        stmt = stmt.where(MemoryRecord.search_text.ilike(f"%{q.strip()}%"))
     stmt = stmt.order_by(MemoryRecord.type, MemoryRecord.updated_at.desc())
     return list((await db.scalars(stmt)).all())
 

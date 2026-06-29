@@ -238,6 +238,36 @@ async def test_list_memories_filters_by_type(db, seeded):
     assert [m.title for m in only] == ["D"]
 
 
+async def test_list_memories_filters_by_query_in_name_and_content(db, seeded):
+    """The `q` filter matches a keyword in a memory's NAME or its CONTENT
+    (via the search_text index) — not just the title."""
+    project = seeded["project"]
+    await save_memory(
+        db=db, project=project, mem_type="stakeholder",
+        title="Priya the designer", content="Leads the mobile redesign.",
+    )
+    await save_memory(
+        db=db, project=project, mem_type="decision",
+        title="Q3 roadmap", content="We will prioritize onboarding polish.",
+    )
+    await db.commit()
+
+    # Keyword only in a TITLE.
+    by_name = await list_memories(db=db, project=project, q="priya")
+    assert [m.title for m in by_name] == ["Priya the designer"]
+
+    # Keyword only in the CONTENT/body (no title contains it) — must match too.
+    by_content = await list_memories(db=db, project=project, q="onboarding")
+    assert [m.title for m in by_content] == ["Q3 roadmap"]
+
+    # Case-insensitive.
+    assert await list_memories(db=db, project=project, q="ONBOARDING")
+
+    # No match -> empty; blank/whitespace q -> unfiltered.
+    assert await list_memories(db=db, project=project, q="zzz-nope") == []
+    assert len(await list_memories(db=db, project=project, q="  ")) == 2
+
+
 def test_read_memory_file_missing_file_is_graceful(tmp_path):
     from types import SimpleNamespace
 

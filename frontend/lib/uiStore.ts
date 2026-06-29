@@ -37,9 +37,13 @@ interface UiState {
   // has finished its initial load (avoids the mount-fetch clobbering the
   // optimistic user bubble).
   queuedFirstMessage: QueuedFirstMessage | null;
+  // Which Memory-pane categories are collapsed (keyed by memory type). Held in
+  // the store so a collapse survives switching the Context panel's tabs.
+  memoryCollapsed: Record<string, boolean>;
 
   setContextPanelOpen: (open: boolean) => void;
   setContextTab: (tab: ContextTab) => void;
+  toggleMemoryCategory: (type: string) => void;
   openSettings: (pane?: SettingsPane) => void;
   closeSettings: () => void;
   setGoogleBanner: (banner: GoogleBanner | null) => void;
@@ -59,6 +63,7 @@ export const useUiStore = create<UiState>((set) => ({
   googleBanner: null,
   profile: null,
   queuedFirstMessage: null,
+  memoryCollapsed: {},
 
   setContextPanelOpen: (open) => {
     set({ contextPanelOpen: open });
@@ -69,6 +74,10 @@ export const useUiStore = create<UiState>((set) => ({
     }
   },
   setContextTab: (tab) => set({ contextTab: tab }),
+  toggleMemoryCategory: (type) =>
+    set((s) => ({
+      memoryCollapsed: { ...s.memoryCollapsed, [type]: !s.memoryCollapsed[type] },
+    })),
   openSettings: (pane) => set((s) => ({ settingsOpen: true, settingsPane: pane ?? s.settingsPane })),
   closeSettings: () => set({ settingsOpen: false, googleBanner: null }),
   setGoogleBanner: (banner) => set({ googleBanner: banner }),

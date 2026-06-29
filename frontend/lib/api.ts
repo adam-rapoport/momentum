@@ -136,9 +136,14 @@ export const api = {
   archiveSession: (id: string) =>
     request<void>(`/api/v1/sessions/${id}`, { method: "DELETE" }),
 
-  listMemories: (projectId?: string) => {
-    const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
-    return request<MemoryRecordSummary[]>(`/api/v1/memory${q}`);
+  // `q` matches a keyword in a memory's NAME or its CONTENT (server-side, via
+  // the search_text index); omit for the full list.
+  listMemories: (projectId?: string, q?: string) => {
+    const params = new URLSearchParams();
+    if (projectId) params.set("project_id", projectId);
+    if (q && q.trim()) params.set("q", q.trim());
+    const qs = params.toString();
+    return request<MemoryRecordSummary[]>(`/api/v1/memory${qs ? `?${qs}` : ""}`);
   },
   getMemory: (id: string) =>
     request<MemoryRecordDetail>(`/api/v1/memory/${id}`),

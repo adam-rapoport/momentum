@@ -35,10 +35,13 @@ async def _resolve_project(
 @router.get("", response_model=list[MemoryRecordSummary])
 async def list_memory_records(
     project_id: UUID | None = None,
+    q: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[MemoryRecord]:
+    """List memories, optionally filtered by `q` — a case-insensitive keyword
+    match over each memory's name AND content (via the search_text index)."""
     project = await _resolve_project(db, project_id)
-    return await list_memories(db=db, project=project)
+    return await list_memories(db=db, project=project, q=q)
 
 
 @router.post("/documents")
