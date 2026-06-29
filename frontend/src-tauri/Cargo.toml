@@ -5,7 +5,8 @@ name = "app"
 version = "0.1.0"
 description = "pMomentum desktop shell — Tauri 2 wrapper around the Next.js UI and the Python backend sidecar"
 authors = ["Adam Rapoport"]
-# Private project, no license — all rights reserved (see README.md).
+license = "MIT"
+# Not published to crates.io — this is the app shell, not a library.
 publish = false
 repository = "https://github.com/adam-rapoport/pmomentum"
 edition = "2021"

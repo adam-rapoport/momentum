@@ -153,4 +153,4 @@ pmomentum/
 
 ## License
 
-Private project, no license. All rights reserved.
+Released under the [MIT License](LICENSE) © 2026 Adam Rapoport.
