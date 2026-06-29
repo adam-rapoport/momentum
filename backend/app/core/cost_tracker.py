@@ -81,7 +81,14 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "openai/gpt-5": ModelPricing("1.25", "10.00"),
     "deepseek/deepseek-chat-v3.1": ModelPricing("0.21", "0.79"),
     "deepseek/deepseek-r1": ModelPricing("0.70", "2.50"),
+    "deepseek/deepseek-v4-flash": ModelPricing("0.09", "0.18"),
     "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
+    # Z.ai GLM + MiniMax via OpenRouter (rates per openrouter.ai/models,
+    # 2026-06-29). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
+    # $0.60/$2.40); free-tier-style discounts just display a lower cost.
+    "z-ai/glm-5.2": ModelPricing("0.95", "3.00"),
+    "z-ai/glm-5": ModelPricing("0.60", "1.92"),
+    "minimax/minimax-m3": ModelPricing("0.30", "1.20"),
 
     # --- Mistral (per mistral.ai pricing; estimates — free tier is $0) ---
     "mistral-small-latest": ModelPricing("0.10", "0.30"),

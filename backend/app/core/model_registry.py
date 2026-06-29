@@ -277,6 +277,40 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="Popular open Llama — solid, low-cost all-rounder.",
     ),
+    # Z.ai GLM + newer open agentic models via OpenRouter (live-verified
+    # 2026-06-29 against openrouter.ai/models).
+    ModelEntry(
+        id="z-ai/glm-5.2",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="GLM 5.2 (OpenRouter)",
+        role="either",
+        notes="Z.ai's GLM 5.2 — 1M context, strong at coding + agentic tool use. Cheap heavy pick.",
+    ),
+    ModelEntry(
+        id="z-ai/glm-5",
+        context_window=202_752,
+        provider="openrouter",
+        display_name="GLM 5 (OpenRouter)",
+        role="either",
+        notes="Z.ai's GLM 5 — a cheaper sibling of 5.2 for long-horizon agent work.",
+    ),
+    ModelEntry(
+        id="deepseek/deepseek-v4-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="DeepSeek V4 Flash (OpenRouter)",
+        role="either",
+        notes="Very cheap, fast MoE — 1M context, strong reasoning/coding. Great low-cost workhorse.",
+    ),
+    ModelEntry(
+        id="minimax/minimax-m3",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="MiniMax M3 (OpenRouter)",
+        role="either",
+        notes="1M context, strong coding/agentic tool use — mid-priced all-rounder.",
+    ),
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.
     ModelEntry(

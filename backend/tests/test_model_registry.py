@@ -164,6 +164,23 @@ def test_registered_slash_ids_keep_their_provider():
     assert model_registry.infer_provider("openai/gpt-oss-120b") == "groq"
 
 
+def test_new_openrouter_models_registered_with_correct_provider():
+    """GLM 5.2 + complementary OpenRouter additions (2026-06-29): the exact
+    live-verified slugs must resolve to the openrouter provider. A typo in a
+    slug, or the slash->openrouter heuristic regressing, would be caught here."""
+    expected = {
+        "z-ai/glm-5.2",
+        "z-ai/glm-5",
+        "deepseek/deepseek-v4-flash",
+        "minimax/minimax-m3",
+    }
+    by_id = {m.id: m for m in REGISTRY}
+    for mid in expected:
+        assert mid in by_id, f"{mid} missing from registry"
+        assert by_id[mid].provider == "openrouter"
+        assert model_registry.infer_provider(mid) == "openrouter"
+
+
 def test_provider_available_honors_configured_set():
     assert model_registry.provider_available("openai", {"openai"})
     assert not model_registry.provider_available("groq", {"openai"})
