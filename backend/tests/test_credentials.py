@@ -23,7 +23,7 @@ def test_llm_provider_for_model_maps_openai_prefixes():
 
 def test_llm_provider_for_model_maps_new_providers():
     # Registry entries:
-    assert credentials.llm_provider_for_model("claude-sonnet-4-6") == "llm:anthropic"
+    assert credentials.llm_provider_for_model("claude-sonnet-5") == "llm:anthropic"
     assert credentials.llm_provider_for_model("mistral-large-latest") == "llm:mistral"
     assert credentials.llm_provider_for_model("openai/gpt-5") == "llm:openrouter"
     # Unregistered prefix-heuristic fallbacks:

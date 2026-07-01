@@ -192,12 +192,12 @@ REGISTRY: tuple[ModelEntry, ...] = (
         client="anthropic_sdk",
     ),
     ModelEntry(
-        id="claude-sonnet-4-6",
+        id="claude-sonnet-5",
         context_window=1_000_000,
         provider="anthropic",
-        display_name="Claude Sonnet 4.6 (Anthropic)",
+        display_name="Claude Sonnet 5 (Anthropic)",
         role="either",
-        notes="Anthropic's best speed/quality balance — the recommended heavy pick. Paid.",
+        notes="Anthropic's newest Sonnet — near-Opus quality for coding and reasoning at Sonnet pricing. The recommended heavy pick. Paid (intro pricing through Aug 2026).",
         client="anthropic_sdk",
     ),
     ModelEntry(
@@ -237,12 +237,12 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Fast all-rounder via OpenRouter.",
     ),
     ModelEntry(
-        id="anthropic/claude-sonnet-4.6",
+        id="anthropic/claude-sonnet-5",
         context_window=1_000_000,
         provider="openrouter",
-        display_name="Claude Sonnet 4.6 (OpenRouter)",
+        display_name="Claude Sonnet 5 (OpenRouter)",
         role="either",
-        notes="Claude Sonnet served via OpenRouter — good heavy pick.",
+        notes="Anthropic's newest Sonnet served via OpenRouter — a strong heavy pick.",
     ),
     ModelEntry(
         id="openai/gpt-5",

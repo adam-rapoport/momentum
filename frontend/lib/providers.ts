@@ -86,7 +86,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with sk-ant-",
     keyPrefix: "sk-ant-",
     keyLength: [40, 200],
-    defaultModel: { light: "claude-haiku-4-5", heavy: "claude-sonnet-4-6" },
+    defaultModel: { light: "claude-haiku-4-5", heavy: "claude-sonnet-5" },
   },
   openrouter: {
     id: "openrouter",
@@ -100,7 +100,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with sk-or-",
     keyPrefix: "sk-or-",
     keyLength: [30, 200],
-    defaultModel: { light: "openai/gpt-5-mini", heavy: "anthropic/claude-sonnet-4.6" },
+    defaultModel: { light: "openai/gpt-5-mini", heavy: "anthropic/claude-sonnet-5" },
   },
   mistral: {
     id: "mistral",
