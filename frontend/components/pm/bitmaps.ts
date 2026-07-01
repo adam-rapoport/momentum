@@ -1,6 +1,6 @@
 // 9×9 pixel icon bitmaps — the retro layer's icon set.
 // '#' = filled cell; rendered as SVG rects by PixelIcon.
-// Ported from docs/design/graphite-phosphor/pm-kit.jsx (search row corrected).
+// Ported from the design-system pixel kit (search row corrected).
 
 export const PM_BITMAPS = {
   plus: [

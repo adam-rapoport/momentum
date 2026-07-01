@@ -55,3 +55,13 @@ Thumbs.db
 .claude/settings.local.json
 # Transient agent worktrees created during Claude Code sessions.
 .claude/worktrees/
+
+# --- Code signing / notarization / updater keys (NEVER commit) ---
+# Apple Developer ID certs, provisioning, and the Tauri updater private key
+# live in the Keychain and in GitHub Actions secrets — never in the repo.
+*.p12
+*.pfx
+*.cer
+*.pem
+*.mobileprovision
+*.key

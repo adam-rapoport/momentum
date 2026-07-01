@@ -6,7 +6,7 @@ import type { PixelIconName } from "./bitmaps";
 
 /* Shared primitives for the Graphite & Phosphor design system.
    Retro level is fixed at "subtle": pixel-font labels, 2px dither rules,
-   round dots/avatars. Spec: docs/design/graphite-phosphor/README.md */
+   round dots/avatars. */
 
 // Pixel-font section label — the retro "eyebrow". Never body text.
 export function PxLabel({

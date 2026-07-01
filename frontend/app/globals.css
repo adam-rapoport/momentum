@@ -6,7 +6,6 @@
    "Graphite & Phosphor" theme — cool graphite neutrals + pixel-green accent.
    Tokens drive every surface; toggle dark mode via data-theme="dark" on <html>.
    Accent is fixed (pixel green) with precomputed theme-aware variants.
-   Spec: docs/design/graphite-phosphor/README.md
    ────────────────────────────────────────────────────────────────────────── */
 :root {
   --bg-app: #f2f3f3; /* window background, toolbar */

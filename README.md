@@ -5,11 +5,11 @@
 An AI agent for product management work, packaged as a **macOS desktop app**.
 It drafts PRDs, stakeholder updates, meeting prep, release notes and more
 through guided skill workflows (slash commands), with persistent memory across
-sessions, web search, and Google Docs / Gmail / Calendar integration — using
-whichever LLM provider you have a key for.
+sessions and web search — using whichever LLM provider you have a key for.
+Google Docs / Gmail / Calendar integration is coming in a future version.
 
-Built as an MVP by a solo non-technical PM with Claude Code as the pair
-programmer. Still in active development.
+Built as an MVP with Claude Code as the pair programmer. Still in active
+development.
 
 ## The desktop app (the main way to run it)
 
@@ -36,13 +36,16 @@ API keys encrypted on your Mac, and keeps all data in
   processes and websites on the machine can't drive the agent.
 - **Frontend:** Next.js 15 (static export) + TypeScript + Tailwind + Zustand,
   rendered in the Tauri webview (or a browser during development).
-- **LLM providers:** Groq, Google AI Studio (Gemini/Gemma), and OpenAI. Keys
-  are **optional at startup** — enter any subset in the onboarding wizard or
-  Settings; they're stored in a Fernet-encrypted vault. Routing is per-turn:
-  fast model for casual/tool-heavy turns, a heavier model for drafting.
-- **Integrations:** Google Docs / Gmail / Calendar (OAuth — see
-  [docs/google-connect-setup.md](docs/google-connect-setup.md)), Tavily or
-  Perplexity for web search.
+- **LLM providers:** Groq, Google AI Studio (Gemini/Gemma), OpenAI, Anthropic,
+  OpenRouter, Mistral, and local models via Ollama. Keys are **optional at
+  startup** — enter any subset in the onboarding wizard or Settings; they're
+  stored in a Fernet-encrypted vault. Routing is per-turn: a fast model for
+  casual/tool-heavy turns, a heavier model for drafting.
+- **Web search:** Tavily or Perplexity.
+- **Integrations:** Google Docs / Gmail / Calendar is **coming in a future
+  version** — the backend is built (see
+  [docs/google-connect-setup.md](docs/google-connect-setup.md)) but the app
+  currently surfaces it as "coming soon."
 - **Desktop shell:** Tauri 2 (Rust) spawning the backend as a PyInstaller
   one-file sidecar on `localhost:8000`.
 
@@ -88,7 +91,7 @@ onboarding wizard — paste an API key for at least one provider there.
 ```bash
 # From backend/
 GROQ_API_KEY=x GOOGLE_AI_API_KEY=x OPENAI_API_KEY=x .venv/bin/pytest -q
-# → 188 passed in a few seconds
+# → 442 passed in a few seconds
 .venv/bin/ruff check .
 
 # From frontend/
@@ -126,13 +129,13 @@ pmomentum/
 │   ├── pmomentum.spec      # PyInstaller spec for the sidecar binary
 │   ├── requirements-desktop.lock  # pinned deps for reproducible desktop builds
 │   ├── scripts/            # Manual smoke tests, seed, lockfile regen
-│   └── tests/              # pytest suite (188 tests)
+│   └── tests/              # pytest suite (442 tests)
 ├── frontend/               # Next.js app (static export for the desktop shell)
 │   ├── app/                # App-router pages (chat, onboarding, settings)
 │   ├── components/         # React components
 │   ├── lib/                # API client, WS client, Zustand store, types
 │   └── src-tauri/          # Tauri 2 desktop shell (Rust)
-└── docs/                   # Setup guides + code-review/revamp plan
+└── docs/                   # Setup guides
 ```
 
 ## Development notes
