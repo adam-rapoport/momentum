@@ -19,7 +19,7 @@ from app.core.default_user import (
     DEFAULT_PROJECT_SLUG,
     DEFAULT_USER_EMAIL,
     LEGACY_ORG_SLUG,
-    LEGACY_USER_EMAIL,
+    LEGACY_USER_EMAILS,
 )
 from app.models import Organization, Project, User
 
@@ -46,8 +46,8 @@ async def ensure_default_setup(db: AsyncSession) -> None:
         await db.flush()
 
     user = await db.scalar(select(User).where(User.email == DEFAULT_USER_EMAIL))
-    if user is None:  # reuse a pre-genericization local user if present
-        user = await db.scalar(select(User).where(User.email == LEGACY_USER_EMAIL))
+    if user is None:  # reuse a pre-rename / pre-genericization local user if present
+        user = await db.scalar(select(User).where(User.email.in_(LEGACY_USER_EMAILS)))
     if user is None:
         user = User(
             id=uuid4(),

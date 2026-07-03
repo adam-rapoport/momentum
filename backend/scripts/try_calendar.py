@@ -100,7 +100,7 @@ async def main() -> None:
                 await execute_tool(
                     "CreateCalendarEvent",
                     {
-                        "summary": "pMomentum Chunk C smoke test (delete me)",
+                        "summary": "Momentum Chunk C smoke test (delete me)",
                         "start_iso": start.isoformat(),
                         "end_iso": end.isoformat(),
                         "description": "Auto-created by try_calendar. Safe to delete.",
@@ -117,7 +117,7 @@ async def main() -> None:
                 await execute_tool(
                     "CreateCalendarEvent",
                     {
-                        "summary": "pMomentum Chunk C smoke test w/ attendee (delete me)",
+                        "summary": "Momentum Chunk C smoke test w/ attendee (delete me)",
                         "start_iso": start2.isoformat(),
                         "end_iso": end2.isoformat(),
                         "attendees": [user.email or "rapoport.apps@gmail.com"],

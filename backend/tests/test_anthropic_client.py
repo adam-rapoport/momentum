@@ -233,7 +233,7 @@ async def test_stream_yields_text_then_result_with_tool_calls(monkeypatch):
                 {"role": "system", "content": "Be terse."},
                 {"role": "user", "content": "weather?"},
             ],
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5",
             tools=[WEATHER_TOOL],
         )
     ]

@@ -90,7 +90,7 @@ async def _web_fetch(input_data: dict) -> str:
         async with httpx.AsyncClient(
             timeout=20.0,
             follow_redirects=True,
-            headers={"User-Agent": "pMomentum/0.1 (+https://local.dev)"},
+            headers={"User-Agent": "Momentum/0.1 (+https://local.dev)"},
         ) as client:
             resp = await client.get(url)
     except httpx.HTTPError as e:

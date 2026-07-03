@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "pMomentum",
+  "productName": "Momentum",
   "version": "0.1.0",
-  "identifier": "com.pmomentum.desktop",
+  "identifier": "com.adamrapoport.momentum",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "pMomentum",
+        "title": "Momentum",
         "width": 1280,
         "height": 832,
         "minWidth": 980,
@@ -33,7 +33,7 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    "externalBin": ["binaries/pmomentum-backend"],
+    "externalBin": ["binaries/momentum-backend"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

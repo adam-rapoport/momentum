@@ -1,7 +1,7 @@
 [project]
-name = "pmomentum-backend"
+name = "momentum-backend"
 version = "0.1.0"
-description = "pMomentum MVP backend — AI agent harness for Product Managers"
+description = "Momentum MVP backend — AI agent harness for Product Managers"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

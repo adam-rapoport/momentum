@@ -94,7 +94,7 @@ export function GtkyStep({
     <div className="flex flex-col gap-5">
       <div>
         <PxLabel>Step {stepNumber} · About you · Optional</PxLabel>
-        <h1 className="mt-2 text-[20px] font-bold text-ink">Tell pMomentum about you</h1>
+        <h1 className="mt-2 text-[20px] font-bold text-ink">Tell Momentum about you</h1>
         <p className="mt-1 text-[13px] text-ink-muted">
           A little context helps from message one. All optional — skip and add it later from chat
           anytime.

@@ -12,7 +12,7 @@ export function IntegrationsPane() {
     <div>
       <h2 className="text-[16.5px] font-bold text-ink">Integrations</h2>
       <p className="mb-4 mt-1 text-[12.5px] text-ink-muted">
-        Connect external accounts so pMomentum can read &amp; write on your behalf. All optional.
+        Connect external accounts so Momentum can read &amp; write on your behalf. All optional.
       </p>
       {googleBanner && (
         <div className="mb-4">

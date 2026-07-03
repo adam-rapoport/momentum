@@ -250,7 +250,7 @@ export function Sidebar() {
         <div data-tauri-drag-region="" className="pm-traffic-spacer" />
         <div data-tauri-drag-region="" className="flex items-center gap-2">
           <PmLogo size={16} />
-          <span className="font-pixel text-[11px] tracking-[0.06em] text-ink">PMOMENTUM</span>
+          <span className="font-pixel text-[11px] tracking-[0.06em] text-ink">MOMENTUM</span>
         </div>
       </div>
 

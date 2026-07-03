@@ -1,11 +1,11 @@
 """In-process key/value store with TTL — a tiny stand-in for the small,
-transient slices of Redis that pMomentum actually used.
+transient slices of Redis that Momentum actually used.
 
 Redis previously held exactly two things: a "cancel this turn" flag
 (60s TTL) and a Google OAuth state token (5min TTL). Neither needs to
 survive a restart, and the app runs in a single process — so a plain
 in-memory dict with lazy expiry replaces Redis entirely. Dropping the
-external service is what lets pMomentum run as a single-user desktop
+external service is what lets Momentum run as a single-user desktop
 install with nothing to set up.
 
 Only the handful of methods the app calls are implemented, with the same

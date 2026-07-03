@@ -60,7 +60,7 @@ async function request<T>(
       signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { "X-PMomentum-Token": token } : {}),
+        ...(token ? { "X-Momentum-Token": token } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -96,7 +96,7 @@ async function uploadFileTo<T>(path: string, file: File): Promise<T> {
       method: "POST",
       body: form,
       signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-      headers: token ? { "X-PMomentum-Token": token } : {},
+      headers: token ? { "X-Momentum-Token": token } : {},
     });
   } catch (err) {
     throw timeoutError(err, UPLOAD_TIMEOUT_MS) ?? err;

@@ -1,7 +1,7 @@
 """Central logging configuration.
 
 One place to decide how the backend logs. Emits one JSON object per log
-record so logs are machine-parseable — important once pMomentum ships as a
+record so logs are machine-parseable — important once Momentum ships as a
 desktop app and we need to make sense of logs from someone else's machine.
 
 Call `configure_logging()` once at startup (from the app lifespan). Modules

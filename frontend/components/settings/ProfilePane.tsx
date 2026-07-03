@@ -75,7 +75,7 @@ export function ProfilePane({ onChanged }: { onChanged: () => void }) {
     <div>
       <h2 className="text-[16.5px] font-bold text-ink">Profile</h2>
       <p className="mb-4 mt-1 text-[12.5px] text-ink-muted">
-        pMomentum runs locally — there&apos;s no account, just how the app addresses you.
+        Momentum runs locally — there&apos;s no account, just how the app addresses you.
       </p>
 
       <div className="rounded-[12px] border border-line bg-surface p-4 shadow-card">

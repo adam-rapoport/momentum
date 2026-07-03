@@ -25,7 +25,7 @@ async def main() -> None:
     messages = [
         {
             "role": "system",
-            "content": "You are pMomentum, an AI assistant for Product Managers. Be direct and concise.",
+            "content": "You are Momentum, an AI assistant for Product Managers. Be direct and concise.",
         },
         {"role": "user", "content": prompt},
     ]

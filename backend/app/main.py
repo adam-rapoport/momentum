@@ -101,20 +101,20 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="pMomentum", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Momentum", version="0.1.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def _local_trust_boundary(request: Request, call_next) -> Response:
     """Reject requests that can't have come from a legitimate local client:
     wrong Host (DNS rebinding), cross-site Origin, or — when the desktop shell
-    configured a per-launch token — a missing/wrong X-PMomentum-Token header.
+    configured a per-launch token — a missing/wrong X-Momentum-Token header.
     The WebSocket equivalent lives in app.api.websocket. See app.security."""
     if not host_allowed(request.headers.get("host")):
         return JSONResponse(status_code=403, content={"detail": "forbidden host"})
     if not origin_allowed(request.headers.get("origin")):
         return JSONResponse(status_code=403, content={"detail": "forbidden origin"})
     if token_required(request.url.path) and not token_valid(
-        request.headers.get("x-pmomentum-token")
+        request.headers.get("x-momentum-token")
     ):
         return JSONResponse(status_code=401, content={"detail": "missing or invalid token"})
     return await call_next(request)
@@ -122,7 +122,7 @@ async def _local_trust_boundary(request: Request, call_next) -> Response:
 
 # Registered AFTER the trust boundary so it is the OUTERMOST middleware
 # (Starlette runs user middleware in reverse registration order). The order is
-# load-bearing: the X-PMomentum-Token header makes every webview request
+# load-bearing: the X-Momentum-Token header makes every webview request
 # non-simple, so the browser sends a CORS preflight (OPTIONS) first — and
 # preflights never carry custom headers. CORSMiddleware must answer them
 # before the token check runs, or the packaged desktop app 401s every

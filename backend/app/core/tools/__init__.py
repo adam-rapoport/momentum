@@ -42,7 +42,7 @@ class ToolContext:
 
 
 _current_context: ContextVar["ToolContext | None"] = ContextVar(
-    "_pmomentum_tool_context", default=None
+    "_momentum_tool_context", default=None
 )
 
 

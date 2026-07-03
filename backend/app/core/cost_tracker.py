@@ -69,6 +69,10 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # --- Anthropic (paid) ---
     # Per platform.claude.com pricing, 2026-06.
     "claude-haiku-4-5": ModelPricing("1.00", "5.00"),
+    # Standard sticker price ($2/$10 intro discount runs through 2026-08-31).
+    "claude-sonnet-5": ModelPricing("3.00", "15.00"),
+    # Retired from the picker (superseded by Sonnet 5) but kept so older
+    # sessions that used it still display a cost.
     "claude-sonnet-4-6": ModelPricing("3.00", "15.00"),
     "claude-opus-4-8": ModelPricing("5.00", "25.00"),
 
@@ -77,6 +81,8 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
     "anthropic/claude-haiku-4.5": ModelPricing("1.00", "5.00"),
     "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    "anthropic/claude-sonnet-5": ModelPricing("3.00", "15.00"),
+    # Retired from the picker (superseded by Sonnet 5) but kept for old sessions.
     "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),
     "openai/gpt-5": ModelPricing("1.25", "10.00"),
     "deepseek/deepseek-chat-v3.1": ModelPricing("0.21", "0.79"),

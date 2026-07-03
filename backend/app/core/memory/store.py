@@ -32,7 +32,7 @@ _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?", re.DOTALL)
 
 def get_memory_root() -> Path:
     """Resolve the memory root directory. Honours the MEMORY_ROOT env var if set;
-    otherwise defaults to `<pmomentum>/data/memory` (sibling of the backend dir).
+    otherwise defaults to `<momentum>/data/memory` (sibling of the backend dir).
     """
     if settings.memory_root:
         p = Path(settings.memory_root).expanduser()

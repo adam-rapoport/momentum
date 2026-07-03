@@ -68,7 +68,7 @@ def _fresh_settings(monkeypatch, **kwargs) -> Settings:
 
 def test_data_dir_derives_db_and_memory_paths(monkeypatch, tmp_path):
     s = _fresh_settings(monkeypatch, DATA_DIR=str(tmp_path))
-    assert s.database_url == f"sqlite+aiosqlite:///{(tmp_path / 'pmomentum.db').as_posix()}"
+    assert s.database_url == f"sqlite+aiosqlite:///{(tmp_path / 'momentum.db').as_posix()}"
     assert s.memory_root == (tmp_path / "memory").as_posix()
 
 
@@ -86,12 +86,12 @@ def test_explicit_database_url_beats_data_dir(monkeypatch, tmp_path):
 def test_explicit_memory_root_beats_data_dir(monkeypatch, tmp_path):
     s = _fresh_settings(monkeypatch, DATA_DIR=str(tmp_path), MEMORY_ROOT="/elsewhere/mem")
     assert s.memory_root == "/elsewhere/mem"
-    assert s.database_url.endswith("/pmomentum.db")
+    assert s.database_url.endswith("/momentum.db")
 
 
 def test_no_config_at_all_falls_back_to_cwd_sqlite(monkeypatch):
     s = _fresh_settings(monkeypatch)
-    assert s.database_url == "sqlite+aiosqlite:///./pmomentum.db"
+    assert s.database_url == "sqlite+aiosqlite:///./momentum.db"
 
 
 def test_data_dir_expands_user_home(monkeypatch):
@@ -140,7 +140,7 @@ def test_fresh_key_minted_into_keychain_leaves_no_file(tmp_path, fake_keyring):
     key = _load_or_create_vault_key(tmp_path)
     Fernet(key.encode())
     # Stored under the documented service/account…
-    assert fake_keyring.store[("pMomentum", "vault-key")] == key
+    assert fake_keyring.store[("Momentum", "vault-key")] == key
     # …and crucially NO plaintext key file on disk (the point of P3).
     assert not (tmp_path / "vault.key").exists()
     # Stable across calls.
@@ -155,15 +155,33 @@ def test_existing_file_key_migrates_into_keychain_and_keeps_file(
 
     assert _load_or_create_vault_key(tmp_path) == file_key
     # Pushed into the keychain (migration)…
-    assert fake_keyring.store[("pMomentum", "vault-key")] == file_key
+    assert fake_keyring.store[("Momentum", "vault-key")] == file_key
     # …but the file stays for rollback to a pre-keychain build.
     assert (tmp_path / "vault.key").read_text(encoding="utf-8") == file_key
 
 
 def test_keychain_key_wins_over_file(tmp_path, fake_keyring):
-    fake_keyring.store[("pMomentum", "vault-key")] = "keychain-key"
+    fake_keyring.store[("Momentum", "vault-key")] = "keychain-key"
     (tmp_path / "vault.key").write_text("stale-file-key", encoding="utf-8")
     assert _load_or_create_vault_key(tmp_path) == "keychain-key"
+
+
+def test_legacy_service_entry_read_and_copied_forward(tmp_path, fake_keyring):
+    """A pre-rename install stored its key under service "pMomentum". The
+    renamed app must keep decrypting with it: read via fallback, copy it to
+    the new service, and keep the legacy entry for rollback."""
+    legacy_key = Fernet.generate_key().decode()
+    fake_keyring.store[("pMomentum", "vault-key")] = legacy_key
+
+    assert _load_or_create_vault_key(tmp_path) == legacy_key
+    assert fake_keyring.store[("Momentum", "vault-key")] == legacy_key
+    assert fake_keyring.store[("pMomentum", "vault-key")] == legacy_key
+
+
+def test_new_service_entry_wins_over_legacy(tmp_path, fake_keyring):
+    fake_keyring.store[("Momentum", "vault-key")] = "new-key"
+    fake_keyring.store[("pMomentum", "vault-key")] = "stale-old-key"
+    assert _load_or_create_vault_key(tmp_path) == "new-key"
 
 
 def test_broken_keyring_backend_degrades_to_file(tmp_path, monkeypatch):
@@ -181,7 +199,7 @@ def test_broken_keyring_backend_degrades_to_file(tmp_path, monkeypatch):
 
 
 def test_bootstrap_creates_dir_and_mints_key(monkeypatch, tmp_path):
-    root = tmp_path / "appdata" / "pMomentum"  # not yet created
+    root = tmp_path / "appdata" / "Momentum"  # not yet created
     monkeypatch.setattr(settings, "data_dir", str(root))
     monkeypatch.setattr(settings, "credential_vault_key", None)
 

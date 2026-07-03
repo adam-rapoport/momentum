@@ -8,7 +8,7 @@ Endpoints:
 
 The callback is not a JSON API — it's the URL Google redirects the user's
 browser to. We finish the token exchange and then render a small self-contained
-HTML page telling the user to return to pMomentum. (We deliberately do NOT
+HTML page telling the user to return to Momentum. (We deliberately do NOT
 redirect to a frontend route: in the desktop build the UI is served from a
 Tauri internal protocol, not an http origin, so there is no reachable
 `FRONTEND_ORIGIN/settings` page. The app re-checks Google status when its window
@@ -70,7 +70,7 @@ async def google_callback(
     kv: LocalKVStore = Depends(get_kv),
 ):
     """Google redirects the browser here with ?code=...&state=... (or error=...).
-    We complete the exchange and render a self-contained 'return to pMomentum'
+    We complete the exchange and render a self-contained 'return to Momentum'
     page (see module docstring for why we don't redirect to the frontend)."""
     error = request.query_params.get("error")
     if error:
@@ -98,7 +98,7 @@ async def google_callback(
 
     return _result_page(
         ok=True,
-        message="Your Google account is connected. You can close this tab and return to pMomentum.",
+        message="Your Google account is connected. You can close this tab and return to Momentum.",
     )
 
 
@@ -114,7 +114,7 @@ def _result_page(ok: bool, message: str) -> HTMLResponse:
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>pMomentum · {title}</title>
+<title>Momentum · {title}</title>
 <style>
   body {{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Per-user writable folder for the desktop build. The desktop launcher
-    # (app/desktop.py) sets this to e.g. ~/Library/Application Support/pMomentum
+    # (app/desktop.py) sets this to e.g. ~/Library/Application Support/Momentum
     # before the app imports. When set, the SQLite DB, memory/documents, and the
     # credential vault key all root here. Unset (web dev) → the explicit/relative
     # defaults below apply unchanged. This is config precedence, not a flag.
@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # user's computer). Set USER_TIMEZONE to override (e.g. server deploys).
     user_timezone: str = Field(default_factory=_detect_local_timezone, alias="USER_TIMEZONE")
     tavily_api_key: str | None = Field(None, alias="TAVILY_API_KEY")
-    memory_root: str = Field("pmomentum/data/memory", alias="MEMORY_ROOT")
+    memory_root: str = Field("momentum/data/memory", alias="MEMORY_ROOT")
 
     # Google Docs integration (Sprint 3 Chunk D). All optional — if any of
     # these are missing, the `/integrations/google/connect` endpoint returns
@@ -142,9 +142,9 @@ class Settings(BaseSettings):
     # Per-launch shared secret for the local API (see app.security). The Tauri
     # shell generates it and passes it to the sidecar via this env var and to
     # the webview over IPC. When set, /api requests must carry it in the
-    # X-PMomentum-Token header and WS connects in the `token` query param.
+    # X-Momentum-Token header and WS connects in the `token` query param.
     # Unset (web dev, tests) the token check is skipped.
-    auth_token: str | None = Field(None, alias="PMOMENTUM_AUTH_TOKEN")
+    auth_token: str | None = Field(None, alias="MOMENTUM_AUTH_TOKEN")
 
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
@@ -165,7 +165,7 @@ class Settings(BaseSettings):
             root = Path(self.data_dir).expanduser()
             # as_posix() keeps the SQLite URL valid on Windows (C:/...) too.
             if "database_url" not in explicit:
-                self.database_url = f"sqlite+aiosqlite:///{(root / 'pmomentum.db').as_posix()}"
+                self.database_url = f"sqlite+aiosqlite:///{(root / 'momentum.db').as_posix()}"
             if "memory_root" not in explicit:
                 # get_memory_root() picks up an absolute path via its existing
                 # `if p.is_absolute()` branch; documents derive from it.
@@ -173,7 +173,7 @@ class Settings(BaseSettings):
         # Guarantee a usable DB URL even with no DATA_DIR and no DATABASE_URL, so
         # the app boots out of the box (SQLite is the project default).
         if not self.database_url:
-            self.database_url = "sqlite+aiosqlite:///./pmomentum.db"
+            self.database_url = "sqlite+aiosqlite:///./momentum.db"
         return self
 
 
@@ -188,7 +188,11 @@ settings = Settings()
 # web dev) or its backend fails (headless session, locked keychain), every
 # helper degrades silently to the file path, which is byte-for-byte the old
 # behavior.
-_KEYRING_SERVICE = "pMomentum"
+_KEYRING_SERVICE = "Momentum"
+# Pre-rename service name (the app shipped as "pMomentum" until 2026-07).
+# Read as a fallback and copied forward so an upgraded install keeps
+# decrypting its stored API keys; the legacy entry is kept for rollback.
+_LEGACY_KEYRING_SERVICE = "pMomentum"
 _KEYRING_ACCOUNT = "vault-key"
 
 
@@ -207,7 +211,12 @@ def _keychain_get_key() -> str | None:
     if kr is None:
         return None
     try:
-        return kr.get_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT) or None
+        key = kr.get_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT) or None
+        if key is None:
+            key = kr.get_password(_LEGACY_KEYRING_SERVICE, _KEYRING_ACCOUNT) or None
+            if key:
+                _keychain_store_key(key)  # copy forward; legacy kept for rollback
+        return key
     except Exception:  # noqa: BLE001 — any backend failure means "no keychain"
         return None
 
@@ -227,7 +236,7 @@ def _load_or_create_vault_key(root: Path) -> str:
     """Return the credential vault key, minting one if absent.
 
     Resolution order:
-      1. OS keychain entry (service "pMomentum" / account "vault-key").
+      1. OS keychain entry (service "Momentum" / account "vault-key").
       2. `vault.key` file under `root` — the pre-keychain location. Its key
          is pushed INTO the keychain (migration) but the file is kept so the
          user can roll back to an older build that only reads the file.
