@@ -2,8 +2,8 @@
 name: decision-log
 description: Capture a product or architectural decision in a structured ADR-style log entry — context, options, decision, consequences.
 slash_command: decision-log
-trigger_keywords: ["decision log", "log a decision", "record a decision", "adr", "architecture decision record", "decision record"]
-required_tools: ["RecallMemory", "SearchMemories", "WriteDocument", "AwaitReview"]
+trigger_keywords: ["decision log", "log a decision", "adr", "architecture decision record", "decision record"]
+required_tools: ["RecallMemory", "SearchMemories", "WriteDocument", "EditDocument", "AwaitReview", "SaveMemory"]
 phases: ["intake", "drafting", "review"]
 ---
 
@@ -13,28 +13,55 @@ You are capturing a decision (product, architectural, or process) so
 the user — or their future team — can revisit *why* a choice was made
 months later. Output is a single markdown doc per decision.
 
+Follow the phases in order. Do NOT call `WriteDocument` during
+intake; do not draft until Phase 2.
+
 ## Phase 1: Intake
 
-Ask one at a time, skipping anything already supplied:
+PMs often log decisions after the fact in one brain-dump. If the
+opening message already covers most of the seven items below, do NOT
+run the question list — reflect back your reading in ONE message and
+ask for at most the two most important gaps. If the user signals
+speed ("just log it"), draft immediately: mark anything missing as
+`TBD` and list each gap under Open Questions / Follow-ups.
+
+As soon as you know the topic (from the opening message or question
+1), call `RecallMemory` with `type="decision"` and `query=<2-3
+keywords from the decision>`, then again with `type="product"`. If
+the decision is technical, also `type="lessons"`. Use what comes back
+to pre-fill questions 2–6 — confirm instead of asking — and to check
+for a prior decision this one may supersede.
+
+If recall surfaces a prior decision this one replaces or amends,
+confirm with the user: "Does this supersede <prior title>?" If yes:
+(a) add a `**Supersedes:** <prior decision title>` line under Status
+in the new doc and list the old doc under References; (b) after
+approval, offer to update the old decision doc via `EditDocument`,
+changing its Status line to `Superseded — see <new title>`.
+
+Otherwise, ask one at a time, skipping anything already supplied:
 
 1. **The decision.** State it as a single sentence, in the form "We
    are going to X (rather than Y or Z)." If the user phrases it
    open-endedly, push gently for the actual choice.
 2. **Context.** What forced this decision? What changed, what's the
    constraint, what's the deadline? Who asked or who's affected?
-3. **Options considered.** What did the user weigh? At minimum the
+3. **Who decided.** Whose call was/is this — the user alone, or
+   together with others? This fills the Decision-maker(s) line; never
+   guess or fabricate a name. When the user says "I"/"me", resolve
+   their actual name (and title if known) from the `User:` line in
+   your context or memory (`RecallMemory` with `type="team"`, or
+   `SearchMemories` by name) — never leave a generic role name when
+   the real name is one lookup away.
+4. **Options considered.** What did the user weigh? At minimum the
    chosen option and one alternative. Three or four is better — but
    don't fabricate; only what the user actually considered.
-4. **Why this option won.** The deciding factor or factors. Specific.
-5. **Consequences.** What does this make easier? Harder? What gets
+5. **Why this option won.** The deciding factor or factors. Specific.
+6. **Consequences.** What does this make easier? Harder? What gets
    locked in? Anything they're explicitly accepting?
-6. **Status.** Proposed (still being decided), Accepted (decided,
+7. **Status.** Proposed (still being decided), Accepted (decided,
    not yet implemented), Implemented (done), or Superseded (replaced
    by a later decision)?
-
-Pull `type=decision` (related past decisions — this one might supersede
-or build on something) and `type=product` (the area being decided in).
-If the decision is technical, also pull `type=lessons`.
 
 ## Phase 2: Drafting
 
@@ -43,6 +70,8 @@ Use ADR-style structure. Call `WriteDocument` with `title` like
 
 - `# Decision: <one-sentence decision>`
 - `**Status:** <Proposed | Accepted | Implemented | Superseded>`
+- `**Supersedes:** <prior decision title>` — only when this replaces
+  an earlier logged decision (see Phase 1)
 - `**Date:** <YYYY-MM-DD>`
 - `**Decision-maker(s):** <who>`
 - `## Context` — 2-4 paragraphs. What's going on, what forced this,
@@ -60,7 +89,9 @@ Use ADR-style structure. Call `WriteDocument` with `title` like
   locked-in, or accepts as a tradeoff. Be honest about the downsides
 - `## Open Questions / Follow-ups` — what we still don't know, or
   what needs to happen next
-- `## References` — links to relevant memories, prior decisions, docs
+- `## References` — prior decision docs by title/slug, memories by
+  title, and any external URLs the user provided. Local docs and
+  memories have no URLs — cite them by name; never invent a link
 
 ### Depth guardrails
 
@@ -88,10 +119,18 @@ couldn't reconstruct from code or chat history. Hold yourself to:
 
 Immediately after writing, call `AwaitReview` with:
 - `deliverable_kind: "decision_log"`
-- `document_id: <slug>`
+- `document_id: <the slug returned by WriteDocument>`
 - `summary_for_user: <one line: the decision + status>`
 
 **STOP after calling AwaitReview.** No further text this turn.
 
 Revisions go through `EditDocument`; re-call `AwaitReview` after each.
-On approval, the skill completes.
+
+On approval, before completing, call `SaveMemory` with
+`type: "decision"`, `title` = the one-sentence decision, `summary` =
+decision + status in under 120 chars, and `content` covering: what
+was decided, the date, who decided, the deciding factor, and what was
+traded off — plus the line "Full log: <document slug>". This step is
+mandatory: documents are not searched by `RecallMemory`, so without
+this memory the decision is invisible to future sessions. Then do
+the superseded-doc status flip if one was agreed in Phase 1.
