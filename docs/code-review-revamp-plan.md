@@ -1,4 +1,4 @@
-# pMomentum — Full Code Review & Revamp Plan
+# Momentum — Full Code Review & Revamp Plan
 
 *Review date: 2026-06-09. Reviewed at commit `741dd48`. No code was changed as part of this review.*
 
@@ -6,7 +6,7 @@
 
 ## 1. What the app is (as built)
 
-pMomentum is a **macOS desktop app** (Tauri 2 shell, Intel build, Rosetta on Apple Silicon)
+Momentum is a **macOS desktop app** (Tauri 2 shell, Intel build, Rosetta on Apple Silicon)
 wrapping:
 
 - **Frontend:** Next.js 15 static export (React, Tailwind, Zustand) rendered in the Tauri
@@ -14,7 +14,7 @@ wrapping:
   onboarding wizard, settings, memory and documents panels.
 - **Backend:** FastAPI (Python 3.12) frozen into a one-file PyInstaller sidecar, spawned by
   the Tauri shell, listening on `localhost:8000` (HTTP + WebSocket). SQLite at
-  `~/Library/Application Support/pMomentum/`, in-process KV store (Redis was removed),
+  `~/Library/Application Support/Momentum/`, in-process KV store (Redis was removed),
   Fernet-encrypted credential vault.
 - **Agent core:** a session engine (`backend/app/core/session_engine.py`, ~880 lines) that
   runs a streaming tool-call loop against a per-turn-routed LLM (Groq / Google AI / OpenAI),
@@ -255,8 +255,8 @@ only by 20 manual `scripts/try_*.py` files. The conftest even anticipates portin
 | T9 | crit | Hardcoded `x86_64-apple-darwin` + host-arch PyInstaller = mislabeled arm64 builds on Apple Silicon | `build-desktop.sh:25,41,46` |
 | T10 | high | Apple Silicon path actively blocked by the script; needs per-arch PyInstaller + `tauri build --target` (or universal) | `build-desktop.sh` |
 | T11 | med | No Python lockfile — non-reproducible desktop binaries | `pyproject.toml:6-35` |
-| T12 | med | `collect_submodules("google")` over-collection; no `copy_metadata`; `--selfcheck` doesn't exercise alembic-on-temp-DB or Google SDK import | `pmomentum.spec:30,36-46` |
-| T13 | med | One-file PyInstaller mode: slow cold start and the blocker for real signing/notarization | `pmomentum.spec`, `build-desktop.sh` header |
+| T12 | med | `collect_submodules("google")` over-collection; no `copy_metadata`; `--selfcheck` doesn't exercise alembic-on-temp-DB or Google SDK import | `momentum.spec:30,36-46` |
+| T13 | med | One-file PyInstaller mode: slow cold start and the blocker for real signing/notarization | `momentum.spec`, `build-desktop.sh` header |
 | T14 | med | CI: Postgres service boots for the SQLite leg; push+PR double-runs; no key-absent registry test | `test.yml` |
 | T15 | high | README documents the removed stack (Postgres 16 + Redis required, keys "required", no mention of the desktop app, manual migrate/seed steps, two-provider story) | `README.md` |
 | T16 | low | Version quadruplicated across pyproject/package.json/tauri.conf/Cargo.toml; INSTALL.md "for Intel Macs" only true if built on Intel; stale module docstrings | various |

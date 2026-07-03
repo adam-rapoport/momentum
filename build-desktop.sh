@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# build-desktop.sh — build the pMomentum macOS desktop app in one command.
+# build-desktop.sh — build the Momentum macOS desktop app in one command.
 #
 # Produces an UNSIGNED build for the architecture of the machine running this
 # script (the dmg/app names carry the real target triple):
-#   - frontend/src-tauri/target/<triple>/release/bundle/macos/pMomentum.app
-#   - frontend/src-tauri/target/<triple>/release/bundle/dmg/pMomentum_<ver>_<arch>.dmg
+#   - frontend/src-tauri/target/<triple>/release/bundle/macos/Momentum.app
+#   - frontend/src-tauri/target/<triple>/release/bundle/dmg/Momentum_<ver>_<arch>.dmg
 #
 # ARCHITECTURE: PyInstaller can only freeze the Python backend for the HOST
 # architecture — there is no cross-compile. The script derives the target
@@ -44,7 +44,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$ROOT/backend"
 FRONTEND="$ROOT/frontend"
-SIDECAR="pmomentum-backend"
+SIDECAR="momentum-backend"
 
 # Which Tauri bundle targets to produce. Default = app + dmg (the local
 # one-command experience). CI sets PM_BUNDLES=app: Tauri's bundle_dmg.sh needs
@@ -79,7 +79,7 @@ fi
 # project itself without re-resolving (--no-deps keeps the pins authoritative).
 .venv/bin/pip install -q -r requirements-desktop.lock
 .venv/bin/pip install -q --no-deps -e .
-.venv/bin/pyinstaller pmomentum.spec --noconfirm
+.venv/bin/pyinstaller momentum.spec --noconfirm
 
 echo "==> Self-check the frozen sidecar (crypto / trafilatura / migrations / SDKs / bundled data)"
 "./dist/$SIDECAR" --selfcheck
@@ -102,9 +102,9 @@ echo "    DMG: ${DMG_PATH:-<none>}"
 
 if [ -n "${APP_PATH:-}" ]; then
   echo "==> Verify the embedded backend kept PyInstaller's signature (expect Signature=adhoc)"
-  codesign -dvv "$APP_PATH/Contents/MacOS/pmomentum-backend" 2>&1 | grep -iE "Identifier|Signature|Format" || true
+  codesign -dvv "$APP_PATH/Contents/MacOS/momentum-backend" 2>&1 | grep -iE "Identifier|Signature|Format" || true
 fi
 
 echo ""
-echo "==> Done. Install the .dmg above (drag pMomentum into Applications)."
+echo "==> Done. Install the .dmg above (drag Momentum into Applications)."
 echo "    First launch may show an 'unidentified developer' prompt — see INSTALL.md."

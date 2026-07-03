@@ -14,9 +14,9 @@ reasoning for plain GETs. Defense is three layered checks:
    the Python test client, server-to-server) are allowed; a local process
    needs no browser to attack us, so blocking it here buys nothing.
 3. Shared auth token — the Tauri shell generates a per-launch secret, hands
-   it to the sidecar via PMOMENTUM_AUTH_TOKEN and to the webview over IPC
+   it to the sidecar via MOMENTUM_AUTH_TOKEN and to the webview over IPC
    (`get_backend_token`). When set, every /api request must present it in
-   the X-PMomentum-Token header and every WS connect in the `token` query
+   the X-Momentum-Token header and every WS connect in the `token` query
    param. Unset (web dev, pytest) the token check is skipped but checks
    1-2 still apply.
 

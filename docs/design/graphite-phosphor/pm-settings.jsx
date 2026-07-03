@@ -132,7 +132,7 @@ function ModelsPane({ slots, setSlots, retro }) {
     <div>
       <PaneTitle
         title="Models"
-        sub="pMomentum routes each turn: quick turns go to the light model, drafting and skills go to the heavy one."
+        sub="Momentum routes each turn: quick turns go to the light model, drafting and skills go to the heavy one."
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <ModelSlotCard tier="light" slot={slots.light} retro={retro} onChange={(s) => setSlots({ ...slots, light: { ...slots.light, ...s } })} />
@@ -250,7 +250,7 @@ function AboutPane({ retro }) {
     ['Version', '0.5.0-dev'],
     ['Shell', 'Tauri 2 · macOS arm64'],
     ['Backend', 'FastAPI sidecar · localhost:8000'],
-    ['Data', '~/Library/Application Support/pMomentum'],
+    ['Data', '~/Library/Application Support/Momentum'],
     ['Keys', 'Fernet-encrypted local vault'],
   ];
   return (
@@ -260,8 +260,8 @@ function AboutPane({ retro }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
           <PmLogo size={26} />
           {retro > 0
-            ? <span className="pixel" style={{ fontSize: 15 }}>PMOMENTUM</span>
-            : <span style={{ fontSize: 17, fontWeight: 700 }}>pMomentum</span>}
+            ? <span className="pixel" style={{ fontSize: 15 }}>MOMENTUM</span>
+            : <span style={{ fontSize: 17, fontWeight: 700 }}>Momentum</span>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           {lines.map(([k, v]) => (

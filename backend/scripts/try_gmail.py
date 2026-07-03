@@ -80,9 +80,9 @@ async def main() -> None:
                     "DraftEmail",
                     {
                         "to": [user.email or "rapoport.apps@gmail.com"],
-                        "subject": "pMomentum Sprint 5 Chunk B smoke test",
+                        "subject": "Momentum Sprint 5 Chunk B smoke test",
                         "body_markdown": (
-                            "Hi from pMomentum.\n\n"
+                            "Hi from Momentum.\n\n"
                             "This is a test draft created by `try_gmail`. "
                             "Open Gmail to see it, then delete or send.\n"
                         ),
@@ -96,7 +96,7 @@ async def main() -> None:
                     "SendEmail",
                     {
                         "to": [user.email or "rapoport.apps@gmail.com"],
-                        "subject": "pMomentum SendEmail (placeholder) test",
+                        "subject": "Momentum SendEmail (placeholder) test",
                         "body_markdown": "Should land as a draft, not a sent message.",
                     },
                 )

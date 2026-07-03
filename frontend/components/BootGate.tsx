@@ -89,7 +89,7 @@ function BootScreen({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
       <span className="pm-pulse">
         <PmLogo size={32} />
       </span>
-      <div className="font-pixel text-[13px] tracking-[0.08em]">PMOMENTUM</div>
+      <div className="font-pixel text-[13px] tracking-[0.08em]">MOMENTUM</div>
       {phase === "stalled" ? (
         <>
           <div className="max-w-sm text-center text-sm text-ink-muted">
@@ -101,7 +101,7 @@ function BootScreen({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
           </Btn>
         </>
       ) : (
-        <div className="font-mono text-[12px] text-ink-muted">Starting pMomentum…</div>
+        <div className="font-mono text-[12px] text-ink-muted">Starting Momentum…</div>
       )}
     </div>
   );

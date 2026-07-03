@@ -123,7 +123,7 @@ export function HomeView() {
               onClick={() => openSettings("help")}
               className="text-[11.5px] text-ink-dim underline underline-offset-2 hover:text-ink-muted"
             >
-              How pMomentum works
+              How Momentum works
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 # Revamp Handoff — What Was Implemented and Why
 
 *Audience: a fresh Claude Code (or human) session running on the owner's Mac.
-This brings you up to speed on the June 2026 revamp of pMomentum and tells you
+This brings you up to speed on the June 2026 revamp of Momentum and tells you
 what still needs doing on real macOS hardware. Read this first; read
 [`code-review-revamp-plan.md`](code-review-revamp-plan.md) second — it is the
 original review (~90 findings with file:line references and finding IDs like
@@ -12,7 +12,7 @@ A1/F8/T9 that commit messages and code comments cite).*
 ## 0. The one-paragraph version
 
 The entire codebase was reviewed, ~90 issues were cataloged, and a 6-phase fix
-plan was then **fully executed** on branch `claude/pmomentum-code-review-c8myfm`
+plan was then **fully executed** on branch `claude/momentum-code-review-c8myfm`
 (33 commits, **not merged to main** — the owner wants to approve that
 explicitly). The backend test suite grew from 188 to **371 passing tests**;
 ruff, ESLint, tsc, and the Next.js static export are all green. Everything was
@@ -22,9 +22,9 @@ one live-API smoke test. Those are your job — see §6.
 
 ## 1. Project snapshot
 
-pMomentum is a macOS desktop app for product managers: a Tauri 2 shell wrapping
+Momentum is a macOS desktop app for product managers: a Tauri 2 shell wrapping
 a Next.js 15 static-export UI and a FastAPI backend frozen into a PyInstaller
-sidecar (SQLite in `~/Library/Application Support/pMomentum/`). The agent core
+sidecar (SQLite in `~/Library/Application Support/Momentum/`). The agent core
 (`backend/app/core/session_engine.py`) runs a streaming tool-call loop against
 a per-turn-routed LLM (Groq / Google AI / OpenAI), with PM "skills"
 (SKILL.md workflows), ~23 tools, a pause-for-approval system for side effects
@@ -52,10 +52,10 @@ types); follow the same rule.
 clone:
 
 ```bash
-git fetch origin main claude/pmomentum-code-review-c8myfm
-git diff main...claude/pmomentum-code-review-c8myfm --stat   # the whole revamp
+git fetch origin main claude/momentum-code-review-c8myfm
+git diff main...claude/momentum-code-review-c8myfm --stat   # the whole revamp
 git show ae443a1                                             # any single commit + its message/rationale
-git log --oneline main..claude/pmomentum-code-review-c8myfm  # the 30+ commit list
+git log --oneline main..claude/momentum-code-review-c8myfm  # the 30+ commit list
 ```
 
 Commit messages carry the per-change rationale and cite the finding IDs from
@@ -74,8 +74,8 @@ the "what exactly changed here".
   DNS rebinding defeats origin reasoning for GETs. *What:* three layers —
   Host allowlist, Origin allowlist, and a **per-launch shared token**: the
   Tauri shell generates it (`src-tauri/src/lib.rs`), passes it to the sidecar
-  as `PMOMENTUM_AUTH_TOKEN`, exposes it to the webview via the
-  `get_backend_token` IPC command; HTTP sends `X-PMomentum-Token`, WS sends
+  as `MOMENTUM_AUTH_TOKEN`, exposes it to the webview via the
+  `get_backend_token` IPC command; HTTP sends `X-Momentum-Token`, WS sends
   `?token=`. `/health` and the Google OAuth callback are token-exempt (the
   callback arrives from the user's real browser; it has its own state token).
   Token unset (web dev, pytest) ⇒ token check skipped, Host/Origin still on.
@@ -145,7 +145,7 @@ every Phase 1 change needed a safety net that doubles as a spec.
   a squatter (e.g. a dev uvicorn) made the packaged app silently talk to the
   wrong process or hang on boot; shutdown was SIGKILL-only. *What:* the shell
   probes 8000, falls back to a free OS-assigned port, passes it via
-  `PMOMENTUM_PORT` (+ `GOOGLE_REDIRECT_URI` when off-default) and the
+  `MOMENTUM_PORT` (+ `GOOGLE_REDIRECT_URI` when off-default) and the
   `get_backend_port` IPC command; `api.ts`/`ws.ts` derive base URLs at
   runtime. Shutdown: SIGTERM to the subtree, 1.5 s grace, SIGKILL sweep.
 * **CSP** (`tauri.conf.json`): real policy replacing `csp: null` — remote
@@ -167,7 +167,7 @@ every Phase 1 change needed a safety net that doubles as a spec.
   cross-compile). Bundle paths now include the triple.
 * **Reproducible builds**: `backend/requirements-desktop.lock` (regenerate
   with `backend/scripts/regen-desktop-lock.sh`) consumed by the build script;
-  `pmomentum.spec` collects only the Google subpackages actually imported +
+  `momentum.spec` collects only the Google subpackages actually imported +
   `copy_metadata` for the SDKs.
 * **Extended `--selfcheck`** (`app/desktop.py`): now also runs alembic against
   a temp SQLite DB and imports the google-genai/openai/google-api-client
@@ -264,7 +264,7 @@ every Phase 1 change needed a safety net that doubles as a spec.
   pydantic schemas in `schemas/websocket.py` (updated to reality first) so
   backend/frontend can't drift; the WS read loop survives malformed frames.
 * **Vault key → macOS Keychain** (item 23, `config.py`): resolution order is
-  Keychain (service `pMomentum`, account `vault-key`) > existing `vault.key`
+  Keychain (service `Momentum`, account `vault-key`) > existing `vault.key`
   file (auto-migrated into the Keychain, file kept for rollback) > fresh mint.
   Degrades silently when `keyring` is unavailable (Linux CI, tests). *Why:*
   the Fernet key sat in plaintext next to the DB it encrypts.
@@ -282,10 +282,10 @@ every Phase 1 change needed a safety net that doubles as a spec.
    `MODEL_API_ERROR`, `TURN_IN_PROGRESS`, `APPROVAL_REQUIRED`, `TOOL_ERROR`,
    `DB_ERROR`, `WS_DISCONNECTED`, `WS_UNAVAILABLE`, `NO_PROVIDER_CONFIGURED`,
    `VALIDATION_ERROR`, `UNKNOWN_MESSAGE_TYPE`, `NOT_FOUND`.
-2. **Shell ⇄ sidecar ⇄ webview contract**: `PMOMENTUM_AUTH_TOKEN` +
-   `PMOMENTUM_PORT` (+ `GOOGLE_REDIRECT_URI` off-default) env vars into the
+2. **Shell ⇄ sidecar ⇄ webview contract**: `MOMENTUM_AUTH_TOKEN` +
+   `MOMENTUM_PORT` (+ `GOOGLE_REDIRECT_URI` off-default) env vars into the
    sidecar; `get_backend_token` / `get_backend_port` IPC commands;
-   `X-PMomentum-Token` header / `?token=` WS param.
+   `X-Momentum-Token` header / `?token=` WS param.
 3. **Message ordering**: always `(turn_id, seq)`, never `created_at`. Every
    new `Message` row must set `seq` (engine helper `_take_seq`) and
    `token_count_estimate`.
@@ -335,7 +335,7 @@ In priority order:
    `frontend/src-tauri/target/<triple>/release/bundle/dmg/`.
 4. **First-launch checks on the installed app**: window appears; BootGate
    resolves; **if you had an existing install**, confirm `vault.key` was
-   migrated into the Keychain (Keychain Access → search "pMomentum") and
+   migrated into the Keychain (Keychain Access → search "Momentum") and
    stored API keys still decrypt; with a dev uvicorn squatting on 8000,
    confirm the app picks another port and still works; ⌘Q leaves nothing
    bound on the port (`lsof -i :8000`).
@@ -370,6 +370,6 @@ In priority order:
 
 ## 8. Branch state
 
-Everything lives on `claude/pmomentum-code-review-c8myfm`, pushed to origin.
+Everything lives on `claude/momentum-code-review-c8myfm`, pushed to origin.
 **Nothing is merged to main** — the owner explicitly reserved that decision.
 If asked to merge or open a PR, get their approval first.

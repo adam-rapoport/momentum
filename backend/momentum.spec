@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller build for the pMomentum desktop backend sidecar.
+"""PyInstaller build for the Momentum desktop backend sidecar.
 
 Build (from backend/, with the desktop extra installed):
-    .venv/bin/pyinstaller pmomentum.spec --noconfirm
+    .venv/bin/pyinstaller momentum.spec --noconfirm
 
-Produces a SINGLE-FILE executable at dist/pmomentum-backend that launches
+Produces a SINGLE-FILE executable at dist/momentum-backend that launches
 app/desktop.py (uvicorn on 127.0.0.1:8000). One-file (not one-dir) so the Tauri
 shell can use it directly as a sidecar `externalBin`. On launch it self-extracts
 to a temp dir (sys._MEIPASS); module __file__ paths resolve there, so the
@@ -80,7 +80,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="pmomentum-backend",
+    name="momentum-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

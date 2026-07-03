@@ -11,6 +11,6 @@ __pycache__/
 *.db-wal
 
 # PyInstaller output (the frozen desktop sidecar). Regenerated from
-# pmomentum.spec via `pyinstaller pmomentum.spec`; not committed.
+# momentum.spec via `pyinstaller momentum.spec`; not committed.
 /build/
 /dist/

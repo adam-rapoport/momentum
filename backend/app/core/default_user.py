@@ -16,19 +16,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Project, User
 
-DEFAULT_USER_EMAIL = "you@pmomentum.local"
+DEFAULT_USER_EMAIL = "you@momentum.local"
 DEFAULT_ORG_SLUG = "local"
 DEFAULT_PROJECT_SLUG = "default"
 
-# Pre-genericization identity. Only used to keep existing local DBs working.
-LEGACY_USER_EMAIL = "adam@local.dev"
+# Pre-rename / pre-genericization identities. Only used to keep existing local
+# DBs working: installs seeded as "you@pmomentum.local" before the 2026-07
+# rename to Momentum, and as "adam@local.dev" before genericization. A DB
+# contains at most one of these (each era's seeding reused the older row).
+LEGACY_USER_EMAILS = ("you@pmomentum.local", "adam@local.dev")
 LEGACY_ORG_SLUG = "adam"
 
 
 async def get_default_user(db: AsyncSession) -> User:
     user = await db.scalar(select(User).where(User.email == DEFAULT_USER_EMAIL))
-    if user is None:  # fall back to a pre-genericization local DB
-        user = await db.scalar(select(User).where(User.email == LEGACY_USER_EMAIL))
+    if user is None:  # fall back to a pre-rename / pre-genericization local DB
+        user = await db.scalar(select(User).where(User.email.in_(LEGACY_USER_EMAILS)))
     if user is None:
         # Self-heal: startup seeding (app.main lifespan) is best-effort, so a
         # one-time hiccup there must not leave every request 500ing forever.

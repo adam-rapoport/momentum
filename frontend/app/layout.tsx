@@ -20,7 +20,7 @@ const fontPixel = Silkscreen({
 });
 
 export const metadata: Metadata = {
-  title: "pMomentum",
+  title: "Momentum",
   description: "AI agent for Product Managers",
 };
 

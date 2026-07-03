@@ -112,8 +112,8 @@ function Composer({ onSend, onCancel, isStreaming, retro, big, autoFocus, seed }
           ref={taRef} value={value} rows={big ? 2 : 1} autoFocus={autoFocus}
           onChange={(e) => { setValue(e.target.value); setDismissed(false); setSelected(0); }}
           onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? 'Responding…' : 'Message pMomentum — or type / for skills'}
-          aria-label="Message pMomentum"
+          placeholder={isStreaming ? 'Responding…' : 'Message Momentum — or type / for skills'}
+          aria-label="Message Momentum"
           style={{
             width: '100%', resize: 'none', border: 'none', outline: 'none',
             background: 'transparent', fontSize: 14, lineHeight: 1.5,

@@ -3,11 +3,11 @@ name = "app"
 # Keep in sync with tauri.conf.json (the source of truth for the app version),
 # backend/pyproject.toml and frontend/package.json.
 version = "0.1.0"
-description = "pMomentum desktop shell — Tauri 2 wrapper around the Next.js UI and the Python backend sidecar"
+description = "Momentum desktop shell — Tauri 2 wrapper around the Next.js UI and the Python backend sidecar"
 authors = ["Adam Rapoport"]
 # Private project, no license — all rights reserved (see README.md).
 publish = false
-repository = "https://github.com/adam-rapoport/pmomentum"
+repository = "https://github.com/adam-rapoport/momentum"
 edition = "2021"
 rust-version = "1.77.2"
 

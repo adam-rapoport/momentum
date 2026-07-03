@@ -131,9 +131,9 @@ function Sidebar({ sessions, activeId, onSelect, onNew, onRename, onDelete, onOp
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <PmLogo size={16} />
           {retro > 0 ? (
-            <span className="pixel" style={{ fontSize: 11, color: 'var(--text)', letterSpacing: '0.06em' }}>PMOMENTUM</span>
+            <span className="pixel" style={{ fontSize: 11, color: 'var(--text)', letterSpacing: '0.06em' }}>MOMENTUM</span>
           ) : (
-            <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.01em' }}>pMomentum</span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.01em' }}>Momentum</span>
           )}
         </div>
       </div>

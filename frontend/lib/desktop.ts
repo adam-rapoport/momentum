@@ -9,7 +9,7 @@ export function isTauri(): boolean {
 /**
  * The per-launch backend auth token (see backend/app/security.py). The Tauri
  * shell generates it and exposes it via the `get_backend_token` command; api.ts
- * sends it as the X-PMomentum-Token header and ws.ts as the `token` query
+ * sends it as the X-Momentum-Token header and ws.ts as the `token` query
  * param. In web dev there is no shell and no token — resolves to null and the
  * backend skips the check. Cached: the token is fixed for the app's lifetime.
  */

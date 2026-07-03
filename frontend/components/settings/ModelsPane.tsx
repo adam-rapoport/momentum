@@ -36,7 +36,7 @@ export function ModelsPane({ connections, onChanged }: { connections: ConnMap; o
     <div>
       <h2 className="text-[16.5px] font-bold text-ink">Models</h2>
       <p className="mb-4 mt-1 text-[12.5px] text-ink-muted">
-        pMomentum routes each turn: quick turns go to the light model, drafting and skills go to
+        Momentum routes each turn: quick turns go to the light model, drafting and skills go to
         the heavy one.
       </p>
       <div className="flex flex-col gap-3.5">
@@ -366,7 +366,7 @@ function SlotCard({
                       </select>
                     </div>
                     <div className="mt-2 text-[12px] text-ink-dim">
-                      pMomentum relies on tool calling — models marked &quot;tools&quot; work best.
+                      Momentum relies on tool calling — models marked &quot;tools&quot; work best.
                     </div>
                   </>
                 )

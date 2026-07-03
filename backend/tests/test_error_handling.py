@@ -180,7 +180,7 @@ async def test_no_provider_configured_routes_to_dedicated_code():
 
     frame = await _run_case(
         NoProviderConfiguredError(
-            "No LLM provider is configured — pMomentum has no API key to run "
+            "No LLM provider is configured — Momentum has no API key to run "
             "a model with. Open Settings → Connections and connect Groq, "
             "Google AI, or OpenAI (or set an API key in .env)."
         )

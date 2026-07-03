@@ -2,7 +2,7 @@
 
 Sessions CRUD in full (the frontend's primary REST surface), plus smoke
 coverage of the preferences and connections endpoints and the Phase 0 local
-trust boundary (Host / Origin / X-PMomentum-Token middleware).
+trust boundary (Host / Origin / X-Momentum-Token middleware).
 
 Runs the real app via the `client` fixture; the lifespan seeds the default
 single-user workspace, so `get_default_user` resolves without extra setup.
@@ -139,12 +139,12 @@ def test_token_enforced_when_configured(client, monkeypatch):
 
     assert client.get(f"{API}/sessions").status_code == 401
     assert (
-        client.get(f"{API}/sessions", headers={"X-PMomentum-Token": "wrong"}).status_code
+        client.get(f"{API}/sessions", headers={"X-Momentum-Token": "wrong"}).status_code
         == 401
     )
     assert (
         client.get(
-            f"{API}/sessions", headers={"X-PMomentum-Token": "per-launch-secret"}
+            f"{API}/sessions", headers={"X-Momentum-Token": "per-launch-secret"}
         ).status_code
         == 200
     )
@@ -167,12 +167,12 @@ def test_cors_preflight_bypasses_token(client, monkeypatch):
         headers={
             "Origin": "tauri://localhost",
             "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "content-type,x-pmomentum-token",
+            "Access-Control-Request-Headers": "content-type,x-momentum-token",
         },
     )
     assert resp.status_code == 200
     assert resp.headers["access-control-allow-origin"] == "tauri://localhost"
-    assert "x-pmomentum-token" in resp.headers["access-control-allow-headers"].lower()
+    assert "x-momentum-token" in resp.headers["access-control-allow-headers"].lower()
 
     # The real (post-preflight) request still requires the token: the
     # preflight exemption must not weaken the trust boundary itself.

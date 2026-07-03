@@ -40,8 +40,8 @@ function ObWelcome({ onNext, retro }) {
     <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, padding: '24px 0' }}>
       <PmLogo size={44} />
       {retro > 0
-        ? <div className="pixel" style={{ fontSize: 22, letterSpacing: '0.06em' }}>PMOMENTUM</div>
-        : <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}>pMomentum</div>}
+        ? <div className="pixel" style={{ fontSize: 22, letterSpacing: '0.06em' }}>MOMENTUM</div>
+        : <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}>Momentum</div>}
       <div style={{ fontSize: 14.5, color: 'var(--text-muted)', maxWidth: 420, lineHeight: 1.6 }}>
         An AI agent for product management work — PRDs, stakeholder updates, meeting prep —
         with persistent memory, running entirely on your Mac.

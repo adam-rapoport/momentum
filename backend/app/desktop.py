@@ -1,4 +1,4 @@
-"""Programmatic entrypoint for running pMomentum as a self-contained desktop
+"""Programmatic entrypoint for running Momentum as a self-contained desktop
 backend. This is also the future PyInstaller freeze target.
 
 It resolves a per-user, writable data directory and exports it as ``DATA_DIR``
@@ -20,11 +20,16 @@ from pathlib import Path
 
 # Default loopback port. 8000 matches the frontend's default API/WS base and the
 # registered Google OAuth redirect URI (localhost:8000/...). Overridable via
-# PMOMENTUM_PORT, but note: changing it means also updating GOOGLE_REDIRECT_URI
+# MOMENTUM_PORT, but note: changing it means also updating GOOGLE_REDIRECT_URI
 # *and* the Google Cloud console redirect registration, or "Connect Google"
 # breaks.
 PORT = 8000
-APP_NAME = "pMomentum"
+APP_NAME = "Momentum"
+# Pre-rename identity (the app shipped as "pMomentum" until 2026-07). Used
+# only by _migrate_legacy_data below so an upgraded install keeps its data.
+LEGACY_APP_NAME = "pMomentum"
+DB_STEM = "momentum.db"
+LEGACY_DB_STEM = "pmomentum.db"
 
 
 def default_data_dir() -> Path:
@@ -42,7 +47,7 @@ def default_data_dir() -> Path:
 
 def _selfcheck() -> int:
     """Validate that the bundled dependencies + data files actually work inside
-    the frozen binary. Run with `pmomentum-backend --selfcheck`. Returns a
+    the frozen binary. Run with `momentum-backend --selfcheck`. Returns a
     non-zero exit code on any failure. Useful as a smoke test of every build —
     catches PyInstaller omitting a data dir or a native dep before we ship.
     """
@@ -53,7 +58,7 @@ def _selfcheck() -> int:
     # file. The env var must be set BEFORE the first `app.*` import in this
     # process (app.config builds its settings singleton at import time, and
     # an os.environ value beats any .env file).
-    tmpdir = Path(tempfile.mkdtemp(prefix="pmomentum-selfcheck-"))
+    tmpdir = Path(tempfile.mkdtemp(prefix="momentum-selfcheck-"))
     selfcheck_db = tmpdir / "selfcheck.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{selfcheck_db.as_posix()}"
 
@@ -139,6 +144,37 @@ def _selfcheck() -> int:
     return 0 if ok else 1
 
 
+def _migrate_legacy_data(data_dir: Path, explicit: bool) -> None:
+    """One-time carry-over from a pre-rename ("pMomentum") install.
+
+    Renames the old per-user data folder to the new name — default location
+    only; an explicit DATA_DIR is the user's own path and not ours to move —
+    and then the SQLite files inside whatever dir we resolved. Pure renames on
+    the same volume, never a copy or delete; a no-op when there is nothing
+    legacy to move or the new location already exists (we never merge or
+    clobber). Runs before the app imports, so config derives paths against
+    the migrated layout.
+    """
+    if not explicit and not data_dir.exists():
+        legacy_dir = data_dir.with_name(LEGACY_APP_NAME)
+        if legacy_dir.is_dir():
+            try:
+                legacy_dir.rename(data_dir)
+            except OSError:
+                return  # can't move it -> boot fresh rather than crash
+    if not (data_dir / LEGACY_DB_STEM).exists() or (data_dir / DB_STEM).exists():
+        return
+    # Main DB file first; its -wal/-shm siblings only exist after an unclean
+    # shutdown and SQLite tolerates their absence.
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        src = data_dir / f"{LEGACY_DB_STEM}{suffix}"
+        if src.exists():
+            try:
+                src.rename(data_dir / f"{DB_STEM}{suffix}")
+            except OSError:
+                break
+
+
 def main() -> None:
     if "--selfcheck" in sys.argv:
         raise SystemExit(_selfcheck())
@@ -146,10 +182,12 @@ def main() -> None:
     # Honour an explicit DATA_DIR (e.g. set by the Tauri shell) if present,
     # otherwise fall back to the per-OS default. The directory itself is created
     # later by bootstrap_data_dir() in the app lifespan — single owner.
-    data_dir = os.environ.get("DATA_DIR") or str(default_data_dir())
-    os.environ["DATA_DIR"] = str(Path(data_dir).expanduser())
+    explicit = bool(os.environ.get("DATA_DIR"))
+    data_dir = Path(os.environ.get("DATA_DIR") or default_data_dir()).expanduser()
+    _migrate_legacy_data(data_dir, explicit)
+    os.environ["DATA_DIR"] = str(data_dir)
 
-    port = int(os.environ.get("PMOMENTUM_PORT", PORT))
+    port = int(os.environ.get("MOMENTUM_PORT", PORT))
 
     # Import only AFTER DATA_DIR is set so app.config resolves paths against it.
     import uvicorn

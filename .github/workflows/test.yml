@@ -34,7 +34,7 @@ jobs:
             postgres_image: ""
           # Postgres proves the dialect-portable models still work there too.
           - name: postgres
-            test_database_url: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+            test_database_url: postgresql+asyncpg://postgres:postgres@localhost:5432/momentum_test
             data_dir: ""
             postgres_image: postgres:16
 
@@ -55,7 +55,7 @@ jobs:
 
     env:
       # Which DB the integration tests run against. Empty -> tests/conftest.py
-      # uses a throwaway SQLite file. Set -> it creates pmomentum_test and runs
+      # uses a throwaway SQLite file. Set -> it creates momentum_test and runs
       # alembic migrations against Postgres.
       TEST_DATABASE_URL: ${{ matrix.test_database_url }}
       # `app.config.Settings` validates these at import time, and most tests
@@ -63,7 +63,7 @@ jobs:
       # gitignored), so fill in placeholders. DATABASE_URL is never connected
       # to during tests — conftest uses TEST_DATABASE_URL. No real LLM call
       # goes out during tests (clients are constructed lazily).
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/pmomentum_test
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/momentum_test
       GROQ_API_KEY: ci-placeholder-not-a-real-key
       # The model_router tests assert Gemini/Gemma models are picker-available;
       # the registry filters Google models out when GOOGLE_AI_API_KEY is unset.
@@ -156,7 +156,7 @@ jobs:
         run: python -m app.desktop --selfcheck
 
       - name: Freeze sidecar (PyInstaller)
-        run: pyinstaller pmomentum.spec --noconfirm
+        run: pyinstaller momentum.spec --noconfirm
 
       - name: Selfcheck (frozen binary)
-        run: ./dist/pmomentum-backend --selfcheck
+        run: ./dist/momentum-backend --selfcheck

@@ -6,7 +6,7 @@ Integrations → Google → Connect** button actually links your Google account
 
 The app's *code* is ready — it opens your real browser for the Google login and
 brings the result back into the app. What's missing is a Google **OAuth client**
-(an ID + secret that identifies pMomentum to Google). You create that once in the
+(an ID + secret that identifies Momentum to Google). You create that once in the
 Google Cloud Console.
 
 > One-time, ~15 minutes. You need a Google account. No coding.
@@ -16,7 +16,7 @@ Google Cloud Console.
 ## 1. Create a project
 
 1. Go to <https://console.cloud.google.com/>.
-2. Top bar → project dropdown → **New Project**. Name it `pMomentum`. Create, then
+2. Top bar → project dropdown → **New Project**. Name it `Momentum`. Create, then
    select it.
 
 ## 2. Turn on the APIs the app uses
@@ -33,7 +33,7 @@ Go to **APIs & Services → Library** and **Enable** each of these:
 **APIs & Services → OAuth consent screen**
 
 1. User type: **External** → Create.
-2. App name `pMomentum`, your email for support + developer contact. Save.
+2. App name `Momentum`, your email for support + developer contact. Save.
 3. **Scopes** — Add these (search by name):
    - `.../auth/documents`
    - `.../auth/drive.file`
@@ -53,7 +53,7 @@ Go to **APIs & Services → Library** and **Enable** each of these:
 
 - Application type: **Web application** (it supports the fixed `localhost`
   redirect the app uses).
-- Name: `pMomentum desktop`.
+- Name: `Momentum desktop`.
 - **Authorized redirect URIs** → Add:
   `http://localhost:8000/api/v1/integrations/google/callback`
 - Create. Copy the **Client ID** and **Client secret**.

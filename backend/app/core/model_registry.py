@@ -1,4 +1,4 @@
-"""Registry of LLM models that pMomentum can route turns to.
+"""Registry of LLM models that Momentum can route turns to.
 
 Chunk C of Sprint 6 makes the per-turn model selection user-controllable
 via a Settings UI. The registry is the single source of truth for which
@@ -111,7 +111,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemma 4 31B (Google)",
         role="heavy",
-        notes="Strong drafting quality. Emits chain-of-thought blocks that pMomentum strips automatically.",
+        notes="Strong drafting quality. Emits chain-of-thought blocks that Momentum strips automatically.",
     ),
     # --- Google: Gemini 3.x via the native google-genai SDK (F5) ---
     # Gemini 3.x models go through the native SDK: the OpenAI-compat endpoint

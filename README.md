@@ -1,6 +1,6 @@
-# pMomentum
+# Momentum
 
-[![CI](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml/badge.svg)](https://github.com/adam-rapoport/pmomentum/actions/workflows/test.yml)
+[![CI](https://github.com/adam-rapoport/momentum/actions/workflows/test.yml/badge.svg)](https://github.com/adam-rapoport/momentum/actions/workflows/test.yml)
 
 An AI agent for product management work, packaged as a **macOS desktop app**.
 It drafts PRDs, stakeholder updates, meeting prep, release notes and more
@@ -25,7 +25,7 @@ build targets the arch of the Mac it runs on — no cross-compiling).
 
 On first launch the app walks you through an onboarding wizard, stores your
 API keys encrypted on your Mac, and keeps all data in
-`~/Library/Application Support/pMomentum/`.
+`~/Library/Application Support/Momentum/`.
 
 ## Stack
 
@@ -52,8 +52,8 @@ Prerequisites: macOS or Linux, Python 3.12+, Node.js 18+. No database service
 — SQLite is created automatically.
 
 ```bash
-git clone https://github.com/adam-rapoport/pmomentum.git
-cd pmomentum
+git clone https://github.com/adam-rapoport/momentum.git
+cd momentum
 
 # Backend
 cd backend
@@ -111,7 +111,7 @@ Then in the UI, try:
 ## Project layout
 
 ```
-pmomentum/
+momentum/
 ├── build-desktop.sh        # one-command macOS desktop build (see INSTALL.md)
 ├── backend/                # FastAPI app
 │   ├── app/
@@ -123,7 +123,7 @@ pmomentum/
 │   │   ├── desktop.py      # Desktop entrypoint + frozen-build --selfcheck
 │   │   └── security.py     # Local-API token/Origin/Host enforcement
 │   ├── alembic/            # DB migrations (applied automatically on startup)
-│   ├── pmomentum.spec      # PyInstaller spec for the sidecar binary
+│   ├── momentum.spec      # PyInstaller spec for the sidecar binary
 │   ├── requirements-desktop.lock  # pinned deps for reproducible desktop builds
 │   ├── scripts/            # Manual smoke tests, seed, lockfile regen
 │   └── tests/              # pytest suite (188 tests)

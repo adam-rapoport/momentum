@@ -1,8 +1,8 @@
-# Handoff: pMomentum Full App Redesign — "Graphite & Phosphor"
+# Handoff: Momentum Full App Redesign — "Graphite & Phosphor"
 
 ## Overview
 
-A complete redesign of the pMomentum desktop app (Tauri + Next.js frontend) covering the
+A complete redesign of the Momentum desktop app (Tauri + Next.js frontend) covering the
 entire experience: chat workspace, empty home state, skill workflows (badge, tool calls,
 approval bar), the merged Memory/Documents context panel, settings, and onboarding.
 The design targets a **macOS-native feel** (traffic lights, draggable titlebar regions, no
@@ -13,7 +13,7 @@ bitmap pixel icons, a pixel display font for section labels, and dithered divide
 
 The files in this bundle are **design references created in HTML** — interactive prototypes
 showing intended look and behavior, **not production code to copy directly**. The task is to
-recreate these designs inside the existing pMomentum codebase
+recreate these designs inside the existing Momentum codebase
 (`frontend/` — Next.js App Router + React + Tailwind) using its established patterns:
 existing components (`Sidebar.tsx`, `ChatView.tsx`, `ChatInput.tsx`, `ToolCallBlock.tsx`,
 `ApprovalBar.tsx`, `MemoryPanel.tsx`, `DocumentsPanel.tsx`, `Header.tsx`, settings/onboarding
@@ -159,7 +159,7 @@ tooltip "Backend connected on localhost:8000"), **context-panel toggle** icon bu
 
 ### 3. Sidebar (`Sidebar.tsx`)
 
-- Header: traffic lights, then logo + wordmark (Silkscreen "PMOMENTUM" 11px when retro on).
+- Header: traffic lights, then logo + wordmark (Silkscreen "MOMENTUM" 11px when retro on).
 - **New chat** button: full-width primary (accent bg, white text, left-aligned label,
   plus icon, right-aligned `⌘N` hint at 70% opacity). 34px tall, radius 8.
 - **Search field**: 30px, `--bg-app` fill, inset pixel search icon, placeholder "Search chats".
@@ -190,7 +190,7 @@ autofocused), then a responsive grid (`repeat(auto-fit, minmax(150px, 1fr))`) of
 
 Floating card: `--bg-surface`, radius 20, composer shadow, 1px border (accent when the
 draft starts with `/`). Autosizing textarea (max 220px), placeholder
-"Message pMomentum — or type / for skills". When draft is a command: text renders in mono,
+"Message Momentum — or type / for skills". When draft is a command: text renders in mono,
 accent color, and a left-aligned mono hint appears: "skill turn → routes to heavy model".
 Bottom row: hints (`⏎ send · ⇧⏎ newline` as kbd chips) + a 32px circular send button
 (accent when nonempty, inset gray disabled; square-ish radius 8 at retro full).
@@ -347,7 +347,7 @@ layout proportions, not absolute crops, as the reference):
 
 | File | Contents |
 |---|---|
-| `pMomentum App.html` | entry: tokens (all CSS variables, both themes), global styles, bootstrap |
+| `Momentum App.html` | entry: tokens (all CSS variables, both themes), global styles, bootstrap |
 | `pm-kit.jsx` | pixel icon bitmaps, logo, Btn/IconBtn/Chip/PxLabel/StatusDot/DitherRule/Toggle/TextInput/Kbd, mini-markdown renderer |
 | `pm-sidebar.jsx` | sidebar incl. session rows, rename/delete, search, footer + theme toggle |
 | `pm-context.jsx` | merged context panel (Memory/Documents tabs, detail drawer) |
@@ -358,5 +358,5 @@ layout proportions, not absolute crops, as the reference):
 | `pm-app.jsx` | shell: toolbar, layout, accent derivation (`accentVars`), theme wiring |
 | `pm-data.jsx` | demo data (sessions, memories, documents, providers, commands) — reference for content tone & shapes only |
 
-Open `pMomentum App.html` in a browser to interact with the prototype while implementing.
+Open `Momentum App.html` in a browser to interact with the prototype while implementing.
 (`tweaks-panel.jsx` is prototype-only review tooling — ignore it.)

@@ -34,7 +34,7 @@ export function WelcomeStep({
       <div className="mb-5 flex justify-center">
         <PmLogo size={44} />
       </div>
-      <div className="mb-6 font-pixel text-[15px] tracking-[0.08em] text-ink">PMOMENTUM</div>
+      <div className="mb-6 font-pixel text-[15px] tracking-[0.08em] text-ink">MOMENTUM</div>
       <p className="mx-auto mb-8 max-w-md text-[14.5px] leading-relaxed text-ink-muted">
         An AI agent for product management work — PRDs, stakeholder updates, meeting prep — with
         persistent memory, running entirely on your Mac.
@@ -235,7 +235,7 @@ export function WebSearchStep({
     <div className="flex flex-col gap-5">
       <div>
         <PxLabel>Step {stepNumber} · Web search · Optional</PxLabel>
-        <h1 className="mt-2 text-[20px] font-bold text-ink">Let pMomentum search the web</h1>
+        <h1 className="mt-2 text-[20px] font-bold text-ink">Let Momentum search the web</h1>
         <p className="mt-1 text-[13px] text-ink-muted">
           Optional. Adds live web search to research-style asks and the <code>/deep</code> command.
           Skip and add it any time in Settings → Web search.

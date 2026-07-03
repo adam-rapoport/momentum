@@ -84,7 +84,7 @@ def _build_environment_section(user: User, google_email: str | None) -> str:
             f"- Role: {role}",
             # Stale "Groq + Llama 3.3" claim removed (A25): the actual model
             # is routed per turn across whichever providers are configured.
-            "- Platform: pMomentum (local desktop app; the model serving "
+            "- Platform: Momentum (local desktop app; the model serving "
             "each turn is routed per turn from the user's Settings)",
         ]
     )

@@ -1,6 +1,6 @@
-# Installing pMomentum (Mac test build)
+# Installing Momentum (Mac test build)
 
-This is the **internal test build** of the pMomentum desktop app: unsigned, and
+This is the **internal test build** of the Momentum desktop app: unsigned, and
 built **for the architecture of the Mac that runs the build script** — there is
 no cross-compilation:
 
@@ -18,7 +18,7 @@ public download come in later sprints.
 
 ## 1. Build it
 
-From the project root (`pmomentum/`):
+From the project root (`momentum/`):
 
 ```bash
 ./build-desktop.sh
@@ -29,20 +29,20 @@ target triple, e.g. `aarch64-apple-darwin` on Apple Silicon or
 `x86_64-apple-darwin` on Intel; `<arch>` is `aarch64` or `x64` accordingly):
 
 ```
-frontend/src-tauri/target/<triple>/release/bundle/dmg/pMomentum_0.1.0_<arch>.dmg
+frontend/src-tauri/target/<triple>/release/bundle/dmg/Momentum_0.1.0_<arch>.dmg
 ```
 
 (The raw app, if you want it directly, is alongside it at
-`frontend/src-tauri/target/<triple>/release/bundle/macos/pMomentum.app`.)
+`frontend/src-tauri/target/<triple>/release/bundle/macos/Momentum.app`.)
 
 ## 2. Install it
 
 1. Double-click the `.dmg` to open it.
-2. In the window that appears, **drag the pMomentum icon onto the Applications
+2. In the window that appears, **drag the Momentum icon onto the Applications
    folder**.
 3. Eject the disk image (drag it to the Trash / click the eject button).
 
-pMomentum now lives in your Applications folder like any other Mac app.
+Momentum now lives in your Applications folder like any other Mac app.
 
 ## 3. First launch — the one-time security prompt
 
@@ -53,26 +53,26 @@ you open it. **This is expected.** Here's how to get past it:
   not, follow the steps below.
 - **If you copied the `.dmg` to another Mac** (downloaded, AirDropped, USB), macOS
   flags it. Do this:
-  1. Open pMomentum from Applications. You'll see a message like *"pMomentum
+  1. Open Momentum from Applications. You'll see a message like *"Momentum
      cannot be opened because Apple cannot check it for malicious software."*
      Click **Done** (do **not** click "Move to Trash").
   2. Open **System Settings → Privacy & Security**.
-  3. Scroll down to the **Security** section. You'll see *"pMomentum was blocked
+  3. Scroll down to the **Security** section. You'll see *"Momentum was blocked
      from use..."* with an **Open Anyway** button. Click it.
-  4. Confirm with Touch ID / your password. pMomentum launches.
+  4. Confirm with Touch ID / your password. Momentum launches.
 
 You only have to do this **once** per Mac.
 
-> If you instead see *"pMomentum is damaged and can't be opened"*, that's macOS
+> If you instead see *"Momentum is damaged and can't be opened"*, that's macOS
 > being extra strict about the unsigned download. Clear the quarantine flag once
 > in Terminal, then open it normally:
 > ```bash
-> xattr -cr /Applications/pMomentum.app
+> xattr -cr /Applications/Momentum.app
 > ```
 
 ## 4. First-run setup
 
-On first launch pMomentum opens an **onboarding wizard**. Use it to:
+On first launch Momentum opens an **onboarding wizard**. Use it to:
 
 - Pick a model and paste an API key for the **fast** slot (casual chat, tool
   calls) and the **drafting** slot (PRDs, updates) — any supported provider
@@ -88,11 +88,11 @@ also change everything above.
 
 ## 5. Where your data lives
 
-Everything pMomentum stores lives in one folder:
+Everything Momentum stores lives in one folder:
 
 ```
-~/Library/Application Support/pMomentum/
-├── pmomentum.db      # your sessions, memory, preferences (SQLite)
+~/Library/Application Support/Momentum/
+├── momentum.db      # your sessions, memory, preferences (SQLite)
 ├── vault.key         # encrypts your saved API keys
 └── memory/           # memory + document files
 ```
@@ -103,7 +103,7 @@ To start completely fresh, quit the app and delete that folder.
 
 There's no auto-updater yet. To get a newer build, re-run `./build-desktop.sh`,
 then reinstall the new `.dmg` over the old app (drag to Applications, replace).
-Your data in `Application Support/pMomentum` is kept across updates.
+Your data in `Application Support/Momentum` is kept across updates.
 
 ---
 

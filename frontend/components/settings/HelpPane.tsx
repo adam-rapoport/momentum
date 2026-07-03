@@ -5,12 +5,12 @@ import { Kbd, PxLabel } from "@/components/pm";
 // data-driven so copy edits don't touch markup.
 const SECTIONS: { title: string; body: React.ReactNode }[] = [
   {
-    title: "What is pMomentum?",
+    title: "What is Momentum?",
     body: (
       <>
-        pMomentum is an AI assistant for product management work that runs entirely on your Mac.
+        Momentum is an AI assistant for product management work that runs entirely on your Mac.
         It chats, drafts documents, remembers what matters, and connects to your tools — and your
-        conversations never pass through a pMomentum server. You bring your own AI provider key
+        conversations never pass through a Momentum server. You bring your own AI provider key
         (or run a local model), and the app talks to that provider directly.
       </>
     ),
@@ -69,7 +69,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <>
         Before anything leaves your machine — sending an email, creating a calendar event,
-        finalizing a deliverable — pMomentum pauses and shows you exactly what it wants to do.
+        finalizing a deliverable — Momentum pauses and shows you exactly what it wants to do.
         Approve it, ask for a revision, or restart. Nothing is sent without your say-so.
       </>
     ),
@@ -78,7 +78,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: "Models: light vs heavy",
     body: (
       <>
-        pMomentum routes each message to one of two model slots you configure in Settings →
+        Momentum routes each message to one of two model slots you configure in Settings →
         Models. The <em>light</em> model handles everyday turns — fast and cheap. The{" "}
         <em>heavy</em> model handles big asks: drafting, synthesis, long reasoning. Skills always
         use the heavy slot. You can mix providers freely — for example a free Groq model for

@@ -184,7 +184,7 @@ class WsClient {
         store.setLastError(m.session_id, {
           code: "WS_UNAVAILABLE",
           message:
-            "Couldn't reach pMomentum's backend to send your message. Please make sure it's running, then try again.",
+            "Couldn't reach Momentum's backend to send your message. Please make sure it's running, then try again.",
         });
         if (m.type === "session.message") {
           // The optimistic bubble never reached the backend — mark it failed

@@ -256,7 +256,7 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
           }}
           onKeyDown={handleKeyDown}
           rows={1}
-          placeholder="Message pMomentum — or type / for skills"
+          placeholder="Message Momentum — or type / for skills"
           className={`block w-full resize-none bg-transparent px-4 pt-3.5 outline-none placeholder:text-ink-dim focus-visible:shadow-none ${
             big ? "text-[15px]" : "text-[14px]"
           } ${isCommand ? "font-mono text-accent-text" : "text-ink"}`}

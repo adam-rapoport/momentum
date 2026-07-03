@@ -80,20 +80,20 @@ jobs:
       - name: Package a headless-safe .dmg (drag-to-Applications)
         run: |
           set -euo pipefail
-          APP="frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pMomentum.app"
+          APP="frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Momentum.app"
           test -d "$APP" || { echo "ERROR: $APP not found"; exit 1; }
           VERSION="$(node -p "require('./frontend/src-tauri/tauri.conf.json').version")"
-          DMG="pMomentum_${VERSION}_aarch64.dmg"
+          DMG="Momentum_${VERSION}_aarch64.dmg"
           STAGING="$(mktemp -d)"
           cp -R "$APP" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
-          hdiutil create -volname "pMomentum" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          hdiutil create -volname "Momentum" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
           rm -rf "$STAGING"
           echo "Built $DMG"; ls -lh "$DMG"
 
       - name: Upload arm64 .dmg artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pmomentum-macos-arm64-dmg
-          path: pMomentum_*_aarch64.dmg
+          name: momentum-macos-arm64-dmg
+          path: Momentum_*_aarch64.dmg
           if-no-files-found: error

@@ -11,11 +11,11 @@ struct BackendProcess(Mutex<Option<CommandChild>>);
 /// backend process subtree on exit. Mutex because a respawn replaces it.
 struct BackendPid(Mutex<u32>);
 /// Per-launch shared secret for the local backend API. Generated here, passed
-/// to the sidecar via PMOMENTUM_AUTH_TOKEN, and handed to the webview through
+/// to the sidecar via MOMENTUM_AUTH_TOKEN, and handed to the webview through
 /// the `get_backend_token` command. Without it, any website the user visits
 /// could drive the backend on 127.0.0.1 (see backend/app/security.py).
 struct AuthToken(String);
-/// The loopback port the backend was told to bind (PMOMENTUM_PORT). Usually
+/// The loopback port the backend was told to bind (MOMENTUM_PORT). Usually
 /// 8000, but when something else already holds 8000 (a dev uvicorn, another
 /// app) we fall back to a free OS-assigned port instead of silently talking
 /// to the squatter. The webview reads it via `get_backend_port`.
@@ -78,9 +78,9 @@ fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell:
     let port = app.state::<BackendPort>().0;
     let mut cmd = app
         .shell()
-        .sidecar("pmomentum-backend")?
-        .env("PMOMENTUM_AUTH_TOKEN", token)
-        .env("PMOMENTUM_PORT", port.to_string());
+        .sidecar("momentum-backend")?
+        .env("MOMENTUM_AUTH_TOKEN", token)
+        .env("MOMENTUM_PORT", port.to_string());
     if port != 8000 {
         // Keep the OAuth callback on the port the backend actually serves.
         // Only overridden off the default so an explicit user-level
@@ -206,7 +206,7 @@ pub fn run() {
             spawn_backend(app.handle(), &token)?;
 
             // The window is shown immediately (tauri.conf.json `visible: true`) so
-            // the user sees the web app's "Starting pMomentum…" loading screen right
+            // the user sees the web app's "Starting Momentum…" loading screen right
             // away instead of a blank wait. The web app (see BootGate) polls the
             // backend's readiness and only renders the real UI once it's serving, so
             // we no longer hide the window here.

@@ -12,7 +12,7 @@ Layered scope:
 
   Default test DB is a throwaway SQLite file (no service needed), matching
   the desktop build. To run the suite against Postgres instead, set
-  `TEST_DATABASE_URL=postgresql+asyncpg://localhost/pmomentum_test`; the
+  `TEST_DATABASE_URL=postgresql+asyncpg://localhost/momentum_test`; the
   fixture then probes that DB and `skip`s the integration tests if it's
   unreachable (so `pytest -q` stays green when only running the unit suite).
 """
@@ -41,7 +41,7 @@ if str(_BACKEND_ROOT) not in sys.path:
 
 # Default: a throwaway SQLite file in the temp dir (no service to install).
 # Override with TEST_DATABASE_URL to run the suite against Postgres.
-_SQLITE_TEST_PATH = os.path.join(tempfile.gettempdir(), "pmomentum_pytest.db")
+_SQLITE_TEST_PATH = os.path.join(tempfile.gettempdir(), "momentum_pytest.db")
 DEFAULT_TEST_DB_URL = f"sqlite+aiosqlite:///{_SQLITE_TEST_PATH}"
 
 
@@ -55,7 +55,7 @@ def _test_db_url() -> str:
 # `app.config.settings`. The contract tests (tests/integration/test_ws_contract,
 # test_rest_api) run the real app via TestClient, which talks to the engine
 # built in app.dependencies from settings.database_url — without this pin it
-# would point at ./pmomentum.db (a developer's real local DB) instead of the
+# would point at ./momentum.db (a developer's real local DB) instead of the
 # throwaway test database the `db`/`seeded` fixtures migrate and truncate.
 os.environ["DATABASE_URL"] = _test_db_url()
 
@@ -106,7 +106,7 @@ def _can_reach_test_db() -> tuple[bool, str]:
 
 
 def _ensure_test_db_exists() -> None:
-    """CREATE DATABASE pmomentum_test if it doesn't already exist."""
+    """CREATE DATABASE momentum_test if it doesn't already exist."""
     import psycopg  # type: ignore
 
     parsed = urlparse(_async_url_to_sync(_test_db_url()))

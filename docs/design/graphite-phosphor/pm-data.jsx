@@ -1,4 +1,4 @@
-// pm-data.jsx — demo data layer for the pMomentum app redesign.
+// pm-data.jsx — demo data layer for the Momentum app redesign.
 // Sessions, messages, memories, documents, commands, providers, integrations.
 
 // ── Slash commands / skills ─────────────────────────────────────────────────
