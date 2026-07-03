@@ -115,6 +115,21 @@ def _parse_skill_file(path: Path) -> Skill | None:
     )
 
 
+def _shared_grounding() -> str:
+    """Rules prepended to EVERY skill body (skills/_shared/grounding.md).
+
+    One file instead of ten copies: the grounding rules (never invent
+    numbers/dates/quotes, say when a lookup came back empty, verify claims
+    inherited from generated docs, …) apply to all skills, and keeping them
+    in a single place means a fix lands everywhere at once — including in
+    skills added later. `_shared/` has no SKILL.md, so the loader below
+    never mistakes it for a skill."""
+    try:
+        return (_SKILLS_DIR / "_shared" / "grounding.md").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
 def load_skills(force: bool = False) -> dict[str, Skill]:
     """Load every SKILL.md under app/skills/ into an in-memory registry.
 
@@ -130,6 +145,7 @@ def load_skills(force: bool = False) -> dict[str, Skill]:
         _cached_skills = registry
         return registry
 
+    grounding = _shared_grounding()
     for skill_dir in sorted(p for p in _SKILLS_DIR.iterdir() if p.is_dir()):
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.exists():
@@ -137,6 +153,8 @@ def load_skills(force: bool = False) -> dict[str, Skill]:
         skill = _parse_skill_file(skill_file)
         if skill is None:
             continue
+        if grounding:
+            skill.body = f"{grounding}\n\n{skill.body}"
         if skill.name in registry:
             logger.warning("duplicate skill name '%s' — overwriting", skill.name)
         registry[skill.name] = skill

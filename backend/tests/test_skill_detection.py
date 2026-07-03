@@ -59,6 +59,40 @@ def test_keyword_trigger_does_not_overfire_on_questions():
     assert detect_skill("remind me what a stakeholder is", {}) is None
 
 
+def test_trigger_collisions_fixed():
+    """Regression tests for the five verified misfires from the 2026-07
+    skills review (each of these previously activated the wrong skill or
+    fired on ordinary conversation)."""
+    # "as a user" used to flip ordinary speech into user-story.
+    assert detect_skill("as our user base grows we need better onboarding", {}) is None
+    assert detect_skill("what happens as a user deletes their account?", {}) is None
+    # "status update for" was effectively bare "status update" — a question
+    # TO the assistant used to activate stakeholder-update.
+    assert detect_skill("can you give me a status update on the tests", {}) is None
+    assert detect_skill("write a status update for leadership", {}) == "stakeholder-update"
+    # "record a decision" fired on descriptions of process, not requests.
+    assert detect_skill("we record every product decision in Notion", {}) is None
+    assert detect_skill("log a decision about the pricing change", {}) == "decision-log"
+    # Prep for a sprint-review MEETING wants meeting-prep, not the retro
+    # author (works because meeting-prep sorts before sprint-review).
+    assert detect_skill("help me prep for the sprint review meeting", {}) == "meeting-prep"
+    assert detect_skill("run a sprint retro for sprint 14", {}) == "sprint-review"
+    # A quarter-scale retro belongs to quarterly-review even without the
+    # word "quarterly" (works because quarterly-review sorts before sprint-review).
+    assert detect_skill("run a retro for the quarter", {}) == "quarterly-review"
+
+
+def test_every_skill_body_starts_with_shared_grounding():
+    """The loader prepends skills/_shared/grounding.md to every skill body,
+    so the anti-fabrication rules ride along with each playbook."""
+    skills = load_skills(force=True)
+    assert len(skills) >= 10
+    for skill in skills.values():
+        assert skill.body.startswith("# Grounding rules"), (
+            f"{skill.name} body is missing the shared grounding preamble"
+        )
+
+
 def test_keyword_trigger_ignored_when_skill_already_active():
     # Don't let natural-language mentions of "write a prd" flip sessions
     # that are already mid-workflow.
