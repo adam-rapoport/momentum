@@ -28,14 +28,23 @@
 # for the app/dmg version. Keep backend/pyproject.toml, frontend/package.json
 # and frontend/src-tauri/Cargo.toml in sync with it (all 0.1.0 today).
 #
-# IMPORTANT: the outer .app is intentionally left UNSIGNED. The embedded backend
-# (a PyInstaller one-file binary) is already ad-hoc signed by PyInstaller in a way
-# that's internally consistent, so it runs. Do NOT add bundle.macOS.signingIdentity
-# here to ad-hoc re-sign the app: that re-signs the backend binary but NOT the Python
-# library bundled inside it, and macOS Library Validation then refuses to launch the
-# backend ("different Team IDs"). Real code signing + notarization come in a later
-# sprint and must use a Developer ID cert + the `com.apple.security.cs.disable-library-
-# validation` entitlement (or switch PyInstaller to onedir mode). See INSTALL.md.
+# SIGNING (env-driven, dormant by default): with no Apple env vars set this
+# produces the same UNSIGNED build as always — the embedded PyInstaller backend
+# keeps its own internally-consistent ad-hoc signature and runs fine. Do NOT
+# add bundle.macOS.signingIdentity to tauri.conf.json: a non-Developer-ID
+# re-sign hits macOS Library Validation ("different Team IDs") and kills the
+# backend at launch. Real signing activates ONLY when Tauri's standard env vars
+# are present (APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+# APPLE_SIGNING_IDENTITY, and APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID for
+# notarization) — together with src-tauri/entitlements.plist, whose
+# disable-library-validation entitlement is what makes a Developer-ID-signed
+# app tolerate the PyInstaller backend. See .github/workflows/release.yml.
+#
+# UPDATER ARTIFACTS: tauri.conf.json sets bundle.createUpdaterArtifacts, which
+# needs the updater signing key. The script auto-loads it from
+# ~/Documents/momentum-release-keys/updater.key (Adam's machine) or the
+# TAURI_SIGNING_PRIVATE_KEY(-_PATH) env (CI secret); with neither present it
+# disables updater artifacts for that build instead of failing.
 #
 # Usage:  ./build-desktop.sh
 #
@@ -88,10 +97,41 @@ echo "==> [2/4] Place the sidecar where Tauri expects it (target-triple suffix)"
 mkdir -p "$FRONTEND/src-tauri/binaries"
 cp -p "dist/$SIDECAR" "$FRONTEND/src-tauri/binaries/$SIDECAR-$TARGET_TRIPLE"
 
-echo "==> [3/4] Build the Tauri bundle(s): $BUNDLES (release; outer app left unsigned — see header)"
+echo "==> [3/4] Build the Tauri bundle(s): $BUNDLES"
 cd "$FRONTEND"
 export PATH="$HOME/.cargo/bin:$PATH"
-npx tauri build --target "$TARGET_TRIPLE" --bundles "$BUNDLES"
+
+# Updater artifact signing key: env (CI) > local key file > disable artifacts.
+LOCAL_UPDATER_KEY="$HOME/Documents/momentum-release-keys/updater.key"
+UPDATER_ARGS=()
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -f "$LOCAL_UPDATER_KEY" ]; then
+  # Pass the key CONTENTS: the CLI's updater signer reads the private key from
+  # TAURI_SIGNING_PRIVATE_KEY (the _PATH variant is not honored by every
+  # version — verified 2026-07 with CLI 2.x: path-only fails with "A public
+  # key has been found, but no private key").
+  TAURI_SIGNING_PRIVATE_KEY="$(cat "$LOCAL_UPDATER_KEY")"
+  export TAURI_SIGNING_PRIVATE_KEY
+fi
+if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+  # Even a passwordless key needs the password var set (to empty) or the CLI
+  # tries to prompt a TTY and dies headless ("Device not configured").
+  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
+fi
+if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+  echo "    updater artifacts: ON (signing key found)"
+else
+  echo "    updater artifacts: OFF (no updater signing key — fine for test builds)"
+  UPDATER_ARGS=(--config '{"bundle":{"createUpdaterArtifacts":false}}')
+fi
+
+if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+  echo "    code signing: ON ($APPLE_SIGNING_IDENTITY; notarization $([ -n "${APPLE_ID:-}" ] && echo ON || echo OFF))"
+else
+  echo "    code signing: OFF (unsigned build — see header)"
+fi
+
+# ${arr[@]+...} keeps macOS's bash 3.2 happy when the array is empty (set -u).
+npx tauri build --target "$TARGET_TRIPLE" --bundles "$BUNDLES" ${UPDATER_ARGS[@]+"${UPDATER_ARGS[@]}"}
 
 echo "==> [4/4] Artifacts:"
 BUNDLE="$FRONTEND/src-tauri/target/$TARGET_TRIPLE/release/bundle"
@@ -101,7 +141,7 @@ echo "    APP: ${APP_PATH:-<none>}"
 echo "    DMG: ${DMG_PATH:-<none>}"
 
 if [ -n "${APP_PATH:-}" ]; then
-  echo "==> Verify the embedded backend kept PyInstaller's signature (expect Signature=adhoc)"
+  echo "==> Embedded backend signature (adhoc when unsigned; Developer ID when signed)"
   codesign -dvv "$APP_PATH/Contents/MacOS/momentum-backend" 2>&1 | grep -iE "Identifier|Signature|Format" || true
 fi
 

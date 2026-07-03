@@ -155,6 +155,98 @@ fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell:
     Ok(())
 }
 
+/// Check GitHub Releases for a newer signed build (release builds only) and,
+/// with the user's consent, install it and restart. Fully fail-quiet: an
+/// offline machine, a 404 (no release yet), or a bad signature only ever
+/// writes a log line — launch is never blocked and no error dialog is shown
+/// for a background check the user didn't ask for.
+#[cfg(not(debug_assertions))]
+fn spawn_update_check(app: &AppHandle) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    use tauri_plugin_updater::UpdaterExt;
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let updater = match app.updater() {
+            Ok(u) => u,
+            Err(e) => {
+                log::warn!("[updater] not available: {e}");
+                return;
+            }
+        };
+        let update = match updater.check().await {
+            Ok(Some(u)) => u,
+            Ok(None) => {
+                log::info!("[updater] up to date");
+                return;
+            }
+            Err(e) => {
+                log::info!("[updater] check skipped: {e}");
+                return;
+            }
+        };
+
+        let version = update.version.clone();
+        let notes = update.body.clone().unwrap_or_default();
+        let ask = app.clone();
+        // Dialogs must not block the async runtime; blocking_show on a
+        // dedicated blocking task is the supported pattern.
+        let wants_update = tauri::async_runtime::spawn_blocking(move || {
+            let mut msg = format!("Momentum {version} is available.");
+            let trimmed = notes.trim();
+            if !trimmed.is_empty() {
+                // Keep the dialog readable if release notes run long.
+                let short: String = trimmed.chars().take(600).collect();
+                msg = format!("{msg}\n\n{short}");
+            }
+            ask.dialog()
+                .message(msg)
+                .title("Update available")
+                .kind(MessageDialogKind::Info)
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Update now".into(),
+                    "Later".into(),
+                ))
+                .blocking_show()
+        })
+        .await
+        .unwrap_or(false);
+        if !wants_update {
+            log::info!("[updater] user postponed the update");
+            return;
+        }
+
+        match update.download_and_install(|_, _| {}, || {}).await {
+            Ok(()) => {
+                log::info!("[updater] update installed; asking to restart");
+                let ask = app.clone();
+                let restart_now = tauri::async_runtime::spawn_blocking(move || {
+                    ask.dialog()
+                        .message(
+                            "The update is installed and will be used the next \
+                             time Momentum starts.",
+                        )
+                        .title("Update ready")
+                        .kind(MessageDialogKind::Info)
+                        .buttons(MessageDialogButtons::OkCancelCustom(
+                            "Restart now".into(),
+                            "Later".into(),
+                        ))
+                        .blocking_show()
+                })
+                .await
+                .unwrap_or(false);
+                if restart_now {
+                    // RunEvent::ExitRequested fires on restart, so the backend
+                    // subtree is terminated by the existing exit handler.
+                    app.restart();
+                }
+            }
+            Err(e) => log::error!("[updater] install failed: {e}"),
+        }
+    });
+}
+
 /// Terminate the backend sidecar AND its child worker. The PyInstaller one-file
 /// binary runs as a bootloader parent plus a Python child that holds the port;
 /// the bootloader does not forward a kill to that child, so we must target both
@@ -184,6 +276,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port])
         .setup(move |app| {
             // File logging in RELEASE builds too (~/Library/Logs/<identifier>/):
@@ -204,6 +298,12 @@ pub fn run() {
             app.manage(BackendPort(port));
 
             spawn_backend(app.handle(), &token)?;
+
+            // Ask-first self-update (release builds only; dev builds have no
+            // signed bundle to update). Runs in the background — the boot
+            // screen and the update check never wait on each other.
+            #[cfg(not(debug_assertions))]
+            spawn_update_check(app.handle());
 
             // The window is shown immediately (tauri.conf.json `visible: true`) so
             // the user sees the web app's "Starting Momentum…" loading screen right

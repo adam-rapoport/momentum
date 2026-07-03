@@ -1,0 +1,236 @@
+name: Release (both Mac builds)
+
+# One `v*` tag -> BOTH macOS installers (Intel x64 + Apple Silicon arm64),
+# signed + notarized when the Apple secrets exist, published as a DRAFT
+# GitHub Release together with the auto-updater manifest (latest.json).
+# Adam reviews the draft and clicks Publish — nothing goes public on its own.
+#
+# workflow_dispatch = dry run: builds both arches (unsigned unless secrets are
+# set) and uploads workflow artifacts, but creates no release. Use it to test
+# the pipeline before the first real tag.
+#
+# SECRETS (all optional until Apple enrollment lands; each activates a layer):
+#   TAURI_SIGNING_PRIVATE_KEY   updater-artifact signing key (generated locally;
+#                               private half of the pubkey in tauri.conf.json)
+#   APPLE_CERTIFICATE           base64 of the Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD  password for that .p12
+#   APPLE_SIGNING_IDENTITY      e.g. "Developer ID Application: Adam Rapoport (TEAMID)"
+#   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID
+#                               Apple ID, app-specific password, team id — enables
+#                               notarization (Tauri submits + staples the .app)
+# With none set, the pipeline still works end-to-end and produces unsigned
+# artifacts — same trust posture as today's INSTALL.md flow.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the draft release + upload assets
+
+jobs:
+  build:
+    name: build ${{ matrix.arch }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # PyInstaller cannot cross-compile: each arch builds on its own hardware.
+          - runner: macos-latest # Apple Silicon
+            arch: aarch64
+            triple: aarch64-apple-darwin
+          - runner: macos-15-intel # Intel x64
+            arch: x64
+            triple: x86_64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-desktop.lock
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Rust (stable, host target)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build (src-tauri)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+
+      - name: Pre-create backend venv (so build-desktop.sh reuses it)
+        run: python -m venv backend/.venv
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Export ONLY the secrets that are actually set. Tauri treats the mere
+      # presence of these env vars as "sign this build", so an empty string
+      # from a missing secret must never reach the build step.
+      - name: Configure signing from available secrets
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for var in TAURI_SIGNING_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
+                     APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!var:-}" ]; then
+              echo "$var<<__EOF__" >> "$GITHUB_ENV"
+              echo "${!var}" >> "$GITHUB_ENV"
+              echo "__EOF__" >> "$GITHUB_ENV"
+              echo "  $var: set"
+            else
+              echo "  $var: (not set)"
+            fi
+          done
+          # The updater key's password must be SET even when empty, or the CLI
+          # prompts a nonexistent TTY and fails ("Device not configured").
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${KEY_PASSWORD}" >> "$GITHUB_ENV"
+          fi
+
+      # Tauri signs + notarizes the .app itself when the APPLE_* env vars are
+      # present, applying src-tauri/entitlements.plist (the Library Validation
+      # fix for the PyInstaller sidecar). PM_BUNDLES=app because Tauri's own
+      # bundle_dmg.sh needs a GUI session; the DMG is wrapped below.
+      - name: Build desktop app (${{ matrix.arch }})
+        env:
+          PM_BUNDLES: app
+        run: ./build-desktop.sh
+
+      - name: Package a headless-safe .dmg (drag-to-Applications)
+        id: dmg
+        run: |
+          set -euo pipefail
+          BUNDLE="frontend/src-tauri/target/${{ matrix.triple }}/release/bundle"
+          APP="$BUNDLE/macos/Momentum.app"
+          test -d "$APP" || { echo "ERROR: $APP not found"; exit 1; }
+          VERSION="$(node -p "require('./frontend/src-tauri/tauri.conf.json').version")"
+          DMG="Momentum_${VERSION}_${{ matrix.arch }}.dmg"
+          STAGING="$(mktemp -d)"
+          cp -R "$APP" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "Momentum" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          rm -rf "$STAGING"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+          ls -lh "$DMG"
+
+      # The .app was notarized by Tauri during the build; the DMG wrapper needs
+      # its own notarization + staple so Gatekeeper accepts the download whole.
+      - name: Notarize + staple the .dmg (only when Apple secrets are set)
+        if: env.APPLE_ID != '' && env.APPLE_PASSWORD != '' && env.APPLE_TEAM_ID != ''
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit "${{ steps.dmg.outputs.dmg }}" \
+            --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "${{ steps.dmg.outputs.dmg }}"
+
+      # The updater feeds on .app.tar.gz + .sig (produced by tauri build when
+      # the updater key is present). Rename per-arch so the two builds' assets
+      # don't collide in one release.
+      - name: Collect updater artifacts (if produced)
+        run: |
+          set -euo pipefail
+          BUNDLE="frontend/src-tauri/target/${{ matrix.triple }}/release/bundle/macos"
+          V="${{ steps.dmg.outputs.version }}"
+          if [ -f "$BUNDLE/Momentum.app.tar.gz" ]; then
+            cp "$BUNDLE/Momentum.app.tar.gz" "Momentum_${V}_${{ matrix.arch }}.app.tar.gz"
+            cp "$BUNDLE/Momentum.app.tar.gz.sig" "Momentum_${V}_${{ matrix.arch }}.app.tar.gz.sig"
+            echo "updater artifacts collected"
+          else
+            echo "no updater artifacts (no updater key for this run)"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: momentum-${{ matrix.arch }}
+          path: |
+            Momentum_*.dmg
+            Momentum_*.app.tar.gz
+            Momentum_*.app.tar.gz.sig
+          if-no-files-found: error
+
+  release:
+    name: draft the GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      # latest.json is what installed apps poll (tauri.conf.json updater
+      # endpoint). It must be attached to the SAME release as the .app.tar.gz
+      # assets its URLs point at. Skipped (with a visible warning) if this run
+      # had no updater key — a release without it simply won't auto-update.
+      - name: Generate updater manifest (latest.json)
+        id: manifest
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          cd assets
+          if [ ! -f "Momentum_${VERSION}_aarch64.app.tar.gz.sig" ] || [ ! -f "Momentum_${VERSION}_x64.app.tar.gz.sig" ]; then
+            echo "::warning::updater artifacts missing — releasing without latest.json (no auto-update for this version)"
+            exit 0
+          fi
+          SIG_ARM="$(cat "Momentum_${VERSION}_aarch64.app.tar.gz.sig")"
+          SIG_X64="$(cat "Momentum_${VERSION}_x64.app.tar.gz.sig")"
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION}",
+            "pub_date": "${NOW}",
+            "platforms": {
+              "darwin-aarch64": {
+                "url": "${BASE}/Momentum_${VERSION}_aarch64.app.tar.gz",
+                "signature": "${SIG_ARM}"
+              },
+              "darwin-x86_64": {
+                "url": "${BASE}/Momentum_${VERSION}_x64.app.tar.gz",
+                "signature": "${SIG_X64}"
+              }
+            }
+          }
+          EOF
+          cat latest.json
+
+      - name: Create draft release with all assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "Momentum ${TAG#v}" \
+            --notes "Draft — edit these notes, then publish. Intel Macs: Momentum_*_x64.dmg · Apple Silicon: Momentum_*_aarch64.dmg" \
+            assets/*

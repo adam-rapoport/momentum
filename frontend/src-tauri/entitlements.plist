@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the SIGNED build (Developer ID).
+  Only applied when signing is active (env-driven; see tauri.conf.json
+  bundle.macOS + .github/workflows/release.yml). Unsigned local builds
+  ignore this file entirely.
+
+  disable-library-validation is LOAD-BEARING: the backend sidecar is a
+  PyInstaller one-file binary whose embedded Python dylib carries
+  PyInstaller's own ad-hoc signature. With Library Validation on, a
+  Developer-ID-signed bootloader refuses to dlopen that differently-signed
+  dylib and the backend dies at launch ("different Team IDs" — verified the
+  hard way, 2026-05-30). allow-unsigned-executable-memory covers Python's
+  ctypes/cffi JIT-ish allocations under the hardened runtime.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

@@ -9,18 +9,17 @@ name: Desktop build (Apple Silicon)
 # target triple from the host (aarch64-apple-darwin here), so NO script change
 # is needed for the architecture.
 #
-# Trigger: manual (workflow_dispatch) + version tags only, so this slow build
-# doesn't run on every PR. Per-push/PR test coverage stays in test.yml.
+# Trigger: manual (workflow_dispatch) only. Version tags are owned by
+# release.yml, which builds BOTH architectures (signed when secrets exist) and
+# drafts the GitHub Release — this workflow remains as a cheap one-off arm64
+# smoke build.
 #
-# Output: an UNSIGNED .dmg (signing + notarization are a later sprint — see
-# INSTALL.md). Note: CI verifies the build + the frozen sidecar's --selfcheck,
-# but cannot launch the GUI; a one-time double-click check on any M-series Mac
-# confirms the window/Keychain/handshake path.
+# Output: an UNSIGNED .dmg. Note: CI verifies the build + the frozen sidecar's
+# --selfcheck, but cannot launch the GUI; a one-time double-click check on any
+# M-series Mac confirms the window/Keychain/handshake path.
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   build-macos-arm64:

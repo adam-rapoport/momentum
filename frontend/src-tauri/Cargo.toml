@@ -32,3 +32,8 @@ tauri-plugin-shell = "2"
 # Opens external URLs (e.g. the Google OAuth login) in the user's real browser;
 # the in-app webview can't navigate to external sites.
 tauri-plugin-opener = "2"
+# Self-update: checks the GitHub Release feed (latest.json) on launch and
+# installs signed updates after the user confirms (see spawn_update_check).
+tauri-plugin-updater = "2"
+# Native dialogs for the update prompt ("Update now / Later").
+tauri-plugin-dialog = "2"
