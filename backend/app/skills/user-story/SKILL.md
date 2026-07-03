@@ -27,7 +27,12 @@ Before asking anything:
   you wrote one in this project), call `ListDocuments` and
   `ReadDocument` it. Derive the stories and acceptance criteria from
   its Scope and Success Metrics sections instead of re-interviewing
-  the user; link the PRD under `## Notes`.
+  the user; link the PRD under `## Notes`. Inherit with the PRD's own
+  confidence levels: its Assumptions and Open Questions carry forward
+  AS assumptions and open questions — never promote them into decided
+  acceptance criteria (an undecided send-time stays an open question in
+  your doc too). Don't add capabilities the PRD doesn't contain; if one
+  seems needed, flag it as a proposed addition, not established scope.
 
 **Express lane.** If the opening message already covers the problem
 and persona, or the user says "just draft it" / gives one-line
