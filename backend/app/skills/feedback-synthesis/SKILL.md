@@ -56,6 +56,13 @@ by paginating through search snippets. State the corpus size only
 after you have counted the entries yourself. Before writing any
 per-theme frequency, enumerate which entries (by date or ID) belong to
 that theme — a count you can't enumerate doesn't go in the doc.
+Verification has a budget: ONE full-read attempt. If the corpus is not
+fully readable (only fragments or search snippets are retrievable),
+stop counting — don't keep probing, and don't guess. Report scope
+qualitatively instead ("~3 months of support entries, Apr–Jun; exact
+count unavailable — source only partially retrievable"), rank themes
+by severity/impact and note the limitation in Caveats. An unverifiable
+count never blocks the synthesis: draft with what you have.
 
 Cluster the feedback into themes. A theme is a recurring
 job-to-be-done, pain point, or unmet expectation — not just a topic
