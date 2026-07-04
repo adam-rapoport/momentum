@@ -109,14 +109,19 @@ jobs:
             echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${KEY_PASSWORD}" >> "$GITHUB_ENV"
           fi
 
-      # Tauri signs + notarizes the .app itself when the APPLE_* env vars are
-      # present, applying src-tauri/entitlements.plist (the Library Validation
-      # fix for the PyInstaller sidecar). PM_BUNDLES=app because Tauri's own
-      # bundle_dmg.sh needs a GUI session; the DMG is wrapped below.
-      - name: Build desktop app (${{ matrix.arch }})
+      # Tauri signs the .app when the APPLE_CERTIFICATE/APPLE_SIGNING_IDENTITY
+      # env vars are present, applying src-tauri/entitlements.plist (the
+      # Library Validation fix for the PyInstaller sidecar). Notarization is
+      # deliberately NOT done here: notarytool inside `tauri build` cannot be
+      # retried and flaked twice on runner networking — it runs as its own
+      # hardened step below. PM_BUNDLES=app because Tauri's own bundle_dmg.sh
+      # needs a GUI session; the DMG is wrapped below.
+      - name: Build desktop app (${{ matrix.arch }}; sign only)
         env:
           PM_BUNDLES: app
-        run: ./build-desktop.sh
+        run: |
+          unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+          ./build-desktop.sh
 
       # The release build leaves multi-GB intermediates (cargo deps, PyInstaller
       # work dirs, node_modules) that starve hdiutil of disk on the runner
@@ -132,6 +137,20 @@ jobs:
                  frontend/node_modules frontend/.next frontend/out \
                  ~/Library/Caches/pip 2>/dev/null || true
           df -h / | tail -1
+
+      # Notarize + staple the .app BEFORE it goes into the DMG, so the DMG
+      # carries an already-stapled app. The updater's .app.tar.gz (created
+      # during the build, pre-staple) intentionally stays as-is: updates are
+      # verified by the updater's own signature and never carry the browser
+      # quarantine attribute, so Gatekeeper doesn't demand notarization there.
+      - name: Notarize + staple the .app (only when Apple secrets are set)
+        if: env.APPLE_ID != '' && env.APPLE_PASSWORD != '' && env.APPLE_TEAM_ID != ''
+        run: |
+          set -euo pipefail
+          APP="frontend/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/Momentum.app"
+          ditto -c -k --keepParent "$APP" /tmp/momentum-app.zip
+          bash .github/scripts/notarize.sh /tmp/momentum-app.zip
+          xcrun stapler staple "$APP"
 
       - name: Package a headless-safe .dmg (drag-to-Applications)
         id: dmg
@@ -153,26 +172,11 @@ jobs:
 
       # The .app was notarized by Tauri during the build; the DMG wrapper needs
       # its own notarization + staple so Gatekeeper accepts the download whole.
-      # notarytool occasionally fails with a spurious "Internet connection
-      # appears to be offline" on hosted runners (observed on the first run) —
-      # retry with backoff before believing it.
       - name: Notarize + staple the .dmg (only when Apple secrets are set)
         if: env.APPLE_ID != '' && env.APPLE_PASSWORD != '' && env.APPLE_TEAM_ID != ''
         run: |
           set -euo pipefail
-          for attempt in 1 2 3; do
-            if xcrun notarytool submit "${{ steps.dmg.outputs.dmg }}" \
-                --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
-                --team-id "$APPLE_TEAM_ID" --wait --timeout 30m; then
-              break
-            fi
-            if [ "$attempt" = 3 ]; then
-              echo "::error::DMG notarization failed after 3 attempts"
-              exit 1
-            fi
-            echo "notarytool attempt $attempt failed — retrying in 45s"
-            sleep 45
-          done
+          bash .github/scripts/notarize.sh "${{ steps.dmg.outputs.dmg }}"
           xcrun stapler staple "${{ steps.dmg.outputs.dmg }}"
 
       # The updater feeds on .app.tar.gz + .sig (produced by tauri build when
