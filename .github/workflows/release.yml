@@ -152,6 +152,12 @@ jobs:
           bash .github/scripts/notarize.sh /tmp/momentum-app.zip
           xcrun stapler staple "$APP"
 
+      # hdiutil's -srcfolder auto-sizing is flaky on virtualized Intel runners:
+      # it under-sizes the temp image and dies with a bogus "No space left on
+      # device" while the disk has 100+ GB free (observed twice on
+      # macos-15-intel). So: create the image at an EXPLICIT size, copy with
+      # ditto, convert to compressed UDZO — and retry the whole dance, since
+      # diskimages-helper itself can flake.
       - name: Package a headless-safe .dmg (drag-to-Applications)
         id: dmg
         run: |
@@ -164,8 +170,22 @@ jobs:
           STAGING="$(mktemp -d)"
           cp -R "$APP" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
-          hdiutil create -volname "Momentum" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
-          rm -rf "$STAGING"
+          SIZE_MB=$(( $(du -sm "$STAGING" | cut -f1) + 150 ))
+          MOUNT="/Volumes/MomentumBuild"
+          for attempt in 1 2 3; do
+            rm -f rw.dmg "$DMG"
+            hdiutil detach "$MOUNT" -force 2>/dev/null || true
+            if hdiutil create -size "${SIZE_MB}m" -fs "HFS+" -volname "Momentum" rw.dmg &&
+               hdiutil attach rw.dmg -mountpoint "$MOUNT" -nobrowse &&
+               ditto "$STAGING" "$MOUNT" &&
+               hdiutil detach "$MOUNT" &&
+               hdiutil convert rw.dmg -format UDZO -o "$DMG"; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then echo "::error::DMG creation failed 3x"; exit 1; fi
+            echo "hdiutil attempt $attempt failed — retrying in 20s"; sleep 20
+          done
+          rm -rf "$STAGING" rw.dmg
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
           ls -lh "$DMG"
