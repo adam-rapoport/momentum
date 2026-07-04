@@ -74,10 +74,27 @@ export async function getWsBase(): Promise<string> {
  * sites (e.g. a Google login page) — doing so silently does nothing. So we hand
  * the URL to the OS via Tauri's opener plugin. In web dev we just open a tab.
  */
+// Raw plugin invoke via the runtime-injected internals — the same channel
+// invokeCached uses for the token/port. Deliberately NOT the
+// @tauri-apps/plugin-opener npm package: that route dynamic-imports a
+// lazily-loaded chunk at click time, which is a silent single point of
+// failure in a packaged build (observed in the first signed release: both
+// About-pane links dead because the chunk never loaded, while raw invokes
+// in the very same webview worked fine).
+function invokeRaw<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
+  const internals = (
+    window as unknown as {
+      __TAURI_INTERNALS__: {
+        invoke: (cmd: string, args?: Record<string, unknown>) => Promise<T>;
+      };
+    }
+  ).__TAURI_INTERNALS__;
+  return internals.invoke(cmd, args);
+}
+
 export async function openExternal(url: string): Promise<void> {
   if (isTauri()) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
+    await invokeRaw("plugin:opener|open_url", { url });
   } else {
     window.open(url, "_blank", "noopener,noreferrer");
   }
@@ -89,13 +106,11 @@ export async function openExternal(url: string): Promise<void> {
  */
 export async function openLocalPath(path: string): Promise<void> {
   if (!isTauri()) return;
-  const { openPath } = await import("@tauri-apps/plugin-opener");
-  await openPath(path);
+  await invokeRaw("plugin:opener|open_path", { path });
 }
 
 /** Reveal a local file in Finder (desktop only). */
 export async function revealInFolder(path: string): Promise<void> {
   if (!isTauri()) return;
-  const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
-  await revealItemInDir(path);
+  await invokeRaw("plugin:opener|reveal_item_in_dir", { path });
 }
