@@ -1,118 +1,90 @@
-# Installing Momentum (Mac test build)
+# Installing Momentum (macOS)
 
-This is the **internal test build** of the Momentum desktop app: unsigned, and
-built **for the architecture of the Mac that runs the build script** — there is
-no cross-compilation:
+Momentum ships as a signed, notarized Mac app in two builds — pick the one for
+your machine:
 
-- Built on an **Intel Mac** → an `x86_64` build. It also runs on Apple Silicon
-  Macs through Apple's Rosetta translation layer.
-- Built on an **Apple Silicon Mac** → a native `aarch64` (arm64) build. It will
-  **not** run on Intel Macs.
+- **Apple Silicon** (M-series Macs): `Momentum_<version>_aarch64.dmg`
+- **Intel**: `Momentum_<version>_x64.dmg`
 
-The `.dmg` filename carries the real architecture (`_x64` / `_aarch64`), so you
-always know what you built. It is meant for your own testing — not a public
-release yet. Code signing, notarization, a universal (dual-arch) build, and a
-public download come in later sprints.
+Not sure which you have?  → Apple menu → *About This Mac*. "Chip: Apple M…"
+means Apple Silicon; "Processor: Intel…" means Intel. (The Apple Silicon build
+does not run on Intel Macs; the Intel build runs on Apple Silicon via Rosetta,
+but the native build is faster.)
 
----
+## 1. Install
 
-## 1. Build it
+1. Download the `.dmg` for your chip from the
+   [latest release](https://github.com/adam-rapoport/momentum/releases/latest).
+2. Double-click it, then **drag the Momentum icon onto the Applications folder**.
+3. Eject the disk image and launch Momentum from Applications.
 
-From the project root (`momentum/`):
+That's it — the app is signed and notarized by Apple, so there are no security
+warnings to click through.
 
-```bash
-./build-desktop.sh
-```
-
-When it finishes, the installer is here (`<triple>` is your machine's Rust
-target triple, e.g. `aarch64-apple-darwin` on Apple Silicon or
-`x86_64-apple-darwin` on Intel; `<arch>` is `aarch64` or `x64` accordingly):
-
-```
-frontend/src-tauri/target/<triple>/release/bundle/dmg/Momentum_0.1.0_<arch>.dmg
-```
-
-(The raw app, if you want it directly, is alongside it at
-`frontend/src-tauri/target/<triple>/release/bundle/macos/Momentum.app`.)
-
-## 2. Install it
-
-1. Double-click the `.dmg` to open it.
-2. In the window that appears, **drag the Momentum icon onto the Applications
-   folder**.
-3. Eject the disk image (drag it to the Trash / click the eject button).
-
-Momentum now lives in your Applications folder like any other Mac app.
-
-## 3. First launch — the one-time security prompt
-
-Because this build isn't signed by Apple yet, macOS will warn you the first time
-you open it. **This is expected.** Here's how to get past it:
-
-- **If you built and are running it on the same Mac:** it usually just opens. If
-  not, follow the steps below.
-- **If you copied the `.dmg` to another Mac** (downloaded, AirDropped, USB), macOS
-  flags it. Do this:
-  1. Open Momentum from Applications. You'll see a message like *"Momentum
-     cannot be opened because Apple cannot check it for malicious software."*
-     Click **Done** (do **not** click "Move to Trash").
-  2. Open **System Settings → Privacy & Security**.
-  3. Scroll down to the **Security** section. You'll see *"Momentum was blocked
-     from use..."* with an **Open Anyway** button. Click it.
-  4. Confirm with Touch ID / your password. Momentum launches.
-
-You only have to do this **once** per Mac.
-
-> If you instead see *"Momentum is damaged and can't be opened"*, that's macOS
-> being extra strict about the unsigned download. Clear the quarantine flag once
-> in Terminal, then open it normally:
-> ```bash
-> xattr -cr /Applications/Momentum.app
-> ```
-
-## 4. First-run setup
+## 2. First-run setup
 
 On first launch Momentum opens an **onboarding wizard**. Use it to:
 
 - Pick a model and paste an API key for the **fast** slot (casual chat, tool
   calls) and the **drafting** slot (PRDs, updates) — any supported provider
-  works for either: Groq, Google AI Studio, or OpenAI. Keys are stored
-  **encrypted on your Mac** — they never leave the machine except to call the
-  providers you entered them for.
+  works for either: Google AI Studio, Groq, OpenAI, Anthropic, OpenRouter,
+  Mistral, or a local Ollama server. Keys are stored **encrypted on your Mac**
+  — they never leave the machine except to call the providers you entered them
+  for.
 - Optionally tell it about yourself and your product so the agent has context
   from message one.
 
-Web search (Tavily / Perplexity) and the Google connection (Docs / Gmail /
-Calendar) can be added afterwards in the in-app **Settings**, where you can
-also change everything above.
+Web search (Tavily / Perplexity) can be added afterwards in the in-app
+**Settings**, where you can also change everything above.
 
-## 5. Where your data lives
+## 3. Where your data lives
 
 Everything Momentum stores lives in one folder:
 
 ```
 ~/Library/Application Support/Momentum/
-├── momentum.db      # your sessions, memory, preferences (SQLite)
-├── vault.key         # encrypts your saved API keys
+├── momentum.db       # your sessions, memory, preferences (SQLite)
 └── memory/           # memory + document files
 ```
 
-To start completely fresh, quit the app and delete that folder.
+The key that encrypts your saved API keys lives in the **macOS Keychain**
+(item "Momentum"). To start completely fresh, quit the app and delete the
+folder above.
 
-## 6. Updating
+## 4. Updating
 
-There's no auto-updater yet. To get a newer build, re-run `./build-desktop.sh`,
-then reinstall the new `.dmg` over the old app (drag to Applications, replace).
-Your data in `Application Support/Momentum` is kept across updates.
+Momentum updates itself: on launch it checks the latest release, and if a
+newer version exists it asks — *Update now / Later*. Nothing installs without
+your click. You can always install a newer `.dmg` over the old app manually
+instead; your data is kept either way.
 
 ---
+
+## Upgrading from an unsigned test build (pre-v0.1.0)
+
+If you previously installed an unsigned pMomentum/Momentum test build:
+
+1. Install the new Momentum app over the old one (if the old app is named
+   **pMomentum**, delete it from Applications after installing Momentum).
+2. On first launch, your data folder and database are migrated automatically —
+   sessions, memories, and documents carry over.
+3. macOS will show a **one-time Keychain prompt** (the new signature asks to
+   read the key the old build stored). Enter your Mac password and click
+   **Always Allow** — you'll never see it again.
+
+## Building from source
+
+From the project root: `./build-desktop.sh` builds an installer for your
+machine's architecture at
+`frontend/src-tauri/target/<triple>/release/bundle/dmg/`. Source builds are
+unsigned — macOS will require System Settings → Privacy & Security → **Open
+Anyway** on first launch.
 
 ## Troubleshooting
 
 - **Window never appears / hangs on launch:** the app waits for its bundled
-  backend to come up on port **8000**. Make sure nothing else is using that port
-  (e.g. a `uvicorn ... --reload` dev server). Quit the other process and relaunch.
-- **"unidentified developer" every launch:** see step 3 — the *Open Anyway* path
-  clears it for good; double-clicking before doing that does not.
+  backend. If another process holds port **8000** (e.g. a `uvicorn ... --reload`
+  dev server), Momentum picks a free port automatically — but if the app still
+  hangs, quit the other process and relaunch.
 - **Quitting:** use ⌘Q or close the window. The app shuts its backend down with
-  it — nothing should be left running on port 8000 afterward.
+  it — nothing is left running afterward.

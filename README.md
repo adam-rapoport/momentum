@@ -13,15 +13,21 @@ development.
 
 ## The desktop app (the main way to run it)
 
+**[Download the latest release](https://github.com/adam-rapoport/momentum/releases/latest)**
+— signed + notarized `.dmg` installers for both Apple Silicon and Intel Macs,
+with built-in auto-update. See **[INSTALL.md](INSTALL.md)** for the 3-step
+install.
+
+Or build it yourself:
+
 ```bash
 ./build-desktop.sh
 ```
 
 builds a self-contained `.dmg` — a Tauri 2 shell bundling the Next.js UI and
 the Python backend frozen into a sidecar binary. No Python, Node, or database
-service needed on the machine that runs it. See **[INSTALL.md](INSTALL.md)**
-for the build/install walkthrough (including the architecture caveat: the
-build targets the arch of the Mac it runs on — no cross-compiling).
+service needed on the machine that runs it. (Source builds target the arch of
+the Mac they run on — no cross-compiling — and are unsigned.)
 
 On first launch the app walks you through an onboarding wizard, stores your
 API keys encrypted on your Mac, and keeps all data in
