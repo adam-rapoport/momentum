@@ -246,9 +246,15 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
           BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
           cd assets
+          # Take the version from the built artifacts' names (tauri.conf.json
+          # is their source of truth), NOT from the tag — a test tag like
+          # v0.1.0-signedtest must not break manifest generation.
+          VERSION="$(ls Momentum_*_x64.dmg | sed -E 's/^Momentum_(.+)_x64\.dmg$/\1/')"
+          if [ "v${VERSION}" != "$TAG" ]; then
+            echo "::warning::tag $TAG != app version $VERSION (fine for test tags; align them for real releases)"
+          fi
           if [ ! -f "Momentum_${VERSION}_aarch64.app.tar.gz.sig" ] || [ ! -f "Momentum_${VERSION}_x64.app.tar.gz.sig" ]; then
             echo "::warning::updater artifacts missing — releasing without latest.json (no auto-update for this version)"
             exit 0
