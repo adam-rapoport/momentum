@@ -24,7 +24,13 @@ export function ExternalLink({
     onClick?.(e);
     if (!href || e.defaultPrevented) return;
     e.preventDefault();
-    void openExternal(href);
+    // Never fail silently: if the opener plugin rejects (permission, scope,
+    // OS handler), log it and fall back to window.open — a no-op inside the
+    // Tauri webview, but it keeps web builds working and leaves evidence.
+    openExternal(href).catch((err) => {
+      console.error(`[ExternalLink] failed to open ${href}:`, err);
+      window.open(href, "_blank", "noopener,noreferrer");
+    });
   }
 
   return (
