@@ -3,15 +3,21 @@ import type { AnchorHTMLAttributes, MouseEvent } from "react";
 import { openExternal } from "@/lib/desktop";
 
 /**
- * An anchor that actually works in the desktop app. The Tauri webview can't
- * navigate to external sites — a plain `<a target="_blank">` silently does
- * nothing — so we intercept the click and hand the URL to the OS browser via
- * the opener plugin (see lib/desktop.ts). In web dev it behaves like a normal
- * new-tab link.
+ * An anchor that actually works in the desktop app. Two Tauri-webview traps
+ * are handled here (both found the hard way, 2026-07-04):
  *
- * Also used directly as the `a` renderer for ReactMarkdown, hence the ignored
- * `node` prop (react-markdown passes it to custom components; spreading it
- * onto the DOM element would trigger a React warning).
+ * 1. The webview can't navigate to external sites, so we hand the URL to the
+ *    OS browser (via the backend's /system/open-url — see lib/desktop.ts).
+ * 2. Tauri injects a global click listener that calls preventDefault() on
+ *    every `target="_blank"` anchor click BEFORE React handlers run — its way
+ *    of blocking popup windows. A naive "respect e.defaultPrevented" check
+ *    therefore silently drops every real click in the desktop app (while
+ *    working fine in a browser and in synthetic-event tests). So we only
+ *    honor a cancellation made by OUR caller's onClick, not one that arrived
+ *    pre-set on the event.
+ *
+ * Also used as the `a` renderer for ReactMarkdown, hence the ignored `node`
+ * prop (react-markdown passes it; spreading it onto the DOM would warn).
  */
 export function ExternalLink({
   node: _node,
@@ -21,12 +27,11 @@ export function ExternalLink({
   ...rest
 }: AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown }) {
   function handleClick(e: MouseEvent<HTMLAnchorElement>) {
+    const cancelledBeforeUs = e.defaultPrevented; // Tauri's _blank interceptor
     onClick?.(e);
-    if (!href || e.defaultPrevented) return;
+    if (!href) return;
+    if (!cancelledBeforeUs && e.defaultPrevented) return; // caller's veto
     e.preventDefault();
-    // Never fail silently: if the opener plugin rejects (permission, scope,
-    // OS handler), log it and fall back to window.open — a no-op inside the
-    // Tauri webview, but it keeps web builds working and leaves evidence.
     openExternal(href).catch((err) => {
       console.error(`[ExternalLink] failed to open ${href}:`, err);
       window.open(href, "_blank", "noopener,noreferrer");

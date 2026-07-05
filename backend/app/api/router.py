@@ -9,6 +9,7 @@ from app.api.memory import router as memory_router
 from app.api.onboarding import router as onboarding_router
 from app.api.preferences import router as preferences_router
 from app.api.sessions import router as sessions_router
+from app.api.system import router as system_router
 from app.api.websocket import router as websocket_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -21,5 +22,6 @@ api_router.include_router(connections_router)
 api_router.include_router(onboarding_router)
 api_router.include_router(commands_router)
 api_router.include_router(attachments_router)
+api_router.include_router(system_router)
 
 ws_router = websocket_router

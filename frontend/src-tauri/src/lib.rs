@@ -39,6 +39,18 @@ fn get_backend_port(port: tauri::State<BackendPort>) -> u16 {
     port.0
 }
 
+/// Open a URL in the system browser via the opener plugin's RUST api —
+/// registered as one of OUR commands (same invoke path as get_backend_token,
+/// which is known-good) instead of the plugin's own command layer, which was
+/// observed to hang without a response on interactive clicks (2026-07-04).
+#[tauri::command]
+async fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| e.to_string())
+}
+
 /// Prefer the historical default port 8000 (matches existing Google OAuth
 /// redirect registrations); when it's taken, let the OS assign a free one.
 /// The probe-then-release has a tiny TOCTOU window, but the loser is the same
@@ -278,7 +290,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port])
+        .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port, open_external])
         .setup(move |app| {
             // File logging in RELEASE builds too (~/Library/Logs/<identifier>/):
             // the sidecar's stdout/stderr and shell events are only observable

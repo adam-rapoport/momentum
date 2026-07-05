@@ -94,7 +94,21 @@ function invokeRaw<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
 
 export async function openExternal(url: string): Promise<void> {
   if (isTauri()) {
-    await invokeRaw("plugin:opener|open_url", { url });
+    // Via the BACKEND, not Tauri IPC: webview->Rust invokes for URL-opening
+    // were observed hanging without a response in packaged builds
+    // (2026-07-04), while the webview->backend HTTP channel is exercised on
+    // every API call and known-good. POST /system/open-url is scheme-
+    // allowlisted and token-protected (see backend/app/api/system.py).
+    const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
+    const res = await fetch(`${base}/api/v1/system/open-url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-Momentum-Token": token } : {}),
+      },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error(`open-url failed: ${res.status}`);
   } else {
     window.open(url, "_blank", "noopener,noreferrer");
   }
