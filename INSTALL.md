@@ -3,8 +3,10 @@
 Momentum ships as a signed, notarized Mac app in two builds — pick the one for
 your machine:
 
-- **Apple Silicon** (M-series Macs): `Momentum_<version>_aarch64.dmg`
-- **Intel**: `Momentum_<version>_x64.dmg`
+- **Apple Silicon** (M-series Macs): `Momentum_macOS_AppleSilicon.dmg`
+  (also listed as `Momentum_<version>_aarch64.dmg` — same file)
+- **Intel**: `Momentum_macOS_Intel.dmg`
+  (also listed as `Momentum_<version>_x64.dmg` — same file)
 
 Not sure which you have?  → Apple menu → *About This Mac*. "Chip: Apple M…"
 means Apple Silicon; "Processor: Intel…" means Intel. (The Apple Silicon build
