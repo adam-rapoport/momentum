@@ -280,6 +280,16 @@ jobs:
           EOF
           cat latest.json
 
+      # Stable-name DMG aliases so a landing page can hardcode evergreen
+      # links (releases/latest/download/<name> resolves by asset NAME, and
+      # the canonical names embed the version).
+      - name: Add stable-name installer aliases
+        run: |
+          set -euo pipefail
+          cd assets
+          cp Momentum_*_aarch64.dmg Momentum_macOS_AppleSilicon.dmg
+          cp Momentum_*_x64.dmg Momentum_macOS_Intel.dmg
+
       - name: Create draft release with all assets
         env:
           GH_TOKEN: ${{ github.token }}
