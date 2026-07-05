@@ -4,7 +4,7 @@ import { ExternalLink } from "@/components/ExternalLink";
 import { DitherRule, PmLogo } from "@/components/pm";
 import { isTauri } from "@/lib/desktop";
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0";
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.1";
 const CONTACT_EMAIL = "rapoport.apps@gmail.com";
 const PORTFOLIO_URL = "https://dadvibecoding.vercel.app";
 

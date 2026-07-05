@@ -8,8 +8,7 @@ through guided skill workflows (slash commands), with persistent memory across
 sessions and web search — using whichever LLM provider you have a key for.
 Google Docs / Gmail / Calendar integration is coming in a future version.
 
-Built as an MVP with Claude Code as the pair programmer. Still in active
-development.
+Still in active development with more features coming soon.
 
 ## The desktop app (the main way to run it)
 
