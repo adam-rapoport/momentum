@@ -1,0 +1,11 @@
+skill: stakeholder-update
+prompt: |
+  /stakeholder-update Weekly leadership update: Sprint 14 just wrapped, AI
+  Summaries v2 beta is live with the 3 design partners. Audience is Maya and
+  the exec team.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §2 (people), §3 (customers), §6 (Sprint 14) and the
+  q2-metrics-onepager fixture + planted-facts table. July failure mode:
+  every milestone date was invented — verify all dates trace to a source.

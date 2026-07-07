@@ -1,0 +1,14 @@
+skill: write-prd
+prompt: |
+  /write-prd I need a PRD for 'AI Summaries v2: scheduled digests' — beta
+  design partners keep asking for a weekly digest of top feedback themes
+  delivered to Slack/email instead of having to open the dashboard. Target
+  is our mid-market push. The AI Summaries v2 context and upmarket strategy
+  are in the workspace docs/memory.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (company/strategy), §5 (decisions), §6 (sprints)
+  and the standing PRD fixture (signalboard-prd-ai-summaries.docx) + the
+  planted-facts table. Watch for invented effort estimates and garbled
+  targets (July failure mode).

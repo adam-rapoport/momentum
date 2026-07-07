@@ -1,0 +1,12 @@
+skill: decision-log
+prompt: |
+  /decision-log Record yesterday's decision: we're gating AI Summaries v2 GA
+  on SOC 2 Type II sign-off. Options were ship GA now vs wait for the audit;
+  we chose to wait because the Helix Health renewal depends on it. Maya,
+  Daniel and I made the call.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §2 (people — "I" must resolve to the seeded persona's
+  real name), §3 (Helix Health), §5 (decision history) + planted-facts
+  table. Watch for unexplained internal tags copied from sources.

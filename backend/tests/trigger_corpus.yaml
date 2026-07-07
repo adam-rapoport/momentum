@@ -1,0 +1,66 @@
+# Realistic PM utterances with their expected skill routing (null = no skill
+# may activate). Read by tests/test_trigger_matrix.py; every wave of new
+# skills adds its positive AND negative rows here BEFORE the SKILL.mds are
+# authored, so collisions surface at design time.
+#
+# Known matcher looseness (accepted, not asserted here): document-name
+# compounds and allowlisted acronyms also fire on *mentions* ("how many user
+# stories are left", "the adr process") — the skill's intake phase is the
+# recovery path for those.
+utterances:
+  # --- positives: natural phrasings that must route to the right skill ---
+  - {text: "write a prd for the export feature", expect: write-prd}
+  - {text: "can you draft a spec for the new billing flow", expect: write-prd}
+  - {text: "prep for my meeting with maya tomorrow", expect: meeting-prep}
+  - {text: "help me prep for the sprint review meeting", expect: meeting-prep,
+     note: "2026-07 collision regression — retro author must not win"}
+  - {text: "write a status update for leadership", expect: stakeholder-update}
+  - {text: "put together a stakeholder update", expect: stakeholder-update}
+  - {text: "run a sprint retro for sprint 14", expect: sprint-review}
+  - {text: "synthesize feedback from the beta cohort", expect: feedback-synthesis}
+  - {text: "draft release notes for version 2.1", expect: release-notes}
+  - {text: "write release notes for the sprint 14 release", expect: release-notes}
+  - {text: "log a decision about the pricing change", expect: decision-log}
+  - {text: "run a competitive analysis on our biggest threat", expect: competitive-analysis}
+  - {text: "we need a competitive brief on acme corp", expect: competitive-analysis}
+  - {text: "break this into stories for the insights squad", expect: user-story}
+  - {text: "help me write a user story for csv export", expect: user-story}
+  - {text: "put together the qbr", expect: quarterly-review}
+  - {text: "run a retro for the quarter", expect: quarterly-review,
+     note: "2026-07 collision regression — quarter-scale retro is not a sprint retro"}
+
+  # --- negatives: ordinary PM chat that must NOT hijack the turn ---
+  - {text: "as our user base grows we need better onboarding", expect: null,
+     note: "2026-07 regression — 'as a user' used to fire user-story"}
+  - {text: "what happens as a user deletes their account?", expect: null}
+  - {text: "can you give me a status update on the tests", expect: null,
+     note: "2026-07 regression — a question TO the assistant is not a deliverable request"}
+  - {text: "we record every product decision in Notion", expect: null,
+     note: "2026-07 regression — describing process is not logging a decision"}
+  - {text: "what is a prd anyway?", expect: null}
+  - {text: "remind me what a stakeholder is", expect: null}
+  - {text: "what's our product strategy for next year?", expect: null,
+     note: "future wave: product-strategy must claim ONLY request phrasings, never this"}
+  - {text: "our pricing is too complicated", expect: null,
+     note: "future wave: pricing-packaging keyword design must keep this null"}
+  - {text: "how did the experiment go?", expect: null,
+     note: "future wave: experiment-brief keyword design must keep this null"}
+  - {text: "the roadmap looks off to me", expect: null,
+     note: "future wave: roadmap-update keyword design must keep this null"}
+  - {text: "what's the vision here?", expect: null,
+     note: "future wave: product-vision keyword design must keep this null"}
+  - {text: "can you review these metrics real quick", expect: null,
+     note: "future wave: metrics-review keyword design must keep this null"}
+  - {text: "we need to plan the next sprint", expect: null,
+     note: "Wave 1 flips this row to sprint-planning when that skill lands"}
+  - {text: "draft okrs for q3", expect: null,
+     note: "Wave 2 flips this row to okr-planning when that skill lands"}
+  - {text: "customer feedback has been positive lately", expect: null}
+  - {text: "our biggest competitor just raised a round", expect: null}
+  - {text: "the exec review went well yesterday", expect: null}
+  - {text: "did the release go out?", expect: null}
+  - {text: "update the leadership deck when you get a chance", expect: null}
+  - {text: "the sprint went sideways after the outage", expect: null}
+  - {text: "maya asked for an update on hiring", expect: null}
+  - {text: "thanks, that looks great", expect: null}
+  - {text: "what should I focus on this week?", expect: null}

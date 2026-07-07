@@ -1,0 +1,11 @@
+skill: sprint-review
+prompt: |
+  /sprint-review Run the retro for Sprint 14 — my planning/standup/wrap
+  notes are in the reference docs.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6 (Sprint 14) and the sprint-14-notes.md fixture +
+  planted-facts table. July failure mode: burndown/velocity numbers were
+  back-computed wrongly instead of quoted verbatim from the notes; memory
+  updates were claimed "Saved" without saving (S6).

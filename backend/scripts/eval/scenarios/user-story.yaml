@@ -1,0 +1,12 @@
+skill: user-story
+prompt: |
+  /user-story Break the digest-scheduling feature (from the AI Summaries v2
+  work) into user stories for the Insights squad.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs the standing PRD fixture (signalboard-prd-ai-summaries.docx),
+  canon §6 and the planted-facts table. Watch S3: if a write-prd run happened
+  earlier in the same workspace, its generated PRD is a SECONDARY source —
+  inherited claims must keep the source's own confidence level (open
+  questions must not become decided acceptance criteria).

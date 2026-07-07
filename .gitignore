@@ -65,3 +65,6 @@ Thumbs.db
 *.pem
 *.mobileprovision
 *.key
+
+# Skill eval run outputs (scripts/eval) — transcripts/docs/grades stay local
+eval-runs/
