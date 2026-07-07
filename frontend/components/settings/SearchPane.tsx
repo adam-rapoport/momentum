@@ -8,7 +8,7 @@ import {
   type SearchPreferences,
 } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { SEARCH_PROVIDERS, validateKeyFormat, type SearchProviderMeta } from "@/lib/providers";
+import { SEARCH_PROVIDERS, type SearchProviderMeta } from "@/lib/providers";
 import { KeyInput } from "./KeyInput";
 
 type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
@@ -93,7 +93,9 @@ function SearchKeyCard({
   const stored = source === "stored";
   const env = source === "env";
   const configured = stored || env;
-  const formatOk = validateKeyFormat(meta, draft).state === "valid";
+  // Format check is advisory (KeyInput shows it); any non-empty key can be
+  // saved — the backend's live validation ping is the real gate.
+  const formatOk = draft.trim().length > 0;
 
   async function save() {
     setSaving(true);

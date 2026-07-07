@@ -9,7 +9,6 @@ import {
   PROVIDERS,
   providersForTier,
   SEARCH_PROVIDERS,
-  validateKeyFormat,
 } from "@/lib/providers";
 import {
   DoneStep,
@@ -271,18 +270,16 @@ export function OnboardingWizard() {
     router.replace("/chat");
   }
 
+  // Any non-empty key may advance — the format check is advisory only
+  // (providers change key formats; the AIza prefix check locked out new
+  // Google keys). Continue saves via the backend, whose live validation
+  // ping rejects genuinely bad keys with a real error message.
   const canAdvance = () => {
     if (step.key === "light") {
-      return (
-        validateKeyFormat(PROVIDERS[light.providerId ?? ""], light.key).state === "valid" ||
-        (isConfigured(light) && !light.key.trim())
-      );
+      return !!light.providerId && (!!light.key.trim() || isConfigured(light));
     }
     if (step.key === "heavy") {
-      return (
-        validateKeyFormat(PROVIDERS[heavy.providerId ?? ""], heavy.key).state === "valid" ||
-        (isConfigured(heavy) && !heavy.key.trim())
-      );
+      return !!heavy.providerId && (!!heavy.key.trim() || isConfigured(heavy));
     }
     return true;
   };

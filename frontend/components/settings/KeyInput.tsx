@@ -35,9 +35,7 @@ export function KeyInput({
   const borderClass =
     validation.state === "valid"
       ? "border-ok"
-      : validation.state === "invalid"
-        ? "border-danger"
-        : "border-line-strong focus-within:border-accent";
+      : "border-line-strong focus-within:border-accent";
 
   return (
     <div>
@@ -89,10 +87,10 @@ export function KeyInput({
             <span className="text-ok">Format looks right — we&apos;ll verify on first use.</span>
           </>
         )}
-        {validation.state === "invalid" && (
+        {validation.state === "warn" && (
           <>
-            <StatusDot tone="danger" size={6} />
-            <span className="text-danger">{validation.message}</span>
+            <StatusDot tone="warn" size={6} />
+            <span className="text-ink-muted">{validation.message}</span>
           </>
         )}
         {validation.state === "partial" && (
