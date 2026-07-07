@@ -12,7 +12,6 @@ import { errorMessage } from "@/lib/errors";
 import {
   PROVIDERS,
   providersForTier,
-  validateKeyFormat,
   type ProviderMeta,
   type Tier,
 } from "@/lib/providers";
@@ -228,7 +227,9 @@ function SlotCard({
     }
   }
 
-  const formatOk = shown ? validateKeyFormat(shown, draft).state === "valid" : false;
+  // Format check is advisory (KeyInput shows it); any non-empty key can be
+  // saved — the backend's live validation ping is the real gate.
+  const formatOk = !!shown && draft.trim().length > 0;
   const showKeyEditor = !!shown && (!shownConnected || changingKey);
   const copy = SLOT_COPY[tier];
   const maskedKey =

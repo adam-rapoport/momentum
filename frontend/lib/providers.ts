@@ -55,9 +55,9 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     description: "Capable reasoning model (Gemini & Gemma) on a generous free tier.",
     helpUrl: "https://aistudio.google.com/apikey",
     helpText: 'In Google AI Studio → "Get API key" → create.',
-    keyHint: "Starts with AIza, ~39 chars",
+    keyHint: "AIza... on older keys — newer formats vary",
     keyPrefix: "AIza",
-    keyLength: [35, 50],
+    keyLength: [35, 90],
     defaultModel: { light: "gemini-3.5-flash", heavy: "gemini-3.5-flash" },
   },
   openai: {
@@ -182,7 +182,7 @@ export const SEARCH_PROVIDERS: Record<string, SearchProviderMeta> = {
   },
 };
 
-export type ValidationState = "idle" | "partial" | "invalid" | "valid";
+export type ValidationState = "idle" | "partial" | "warn" | "valid";
 
 export interface FormatValidation {
   state: ValidationState;
@@ -201,8 +201,11 @@ export interface KeyFormatMeta {
   inputLabel?: string;
 }
 
-// Client-side format check — fast feedback as the user types. The real
-// provider ping happens on save via the backend validate endpoint.
+// Client-side format check — fast feedback as the user types. ADVISORY
+// ONLY: providers change key formats (Google keys stopped starting with
+// AIza in 2026, which hard-locked new users out of onboarding while this
+// check could veto saves). The real gate is the backend's live validation
+// ping on save — a mismatch here warns, it never blocks.
 export function validateKeyFormat(
   provider: KeyFormatMeta | null,
   value: string,
@@ -211,10 +214,18 @@ export function validateKeyFormat(
   const v = value.trim();
   if (!v) return { state: "idle", message: "" };
   if (provider.keyPrefix && !v.startsWith(provider.keyPrefix)) {
-    return { state: "invalid", message: `Should start with "${provider.keyPrefix}".` };
+    return {
+      state: "warn",
+      message: `Unusual format — usually starts with "${provider.keyPrefix}". We'll verify it on save.`,
+    };
   }
   const [min, max] = provider.keyLength;
   if (v.length < min) return { state: "partial", message: `${v.length}/${min}+ characters` };
-  if (v.length > max) return { state: "invalid", message: `Too long (${v.length} chars).` };
+  if (v.length > max) {
+    return {
+      state: "warn",
+      message: `Longer than usual (${v.length} chars) — we'll verify it on save.`,
+    };
+  }
   return { state: "valid", message: "Format looks right." };
 }
