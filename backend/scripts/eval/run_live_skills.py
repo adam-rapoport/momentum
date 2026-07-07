@@ -40,7 +40,10 @@ import yaml
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "scenarios"
 
-TURN_TIMEOUT = 300    # seconds per assistant turn
+TURN_TIMEOUT = 300    # max SILENCE between stream events (a hung turn),
+                      # not whole-turn wall clock — degraded providers make
+                      # legitimate turns slow (503 retries restart the whole
+                      # streamed generation) and those keep emitting events
 SKILL_TIMEOUT = 1200  # hard wall-clock cap per skill
 MAX_USER_MESSAGES = 5  # initial ask + nudges/approval (raised per-scenario
                        # when scripted_replies need more room)
@@ -160,18 +163,22 @@ class Runner:
             return set()
         return set(self.docs_dir.rglob("*.md"))
 
-    async def _one_turn(self, ws, transcript: list[str], t0: float) -> dict:
+    async def _one_turn(self, ws, transcript: list[str], skill_t0: float) -> dict:
         """Collect one assistant turn. Returns {'end': 'done'|'awaiting_review'|'error'|'timeout', ...}."""
         text_chars = 0
         event_counts: dict[str, int] = {}
+        last_event = time.time()
         while True:
-            remaining = TURN_TIMEOUT - (time.time() - t0)
+            idle_left = TURN_TIMEOUT - (time.time() - last_event)
+            hard_left = SKILL_TIMEOUT - (time.time() - skill_t0)
+            remaining = min(idle_left, hard_left)
             if remaining <= 0:
                 return {"end": "timeout", "event_counts": event_counts}
             try:
                 raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             except (asyncio.TimeoutError, TimeoutError):
                 return {"end": "timeout", "event_counts": event_counts}
+            last_event = time.time()
             ev = json.loads(raw)
             et = ev.get("type", "?")
             event_counts[et] = event_counts.get(et, 0) + 1
@@ -233,7 +240,7 @@ class Runner:
                 }))
                 sent += 1
                 t0 = time.time()
-                turn = await self._one_turn(ws, transcript, t0)
+                turn = await self._one_turn(ws, transcript, skill_t0)
                 turn["seconds"] = round(time.time() - t0, 1)
                 turn["user"] = next_msg[:100]
                 meta["turns"].append(turn)
