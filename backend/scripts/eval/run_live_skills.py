@@ -139,6 +139,7 @@ class Runner:
         profile = self._fixture_yaml("profile.yaml")
         manifest = self._fixture_yaml("manifest.yaml")
         uploads = manifest.get("upload") or []
+        extracted_total = 0
         async with httpx.AsyncClient(timeout=300) as c:
             (await c.post(f"{self.api}/onboarding/complete")).raise_for_status()
             r = await c.post(f"{self.api}/onboarding/profile", json=profile)
@@ -152,9 +153,22 @@ class Runner:
                     files={"file": (name, path.read_bytes())},
                 )
                 info = r.json() if r.status_code == 200 else r.text[:200]
+                if r.status_code == 200:
+                    extracted_total += int(info.get("memories_created") or 0)
                 log(f"[seed] {name}: {r.status_code} in {time.time()-t0:.0f}s -> {info}")
             r = await c.get(f"{self.api}/memory")
-            log(f"[seed] memory records now: {len(r.json())}")
+            log(f"[seed] memory records now: {len(r.json())} "
+                f"({extracted_total} extracted from documents)")
+        if uploads and extracted_total == 0:
+            # Extraction is failure-safe app-side (reference saved, memories
+            # skipped), so a provider outage produces a silently starved
+            # workspace — and grade-bearing runs against it are garbage.
+            raise SystemExit(
+                "[seed] STARVED: 0 memories extracted across all documents — "
+                "the heavy model was likely unavailable (check the server "
+                "log). Re-seed into a FRESH data dir once the provider "
+                "recovers; re-uploading here would duplicate references."
+            )
 
     # -- running ---------------------------------------------------------
 
