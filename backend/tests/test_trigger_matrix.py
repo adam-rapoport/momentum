@@ -34,6 +34,9 @@ ALLOWED_OVERLAPS = {
     # "prep for sprint review" (meeting-prep) contains sprint-review's
     # "sprint review"; prepping for the meeting is the more specific intent.
     "prep for sprint review": "meeting-prep",
+    # Same shape for the planning ceremony: "prep for sprint planning"
+    # (meeting-prep) contains sprint-planning's "sprint planning".
+    "prep for sprint planning": "meeting-prep",
 }
 
 

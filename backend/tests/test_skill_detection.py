@@ -84,6 +84,24 @@ def test_trigger_collisions_fixed():
     assert detect_skill("run a retro for the quarter", {}) == "quarterly-review"
 
 
+def test_wave1_skills_activate():
+    """Wave 1 (2026-07): roadmap-update + sprint-planning — slash commands,
+    natural phrasings, and mention-vs-request negatives."""
+    # slash commands
+    assert detect_skill("/roadmap-update after the slip", {}) == "roadmap-update"
+    assert detect_skill("/sprint-planning sprint 15", {}) == "sprint-planning"
+    # natural phrasings
+    assert detect_skill("let's update the roadmap for the new initiative", {}) == "roadmap-update"
+    assert detect_skill("reprioritize the roadmap now that the vendor slipped", {}) == "roadmap-update"
+    assert detect_skill("we need to plan the next sprint", {}) == "sprint-planning"
+    assert detect_skill("help me scope the sprint against capacity", {}) == "sprint-planning"
+    # mentions must not hijack the turn (keywords are verb-anchored)
+    assert detect_skill("what's on the roadmap for q3?", {}) is None
+    assert detect_skill("velocity dipped last sprint", {}) is None
+    # the planning CEREMONY's meeting prep still belongs to meeting-prep
+    assert detect_skill("prep for the sprint planning meeting", {}) == "meeting-prep"
+
+
 def test_every_skill_body_starts_with_shared_grounding():
     """The loader prepends skills/_shared/grounding.md to every skill body,
     so the anti-fabrication rules ride along with each playbook."""
