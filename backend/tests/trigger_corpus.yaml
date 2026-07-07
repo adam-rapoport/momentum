@@ -51,8 +51,18 @@ utterances:
      note: "future wave: product-vision keyword design must keep this null"}
   - {text: "can you review these metrics real quick", expect: null,
      note: "future wave: metrics-review keyword design must keep this null"}
-  - {text: "we need to plan the next sprint", expect: null,
-     note: "Wave 1 flips this row to sprint-planning when that skill lands"}
+  - {text: "we need to plan the next sprint", expect: sprint-planning,
+     note: "flipped from null when Wave 1 landed sprint-planning"}
+  - {text: "help me with sprint planning for sprint 15", expect: sprint-planning}
+  - {text: "put together a sprint plan for sprint 15", expect: sprint-planning}
+  - {text: "update the roadmap after the dependency slip", expect: roadmap-update}
+  - {text: "reprioritize the roadmap for q3", expect: roadmap-update}
+  - {text: "prep for the sprint planning meeting", expect: meeting-prep,
+     note: "guard: meeting prep for the ceremony beats the planning skill (longest-phrase tiebreak)"}
+  - {text: "what's on the roadmap for q3?", expect: null,
+     note: "roadmap MENTIONS must not fire — keywords are verb-anchored"}
+  - {text: "is the salesforce integration still on the roadmap?", expect: null}
+  - {text: "velocity dipped last sprint", expect: null}
   - {text: "draft okrs for q3", expect: null,
      note: "Wave 2 flips this row to okr-planning when that skill lands"}
   - {text: "customer feedback has been positive lately", expect: null}

@@ -1,0 +1,21 @@
+skill: roadmap-update
+prompt: |
+  /roadmap-update The SOC 2 evidence work is eating more engineer time than
+  planned — Daniel wants the evidence-automation work pulled into this
+  quarter instead of waiting. Update the roadmap: bring "SOC 2 evidence
+  automation" into Now, and make sure the Q3 Salesforce commitment stays
+  protected. The current roadmap is in the workspace docs.
+scripted_replies:
+  - >-
+    Displace whatever is least critical to make room — your call, but
+    justify it in the doc. Owners stay as they are in the roadmap doc.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6b (roadmap: Now/Next/Later) and PF-21..23 + the
+  product-roadmap-now-next-later.md fixture. Must-checks: What Changed
+  cites the real cause (SOC 2 evidence load; the audit started 2026-03-05);
+  the Q3 Salesforce commitment (PF-21, decision 2026-05-20) is explicitly
+  protected or any change to it flagged as a decision change; Bluefin
+  at-risk item (PF-22) not silently dropped; SSO/SAML stays parked (PF-23);
+  no invented dates or owners; deltas vs the previous roadmap doc explicit.

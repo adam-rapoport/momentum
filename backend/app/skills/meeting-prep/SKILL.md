@@ -2,7 +2,7 @@
 name: meeting-prep
 description: Prepare for a meeting — pull context, draft agenda, flag decisions needed.
 slash_command: meeting-prep
-trigger_keywords: ["meeting prep", "prep for meeting", "prep for the meeting", "prepare for a meeting", "prepare for my meeting", "prep for sprint review", "prep for the exec review"]
+trigger_keywords: ["meeting prep", "prep for meeting", "prep for the meeting", "prepare for a meeting", "prepare for my meeting", "prep for sprint review", "prep for sprint planning", "prep for the exec review"]
 required_tools: ["RecallMemory", "SearchMemories", "WebSearch", "WebFetch", "WriteDocument", "EditDocument", "AwaitReview", "TimeCheck"]
 phases: ["intake", "drafting", "review"]
 ---

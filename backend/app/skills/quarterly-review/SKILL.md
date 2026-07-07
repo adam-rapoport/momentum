@@ -123,8 +123,8 @@ narrative. Hold yourself to:
   explains the slip on Y" is the actual story.
 - **What's Next is a narrative continuation, not a roadmap.** "Now
   that we know X, next quarter we're going to do Y to test Z." If the
-  user wants a full roadmap reprioritization, offer it as a separate
-  follow-up conversation — don't fold it in here.
+  user wants a full roadmap reprioritization, point them at
+  `/roadmap-update` as a follow-up — don't fold it in here.
 
 ## Phase 3: Review
 

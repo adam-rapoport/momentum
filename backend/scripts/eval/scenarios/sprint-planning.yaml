@@ -1,0 +1,21 @@
+skill: sprint-planning
+prompt: |
+  /sprint-planning Plan Sprint 15 for me — my planning-inputs doc with the
+  candidate backlog, estimates, and capacity is in the workspace. Sprint 15
+  starts the Monday after Sprint 14 ended.
+scripted_replies:
+  - >-
+    Everything you need is in the Sprint 15 planning-inputs doc — work from
+    it. My draft sprint goal is in there too; sharpen it if you can, and
+    make the committed-vs-stretch call yourself with reasoning.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6 (Sprint 15 planning inputs) and PF-24..26 + the
+  sprint-15-planning-inputs.md fixture. Must-checks: capacity stated as 36
+  (not 40) with the real reasons; committed total arithmetic shown and
+  ≤36; velocity quoted verbatim (31/38/34, Sprint 13 = 38 — PF-24); the
+  6-pt send-scheduling carryover committed; the Salesforce discovery spike
+  (3 pts) protected per PF-26/the 2026-05-20 decision; no invented
+  estimates (every point value traces to the doc); last retro's action
+  items addressed if a Sprint 14 review doc exists in the workspace.
