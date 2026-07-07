@@ -1,0 +1,12 @@
+skill: quarterly-review
+prompt: |
+  /quarterly-review Put together the Q2 2026 quarterly review — the metrics
+  one-pager and strategy memo are in the workspace.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §5 (decisions), §6 (sprints), the q2-metrics fixtures
+  and q2-strategy-memo.pdf + planted-facts table. July failure modes: a
+  never-committed goal retconned into "Goals We Set", flat headline ARR
+  framed as growth, and wrong sprint math inherited from an earlier
+  generated retro (S3 — verify against primary notes).

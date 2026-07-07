@@ -74,11 +74,13 @@ def test_trigger_collisions_fixed():
     assert detect_skill("we record every product decision in Notion", {}) is None
     assert detect_skill("log a decision about the pricing change", {}) == "decision-log"
     # Prep for a sprint-review MEETING wants meeting-prep, not the retro
-    # author (works because meeting-prep sorts before sprint-review).
+    # author (meeting-prep's "prep for sprint review" is the more specific
+    # match — 3 essential tokens vs sprint-review's 2).
     assert detect_skill("help me prep for the sprint review meeting", {}) == "meeting-prep"
     assert detect_skill("run a sprint retro for sprint 14", {}) == "sprint-review"
     # A quarter-scale retro belongs to quarterly-review even without the
-    # word "quarterly" (works because quarterly-review sorts before sprint-review).
+    # word "quarterly" ("retro for the quarter" is the longer phrase on a
+    # 2-token tie with sprint-review's "run a retro").
     assert detect_skill("run a retro for the quarter", {}) == "quarterly-review"
 
 

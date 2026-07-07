@@ -46,6 +46,12 @@ dev = [
     "psycopg[binary]>=3.2",
     # Lint floor for CI (see [tool.ruff.lint] below).
     "ruff>=0.8",
+    # Eval-scenario files (scripts/eval/scenarios/*.yaml) + their CI test.
+    "pyyaml>=6.0",
+    # WS client for the live skill-eval runner (scripts/eval/). The server
+    # side already ships it via uvicorn[standard]; pinning it here keeps the
+    # runner working even if uvicorn's extras change.
+    "websockets>=12",
 ]
 # Sprint 8B Stage 2: freezes the backend into the desktop sidecar binary.
 # Only needed to BUILD the desktop app, not to run the web app or tests.

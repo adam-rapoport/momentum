@@ -177,7 +177,8 @@ def detect_skill(user_text: str, session_metadata: dict | None) -> str | None:
       1. Explicit exit (`/cancel-skill`, `/exit-skill`, `/restart`) -> CLEAR_SENTINEL
       2. Slash command at start (`/write-prd ...`) matching a known skill -> skill.name
       3. No skill currently active + user message matches a skill's
-         trigger_keyword (intent) -> skill.name. Matching is filler-tolerant
+         trigger_keyword (intent) -> the most specific matching skill (most
+         essential tokens, then longest phrase). Matching is filler-tolerant
          (see `_keyword_matches`) so natural phrasings like "write me a PRD"
          behave like the `/write-prd` slash command.
       4. Otherwise -> None (no change to active_skill)
@@ -202,8 +203,17 @@ def detect_skill(user_text: str, session_metadata: dict | None) -> str | None:
         return None
 
     lowered = stripped.lower()
+    matches: list[tuple[int, int, str]] = []
     for skill in load_skills().values():
         for keyword in skill.trigger_keywords:
             if _keyword_matches(keyword, lowered):
-                return skill.name
-    return None
+                essential = [t for t in keyword.split() if t not in _FILLER_WORDS] or keyword.split()
+                matches.append((len(essential), len(keyword), skill.name))
+    if not matches:
+        return None
+    # Most specific match wins: most essential tokens, then longest phrase,
+    # then alphabetical skill name as a stable last resort. Before this,
+    # the first match in directory order won — "prep for the sprint review
+    # meeting" only routed to meeting-prep because "m" sorts before "s".
+    matches.sort(key=lambda m: (-m[0], -m[1], m[2]))
+    return matches[0][2]

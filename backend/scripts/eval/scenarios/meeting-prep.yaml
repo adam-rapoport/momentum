@@ -1,0 +1,11 @@
+skill: meeting-prep
+prompt: |
+  /meeting-prep Prep me for Tuesday's weekly exec review (Maya's meeting —
+  the agenda is in the reference docs). I'm presenting Sprint 14 wrap and
+  AI Summaries v2 beta status.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §2 (people), §5 (decisions), §6 (Sprint 14) and the
+  exec-meeting-agenda.txt fixture + planted-facts table. Check the S7 rule:
+  recommendations must not silently contradict logged decisions.

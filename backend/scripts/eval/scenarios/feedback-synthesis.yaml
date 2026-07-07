@@ -1,0 +1,12 @@
+skill: feedback-synthesis
+prompt: |
+  /feedback-synthesis Synthesize the Q2 support feedback export that's in
+  the workspace docs. I want the themes ranked so I know what to prioritize
+  on the AI Summaries roadmap.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs the support-feedback-export.txt fixture (entry count is a
+  planted check) + canon §3 (customers) + planted-facts table. July failure
+  mode: miscounted the corpus (37 of 40) then reported decimal-precision
+  percentages on the wrong denominator (S4).
