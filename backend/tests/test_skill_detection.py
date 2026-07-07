@@ -102,6 +102,42 @@ def test_wave1_skills_activate():
     assert detect_skill("prep for the sprint planning meeting", {}) == "meeting-prep"
 
 
+def test_wave2_skills_activate():
+    """Wave 2 (2026-07): the seven Tier-1 skills — slash commands, natural
+    phrasings, and mention-vs-request negatives."""
+    # slash commands
+    assert detect_skill("/eval-plan for ai summaries v2", {}) == "eval-plan"
+    assert detect_skill("/prototype-brief digest flow demo", {}) == "prototype-brief"
+    assert detect_skill("/product-strategy rest of 2026", {}) == "product-strategy"
+    assert detect_skill("/launch-plan summaries ga", {}) == "launch-plan"
+    assert detect_skill("/metrics-review may numbers", {}) == "metrics-review"
+    assert detect_skill("/okr-planning q3", {}) == "okr-planning"
+    assert detect_skill("/experiment-brief send-time test", {}) == "experiment-brief"
+    # natural phrasings (two per skill)
+    assert detect_skill("write an eval plan for the summarizer", {}) == "eval-plan"
+    assert detect_skill("help me design evals for this feature", {}) == "eval-plan"
+    assert detect_skill("put together a prototype brief for the demo", {}) == "prototype-brief"
+    assert detect_skill("draft the build prompt for the dashboard", {}) == "prototype-brief"
+    assert detect_skill("draft a product strategy for next year", {}) == "product-strategy"
+    assert detect_skill("we need a product strategy doc before the offsite", {}) == "product-strategy"
+    assert detect_skill("put together a launch plan for v2", {}) == "launch-plan"
+    assert detect_skill("help me plan the launch of the beta", {}) == "launch-plan"
+    assert detect_skill("run the monthly metrics review", {}) == "metrics-review"
+    assert detect_skill("build a metrics scorecard for the exec sync", {}) == "metrics-review"
+    assert detect_skill("draft okrs for next quarter", {}) == "okr-planning"
+    assert detect_skill("help me set okrs with the team", {}) == "okr-planning"
+    assert detect_skill("design an experiment for the pricing change", {}) == "experiment-brief"
+    assert detect_skill("write an ab test plan for onboarding", {}) == "experiment-brief"
+    # mentions must not hijack the turn (keywords are verb-anchored)
+    assert detect_skill("the evals came back mixed this week", {}) is None
+    assert detect_skill("we should prototype this before committing", {}) is None
+    assert detect_skill("what's our product strategy for next year?", {}) is None
+    assert detect_skill("the launch went sideways last time", {}) is None
+    assert detect_skill("can you review these metrics real quick", {}) is None
+    assert detect_skill("our okrs are slipping this quarter", {}) is None
+    assert detect_skill("how did the experiment go?", {}) is None
+
+
 def test_every_skill_body_starts_with_shared_grounding():
     """The loader prepends skills/_shared/grounding.md to every skill body,
     so the anti-fabrication rules ride along with each playbook."""

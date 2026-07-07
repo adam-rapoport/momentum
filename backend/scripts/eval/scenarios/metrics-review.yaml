@@ -1,0 +1,25 @@
+skill: metrics-review
+prompt: |
+  /metrics-review Run a metrics review for May. My growth-metrics doc
+  is in the workspace, and the Q2 one-pager has the older baselines.
+  Audience is the leadership sync.
+scripted_replies:
+  - >-
+    Focus on the usage dip — that's the one Maya will ask about. Use
+    only the numbers in the docs; where there's no target on record,
+    say so rather than making one up. End with recommended actions I
+    can take to the team.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6d (growth metrics & experiments) and
+  PF-30..32, plus §1/§3 (usage baseline, Bluefin context) and the Q2
+  targets (PF-13/PF-14). Must-checks: every scorecard number verbatim
+  with source named (PF-30 dip figures exact, digest engagement
+  figures exact); delta arithmetic shown; the dip's driver reported as
+  the doc states it (account-concentration, PF-30) — not generalized;
+  confirmed-vs-hypothesis labeling honest (no hypothesis in the voice
+  of fact); untargeted digest metrics marked "no target set", any
+  proposed target labeled a proposal; no trend claims from single
+  data points; follow-ups section handled honestly (no prior metrics
+  review exists).

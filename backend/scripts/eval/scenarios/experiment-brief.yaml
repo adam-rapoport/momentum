@@ -1,0 +1,26 @@
+skill: experiment-brief
+prompt: |
+  /experiment-brief Design the digest send-time experiment: does
+  letting customers pick their digest day/time lift digest engagement?
+  My growth-metrics doc in the workspace has the baselines and our
+  experiment rules.
+scripted_replies:
+  - >-
+    Primary metric is digest-to-dashboard click-through; opens are a
+    guardrail. Honor the standing experiment rules in the doc — runtime
+    and the no-peeking check date are non-negotiable after what
+    happened with the pricing test. Traffic numbers aren't in the doc,
+    so be honest about the sample-size gap.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6d (growth metrics & experiments) and
+  PF-30..32. Must-checks: primary-metric baseline verbatim (digest
+  click-through per §6d) with opens as guardrail per the scripted
+  reply; the standing post-EXP-06 rule (PF-32) cited and applied to
+  runtime + a pre-registered decision rule with an explicit check
+  date; the EXP-06 peeking story reported accurately if referenced
+  (PF-32), EXP-07 figures exact if referenced (PF-31); no fabricated
+  sample-size/power numbers — the missing-traffic-inputs gap stated
+  honestly; exactly one primary metric; results section left as an
+  unfilled stub.

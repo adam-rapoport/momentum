@@ -1,0 +1,27 @@
+skill: launch-plan
+prompt: |
+  /launch-plan Draft the launch plan for AI Summaries v2 GA. The beta
+  is running with 3 design partners now; the roadmap and Ji-won's
+  quality-gate doc are in the workspace. No GA date is committed yet —
+  the plan should say what gates one.
+scripted_replies:
+  - >-
+    Mid-tier launch — real GTM push to our existing base and
+    mid-market prospects, no press. Readiness beyond product: sales
+    enablement not started, support macros in flight. Success for me
+    is digest adoption across the base; pull-back signal is the
+    quality gate tripping after GA.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6 (Sprint 14 beta state), §6b (roadmap: GA
+  placement), §6c (quality gate, PF-27/PF-29), and §1 (customer/ARR
+  context). Must-checks: timing honest — GA has no committed date, so
+  "date TBD" gated on named conditions, never an invented date; GA
+  sequencing consistent with the roadmap (Later, §6b); rollback/hold
+  criteria built on the documented ship gate and hold-for-review
+  policy (PF-27/PF-29), testable, not vague; readiness owners/statuses
+  only from sources or the scripted reply, unknowns marked TBD;
+  success-metric baselines verbatim where sourced (digest engagement,
+  §6d PF-30..31 context if used); no invented press/analyst plans
+  beyond the stated mid-tier scope.
