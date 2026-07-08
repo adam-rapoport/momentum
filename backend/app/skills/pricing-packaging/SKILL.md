@@ -98,10 +98,15 @@ Call `WriteDocument` with a `title` like "Pricing Proposal:
 - `## Risks` — churn triggers, competitive response, support load —
   including any `type=lessons` pattern from past pricing changes.
 - `## Open Questions` — gaps the sources couldn't fill.
-- `## Memory Updates` — propose a `type=decision` entry (the pricing
-  call, IF approved) and `type=product` (current-pricing facts worth
-  recording). Proposals until saved in Phase 3 — never mark one
-  "Saved" in the doc.
+- `## Memory Updates` — always propose a `type=product` entry for the
+  durable current-pricing FACTS ($49/$79, the add-on's beta status —
+  things that are true today). Propose a `type=decision` entry ONLY if
+  the user actually made a pricing decision in this conversation; a
+  recommendation under review (e.g. a proposed volume tier) is NOT a
+  decision — if it must be recorded at all, record it as
+  `type=product` labeled "proposed — not yet decided," never as an
+  approved tier and never with a proposed price written as a fact.
+  Proposals until saved in Phase 3 — never mark one "Saved" in the doc.
 
 ### Depth guardrails
 
@@ -116,7 +121,10 @@ Call `WriteDocument` with a `title` like "Pricing Proposal:
   stakeholder or research doc stays labeled as that person's
   recommendation until a `type=decision` memory or the user
   confirms it was adopted. Check the decision log before framing
-  anything as already-agreed.
+  anything as already-agreed. Approving THIS document for saving is
+  not the same as approving the pricing it recommends — never write
+  a proposed tier into memory as a decided or "approved" pricing
+  call, and never save a proposed price as though it were set.
 - **Show all scenario arithmetic.** Any revenue/impact number you
   derive shows its inputs and steps inline ("120 seats × $79 =
   $9,480/mo"). No compounding, annualizing, or growth assumptions
