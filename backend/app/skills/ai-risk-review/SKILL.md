@@ -112,6 +112,13 @@ Call `WriteDocument` with a `title` like "AI Risk Review: <feature>
 - **The failure taxonomy is sourced and counted.** Failure classes and
   their counts come verbatim from the logged examples; the largest
   class and the gate rule anchor the accuracy and fabrication rows.
+- **An under-selection model is a candidate, not the launch choice.**
+  When the sources say the model/vendor decision is still open (a
+  benchmark memo naming a front-runner is not a decision), the review
+  says the same: name the leading candidate, cite its numbers, and list
+  the model decision itself as an open item — never write "GA is
+  launching on <model>" or "we are shipping on <model>". A risk review
+  that locks an undecided choice misleads the very go/no-go it informs.
 - **Honest gaps beat false assurance.** An unassessed dimension is
   named as a gap with a proposed next step (a bias audit, a red-team
   pass) — never smoothed over with a confident "no issues".

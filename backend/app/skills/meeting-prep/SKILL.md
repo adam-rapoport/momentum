@@ -98,8 +98,17 @@ shrink `[FYI]` items first and note what was cut under Open Risks
 ("parked: X — no time in a 30m slot").
 
 **Influence mode** — when intake detected a persuasion conversation,
-add these sections (for a 1:1 persuasion the `## Agenda` shrinks to a
-light conversation flow, and these carry the doc):
+the influence sections below CARRY the doc; do not also emit the full
+coordination scaffolding. For a 1:1 persuasion, keep only `## Purpose`
+(one line), `## Pre-read`, and `## Open Risks / Watchouts`, then the
+four influence sections — DROP `## Agenda`, `## Decisions Needed`, and
+`## Desired Outcome`: the conversation flow lives in the Ask & Script,
+the core choice lives in the influence sections, and repeating the same
+argument across a time-boxed agenda AND the influence sections just
+bloats a doc meant to be scanned before a hard 1:1. (A mixed meeting
+that is part-coordination, part-persuasion keeps the base agenda for
+the coordination items and adds the influence sections for the
+persuasion ones.) Add:
 
 - `## Stakeholder Map` — the person(s) you're persuading: their goals,
   incentives, and known positions — EVERY line sourced from
@@ -119,9 +128,6 @@ light conversation flow, and these carry the doc):
   agree, and the fallback path (a smaller ask, a follow-up, an
   escalation) — so you're not negotiating against yourself in the room.
 
-The base `## Decisions Needed`, `## Pre-read`, `## Open Risks`, and
-`## Desired Outcome` sections stay — the influence sections are added,
-not a replacement.
 
 ### Depth guardrails (apply to every section of the prep doc)
 

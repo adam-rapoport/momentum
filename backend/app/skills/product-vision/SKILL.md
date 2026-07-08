@@ -111,12 +111,15 @@ uncommitted ones are labeled proposed), `## What We're NOT Saying`
   clearly, at the top of the press release or vision section
   ("Aspirational — dateline <year>").
 - **Vision quotes are fiction and look it.** The press release's
-  customer/company quotes are illustrative by genre convention:
-  attribute them to invented personas or role titles ("a mid-market
-  ops lead"), NEVER to a real customer, account, or stakeholder from
-  memory — putting future words in a real person's mouth is
-  fabrication even inside a vision doc. Real people may appear only
-  quoting things they actually said, from a source.
+  customer AND company/leadership quotes are illustrative by genre
+  convention: attribute them to invented personas or role titles ("a
+  mid-market ops lead", "a Fernwood spokesperson"), NEVER to a real
+  customer, account, or stakeholder from memory — and this includes
+  your own real CEO or founder. Write `said a Fernwood spokesperson`,
+  not `said <real CEO name>`: putting fabricated future words in a real
+  person's mouth is fabrication even inside a vision doc, even for your
+  own executive. Real people may appear only quoting things they
+  actually said, from a source.
 - **The future must be reachable from the present.** Every press-
   release claim lands in the Today-vs-Vision table with a sourced
   today-status. A claim with no plausible bridge either gets a

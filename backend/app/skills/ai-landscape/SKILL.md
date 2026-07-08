@@ -117,6 +117,15 @@ Call `WriteDocument` with a `title` like "AI Landscape Brief: <scope>
 - **Not a generic think-piece.** If a paragraph could appear in any
   company's AI brief, it doesn't belong in this one. Cut anything not
   tied to a specific company bet.
+- **Inform the decision, don't make it.** A landscape brief surfaces an
+  external shift's implications and the options it opens — it does NOT
+  recommend "approve" or "authorize" an internal decision that the
+  sources say is still open (a pricing proposal, a model choice). Frame
+  a bearing on an open decision as "this strengthens the case for X;
+  the call is still <owner>'s to make" — never a "no-regret move: adopt
+  X", and never invent the adopted mechanism (a credit-pool size, a
+  price). If a move you surface would reverse a logged decision, flag it
+  as a decision change, not continuity.
 - **One research pass, not a spiral.** Search, fetch, cite — once.
 - **One follow-up per thin answer.** If the scope is vague, ask at
   most ONE follow-up, then draft with what you have, marking unknowns.
