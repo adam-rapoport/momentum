@@ -73,7 +73,11 @@ and `content_markdown` structured as:
 
 - `# <Title>`
 - `## Strategy Link` — 2-3 sentences naming which strategic bets
-  these OKRs serve, citing the strategy source.
+  these OKRs serve, citing the strategy source — then a **Standing
+  targets** list: every numeric target the strategy source sets, each
+  with its disposition ("→ KR 1.2" or "not carried this quarter —
+  <why>"). A target acknowledged in intake but absent here is a
+  dropped commitment.
 - `## Objectives` — 2-3 maximum. Each objective: one qualitative,
   outcome-shaped sentence a team could rally behind, plus one line on
   why now.
@@ -85,8 +89,10 @@ and `content_markdown` structured as:
 - `## Quality Checks` — the doc grades its own OKRs, one line each:
   (a) every KR an outcome, not a task/output; (b) every KR measurable
   with a named source; (c) targets ambitious relative to baseline —
-  with the reasoning; (d) few enough to mean something. Where a check
-  fails and the user insisted, say so honestly.
+  with the reasoning; (d) few enough to mean something. Each line
+  cites its evidence (KR numbers, source names) — a check that names
+  no evidence is a rubber stamp and fails. Where a check fails and
+  the user insisted, say so honestly.
 - `## Not This Quarter` — goals considered and deprioritized, from
   sources or the user, each with one line of why. The cut list is
   what makes the commit list credible.
@@ -111,7 +117,9 @@ and `content_markdown` structured as:
   unverified)" and do not build a KR on it. A number that changed
   meaning between a primary and a generated doc (a company-wide
   metric relabeled as a segment metric) is a fabrication to catch,
-  not inherit.
+  not inherit. The tag is applied INLINE where the number appears,
+  every time — and a generated doc is never described as a primary;
+  misfiling one is itself a factual error.
 - **Targets are proposals with reasoning.** Each target gets one line
   of why-this-number relative to its baseline ("58% now; 64% was the
   2025 level — recovering it is ambitious but precedented"). Never
