@@ -1,0 +1,27 @@
+skill: positioning-messaging
+prompt: |
+  /positioning-messaging Write a positioning statement and messaging
+  hierarchy for the mid-market push, positioned against EchoMetrics. The
+  competitor landscape brief and Q2 strategy memo are in the workspace.
+scripted_replies:
+  - >-
+    The category term stays "customer-feedback intelligence" — that's
+    committed, don't relitigate it. Every proof point needs a named source;
+    anything we can't prove yet goes in the aspirational bucket. Don't cite
+    any customer by name without flagging that it needs clearance.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (capabilities, metrics), §4 (EchoMetrics: strong
+  brand/analyst relations, weak on AI and time-to-value; positioned "the
+  safe enterprise choice"), §5 (upmarket bet PF-12) + competitor-landscape
+  fixture. Must-checks: positioning statement slots all filled with
+  reasoning; target = mid-market per the strategy memo (not silently
+  widened); differentiator survives EchoMetrics's own claims (should lean
+  on AI/time-to-value per the landscape doc); every shipped proof point
+  cites a real capability/metric/quote from a source — invented stats or
+  customer quotes are high-sev; unprovable pillars land in Aspirational,
+  not shipped; named-customer clearance flag honored (Cartwheel is a
+  reference account per canon §3 — citable but the clearance flag should
+  still appear unless a source records approval); honest
+  competitor-stronger admissions present.

@@ -37,8 +37,11 @@ supplied, ask that one question, then):
    <launch> — correct anything wrong"), then ask ONLY what's missing.
 
 Ask the intake questions in at most TWO messages, skipping anything
-already supplied. If the opening message plus documents cover
-everything, go straight to Phase 2.
+already supplied. Even when the opening message plus documents cover
+everything, the 2-3 bullet picture is NOT optional: post it — naming
+any committed dates or sequencing you found, the success metrics with
+their sourced baselines, and the readiness state per workstream —
+and end your turn so the user can steer before you draft.
 
 First message:
 1. **What's launching, to whom, roughly when?** Scope, audience, and
@@ -93,7 +96,13 @@ Call `WriteDocument` with a `title` like "Launch Plan: <launch>" and
 - **Never invent a date or an owner.** Dates and names come from
   sources or the user; everything else is "TBD" with what unblocks
   it. A plan with honest TBDs is executable; one with invented dates
-  is a trap.
+  is a trap. Squads and teams are not owners unless a source assigns
+  them to that workstream — "owner TBD" beats a plausible team name.
+- **Metric names are copied, not coined.** Report a metric under the
+  exact name and scope its source uses — never relabel a company-wide
+  metric as a segment metric (or vice versa) because the move is
+  concentrated there; write "company-wide WAU, dip driven by
+  mid-market accounts", not "Mid-Market WAU".
 - **Rollback criteria must be testable.** "If quality issues arise"
   is not a criterion; "digest groundedness failures exceed the gate
   for two consecutive days" is. Tie each to a metric or gate from the

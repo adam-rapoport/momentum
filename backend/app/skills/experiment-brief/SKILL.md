@@ -37,8 +37,11 @@ supplied, ask that one question, then):
    what's missing.
 
 Ask the intake questions in at most TWO messages, skipping anything
-already supplied. If the opening message plus documents cover
-everything, go straight to Phase 2.
+already supplied. Even when the opening message plus documents cover
+everything, the 2-3 bullet picture is NOT optional: post it — naming
+the primary metric with its sourced baseline, any standing experiment
+rules you found, and where the feature is actually available today —
+and end your turn so the user can steer before you draft.
 
 First message:
 1. **The change and the belief.** What changes, and what do they
@@ -115,6 +118,11 @@ and `content_markdown` structured as:
   claims appear only when their inputs exist in the sources; showing
   the missing-inputs list is the honest alternative and is always
   acceptable.
+- **The audience must be reachable by the feature.** Check
+  eligibility against where the feature actually runs today (beta
+  accounts, flags, platforms per the sources); an audience wider than
+  the feature's availability makes the rollout gap a stated launch
+  precondition, not a silent assumption.
 - **One follow-up per thin answer.** If the metric or audience is
   vague, ask at most ONE follow-up, then draft with what you have,
   marking unknowns as launch preconditions.

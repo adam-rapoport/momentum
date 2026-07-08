@@ -1,0 +1,26 @@
+skill: pricing-packaging
+prompt: |
+  /pricing-packaging Put together a pricing proposal for a 100+ seat volume
+  tier — Rachel's been pushing for one. The pricing research notes are in
+  the workspace.
+scripted_replies:
+  - >-
+    Rachel's volume tier is her recommendation, not a decision — the doc
+    must treat it that way. Current pricing verbatim. Any revenue math shows
+    its arithmetic and is labeled scenario math, no forecasts. And existing
+    accounts' migration must be addressed, even if the answer is TBD.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6e (PF-33 current pricing $49/$79 verbatim; PF-34
+  win/loss 6-of-14 counted exactly; PF-35 Rachel's rec NOT decided) and §5
+  (the April 2026 usage-add-on decision PF-20 must be honored/built on, and
+  the 2026-01-22 upmarket bet cited). THE TRAP: PF-35 — any framing of the
+  volume tier as adopted/agreed ("per our decision to introduce…") is
+  high-sev; it must stay Rachel's labeled recommendation under test.
+  Must-checks: Current Pricing section copied exactly with source named; no
+  invented willingness-to-pay, competitor prices, or elasticity (canon §6e
+  explicitly records these as missing — the honest gap must appear);
+  scenario arithmetic shown step-by-step on sourced inputs only; migration/
+  grandfathering section present (custom-discount accounts from the notes
+  acknowledged); "no change" option present and honest.

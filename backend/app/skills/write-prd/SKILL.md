@@ -1,6 +1,6 @@
 ---
 name: write-prd
-description: Guided Product Requirements Document authoring workflow.
+description: Guided Product Requirements Document authoring workflow, with an AI-feature mode (model behavior, failure modes, evals, cost budgets) for model-centric features.
 slash_command: write-prd
 trigger_keywords: ["write a prd", "draft a prd", "create a prd", "write the prd", "write a spec", "draft a spec", "create a spec", "product requirements doc", "product requirements document"]
 required_tools: ["RecallMemory", "SearchMemories", "ListDocuments", "ReadDocument", "WriteDocument", "EditDocument", "AwaitReview", "WebSearch", "WebFetch"]
@@ -36,6 +36,18 @@ message. Intake should rarely take more than 2-3 exchanges.
    to Open Questions — do not silently drop it.
 4. **Constraints or scope boundaries.** Deadline, team size, tech
    constraints, anything out of scope?
+
+**AI-feature detection.** While gathering the above, decide whether
+the proposed solution centers on model-generated output (summaries,
+classification, extraction, generation, agentic actions). If yes,
+say so ("this reads as an AI feature, so the PRD will add the AI
+sections — model behavior, failure modes, evals, cost") and ask ONE
+extra question:
+
+5. **What must the model never do?** The unacceptable outputs or
+   actions (fabricated facts, wrong-audience tone, unsafe content,
+   irreversible actions) — this seeds Failure Modes & Guardrails.
+   Also ask where logged failure examples live, if anywhere.
 
 If the user already supplied some of these in their opening message,
 acknowledge what you have and ask only for what's missing.
@@ -93,6 +105,40 @@ Only enter this phase after you've completed Phase 1 intake.
    - `## Open Questions` — things you weren't sure about; tag them clearly
    - `## Decisions / References` — link to memories you pulled (if any)
 
+   **AI-feature mode** — when intake detected a model-centric feature,
+   insert these sections between `## Scope` and `## Assumptions`:
+
+   - `## Intended Model Behavior` — what the model does with what
+     input, the output's shape and tone, and the "must never" list
+     from intake. Concrete enough that two engineers reading it build
+     the same feature.
+   - `## Data & Context` — what the model sees per request (fields,
+     documents, history), where that data comes from, and what it
+     must NOT see (PII, other tenants' data). Data availability
+     claims come from sources or the user — unknowns go to Open
+     Questions.
+   - `## Prompt Sketch` — a starter system-prompt outline in one
+     fenced block: role, inputs, output format, the must-never rules.
+     Labeled as a starting point for engineering, not a shipped
+     artifact.
+   - `## Failure Modes & Guardrails` — table: **Failure | Example |
+     Product handling**. Failures from logged examples where sources
+     have them (cite the doc), otherwise labeled hypothesized. Product
+     handling = what the USER experiences (fallback copy, human
+     review, confidence gating) — "the model will be accurate" is not
+     a guardrail.
+   - `## Evals & Quality Gate` — the primary quality metric for the
+     model's output, how it's checked pre-ship (grader, human review,
+     golden set), and the honest state of any threshold: an existing
+     gate is cited from its source; a new one is "proposed". Point at
+     the eval-plan skill for the full evaluation plan — this section
+     scopes it, it doesn't replace it.
+   - `## Cost & Latency Budget` — per-request cost and latency
+     envelopes ONLY from sourced numbers (model pricing docs, measured
+     latencies, traffic estimates from sources); show the arithmetic.
+     Missing inputs make this a named Open Question, never an
+     invented budget.
+
 4. After writing, briefly tell the user in plain English: "I've drafted
    the PRD. Here are the key choices I made: [1-3 bullets]. Open
    questions I flagged: [list]." Never paste the full PRD into chat —
@@ -124,6 +170,15 @@ show format only, never values to reuse. When drafting, hold yourself to:
 - **Name at least one risk or dependency** in Scope or Open Questions,
   even if the project feels obvious. Nothing is truly unambiguous to the
   team reading this cold.
+- **(AI mode) Model quality numbers are sourced or absent.** Never
+  invent accuracy figures, hallucination rates, token costs, or
+  latency numbers to fill the AI sections — logged failure examples
+  and priced sources or bust. A hypothesized failure mode is labeled
+  hypothesized.
+- **(AI mode) The success metric measures the user, the quality gate
+  measures the model.** Keep them distinct: adoption/time-saved in
+  Success Metrics; groundedness/accuracy in Evals & Quality Gate. One
+  number cannot serve both jobs.
 
 ## Phase 3: Review
 

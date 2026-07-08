@@ -89,6 +89,35 @@ utterances:
      note: "okr mentions stay null — only draft/write/set/plan okrs fire"}
   - {text: "design an experiment for the onboarding change", expect: experiment-brief}
   - {text: "set up an a/b test plan for the new digest email", expect: experiment-brief}
+  # --- Wave 3 (2026-07): opportunity-assessment, discovery-interview-kit,
+  # --- positioning-messaging, pricing-packaging, product-vision, growth-audit
+  # --- (ai-feature-spec = a mode inside write-prd; no new keywords)
+  - {text: "run an opportunity assessment for the zendesk two-way sync", expect: opportunity-assessment}
+  - {text: "should we build this? draft a business case first", expect: opportunity-assessment}
+  - {text: "the business case is weak", expect: null,
+     note: "business-case MENTIONS must not fire — keywords are verb-anchored"}
+  - {text: "draft an interview guide for the digest discovery round", expect: discovery-interview-kit}
+  - {text: "turn these into an interview snapshot", expect: discovery-interview-kit}
+  - {text: "synthesize the feedback from customer interviews", expect: feedback-synthesis,
+     note: "boundary: inbound-feedback clustering stays with feedback-synthesis; the kit owns interview NOTES/guides"}
+  - {text: "we did 5 discovery interviews last week", expect: null,
+     note: "bare 'discovery interviews' deliberately not a keyword — mention-prone"}
+  - {text: "the interview went long", expect: null}
+  - {text: "write a positioning statement for the mid-market push", expect: positioning-messaging}
+  - {text: "we need a messaging framework before launch", expect: positioning-messaging}
+  - {text: "our positioning is weak against echometrics", expect: null,
+     note: "no bare 'positioning' keyword — statements stay null"}
+  - {text: "put together a pricing proposal for the volume tier", expect: pricing-packaging}
+  - {text: "help me propose pricing for ai summaries", expect: pricing-packaging}
+  - {text: "write a prfaq for signalboard 2027", expect: product-vision}
+  - {text: "draft a product vision narrative for the offsite", expect: product-vision}
+  - {text: "run a growth audit on the funnel", expect: growth-audit}
+  - {text: "diagnose growth — why did trials flatten?", expect: growth-audit}
+  - {text: "growth stalled last quarter", expect: null,
+     note: "statement, not a request — 'why did growth stall' needs the question shape"}
+  - {text: "write a prd for the ai triage feature", expect: write-prd,
+     note: "Wave 3 guard — ai-feature-spec is a write-prd MODE; AI PRDs route to write-prd, no collision surface"}
+
   - {text: "our biggest competitor just raised a round", expect: null}
   - {text: "the exec review went well yesterday", expect: null}
   - {text: "did the release go out?", expect: null}

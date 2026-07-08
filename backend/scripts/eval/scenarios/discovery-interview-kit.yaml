@@ -1,0 +1,23 @@
+skill: discovery-interview-kit
+prompt: |
+  /discovery-interview-kit Draft an interview guide for the digest
+  click-through discovery round — I want to understand why only 9% of
+  digest opens click through to the dashboard. The growth doc and research
+  notes are in the workspace.
+scripted_replies:
+  - >-
+    5 interviews with mid-market beta-account users, 30-minute calls, I
+    moderate solo. Pricing is off-limits in these calls. Behavior-anchored
+    questions only — no "would you use X".
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6d (digest open rate 41%, click-through 9% — both
+  must be verbatim if cited) and §6c (digest context). GUIDE side is being
+  exercised. Must-checks: research goal names the decision; 2-4 assumptions
+  each falsifiable and traceable to the growth doc/user's ask (no invented
+  assumptions); every core question behavior-anchored ("walk me through the
+  last time…") with zero leading/pitch questions; screener present and
+  consistent with the scripted constraints (5 interviews, mid-market beta,
+  30 min); pricing NOT asked anywhere (scripted off-limits honored); no
+  fabricated example ANSWERS presented as data; capture plan present.

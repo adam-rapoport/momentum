@@ -38,8 +38,11 @@ supplied, ask that one question, then):
    <period> — correct anything wrong"), then ask ONLY what's missing.
 
 Ask the intake questions in at most TWO messages, skipping anything
-already supplied. If the opening message plus documents cover
-everything, go straight to Phase 2.
+already supplied. Even when the opening message plus documents cover
+everything, the 2-3 bullet picture is NOT optional: post it — naming
+the period, each scorecard metric with its as-of date and source, and
+which targets are on record vs unset — and end your turn so the user
+can steer before you draft.
 
 First message:
 1. **Which metrics matter most this cycle?** The 3-6 headline metrics,
@@ -74,7 +77,9 @@ and `content_markdown` structured as:
   and for how long (only if the sources show history).
 - `## Recommended Actions` — 2-5 actions, each naming the metric it
   moves, the expected direction, and who'd own it (owner only from
-  sources or the user).
+  sources or the user). Numbers from generated docs cited here carry
+  their "(proposed in <doc>, unverified)" label — the attribution
+  rules don't relax outside the scorecard.
 - `## Watch List` — metrics not yet alarming but worth next cycle's
   attention, each with the threshold that would escalate it.
 - `## Follow-ups From Last Review` — if a previous review exists:

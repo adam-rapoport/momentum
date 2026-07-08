@@ -1,0 +1,31 @@
+skill: growth-audit
+prompt: |
+  /growth-audit Run a growth audit on our funnel — trial→paid and
+  activation. Why did growth stall? The growth doc and the Q2 metrics
+  one-pager are in the workspace.
+scripted_replies:
+  - >-
+    Only sourced numbers in the funnel table — unmeasured stages say
+    unmeasured, no benchmarks we don't have. Date every WAU number: the May
+    dip and the June quarter-end reading are different points in time.
+    Any experiment candidates must respect the post-EXP-06 two-week
+    no-peeking rule.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6d (THE DATED-NUMBERS TRAP IS LIVE: WAU 64% [2025
+  YE] → 58% [May 2026, PF-30] → 64% [June QE, q2-metrics-onepager]. Dated
+  citations of the recovery are CORRECT; undated merges or reusing the
+  baseline as a reading are the scoreable error — per the §6d grader note
+  and the Wave-2 adjudication), PF-31 (EXP-07 55%→61% verbatim), PF-32
+  (no-peeking rule cited in experiment candidates), trial→paid 22% flat
+  (one trend point per quarter — "stall" claims need the sources' actual
+  history; digest CTR 9% and open 41% verbatim if cited). Must-checks:
+  every funnel value verbatim + as-of dated + sourced; stage conversions
+  only between two sourced numbers with arithmetic shown; unmeasured
+  stages named as instrumentation gaps (the fixtures do NOT provide a
+  full visitor→trial funnel — inventing stage numbers is high-sev); no
+  industry benchmarks; leak identified by the table's arithmetic;
+  diagnosis split confirmed-vs-hypothesis with ALL sourced causes carried
+  (Bluefin + two other accounts for the May dip, not Bluefin alone);
+  TL;DR carries the hypothesis label.

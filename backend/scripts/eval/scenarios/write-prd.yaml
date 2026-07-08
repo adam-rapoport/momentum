@@ -1,14 +1,33 @@
 skill: write-prd
 prompt: |
-  /write-prd I need a PRD for 'AI Summaries v2: scheduled digests' — beta
-  design partners keep asking for a weekly digest of top feedback themes
-  delivered to Slack/email instead of having to open the dashboard. Target
-  is our mid-market push. The AI Summaries v2 context and upmarket strategy
-  are in the workspace docs/memory.
+  /write-prd I need a PRD for 'AI-assisted triage rules' — Inbox Triage
+  should learn from feedback patterns and suggest routing/tagging rules,
+  with every model-suggested rule approved by a human before it runs. This
+  is an AI feature, so include the AI sections. Context is in the workspace
+  docs and memory.
+scripted_replies:
+  - >-
+    Failure modes should draw on Ji-won's logged failure examples where the
+    classes carry over — cite the doc, and label anything else hypothesized.
+    No invented accuracy, cost, or latency numbers; those are open
+    questions. The quality gate should follow our existing groundedness-gate
+    pattern as a pattern — the 0.92 gate belongs to AI Summaries, not to
+    this feature — and point at /eval-plan for the full plan.
 expect:
   min_documents: 1
 grader_notes: |
-  Fact-check vs canon §1 (company/strategy), §5 (decisions), §6 (sprints)
-  and the standing PRD fixture (signalboard-prd-ai-summaries.docx) + the
-  planted-facts table. Watch for invented effort estimates and garbled
-  targets (July failure mode).
+  Wave-3 gate scenario for write-prd's NEW AI-feature mode (classic-mode
+  baselines: July 7/10 + harness-E2E). Fact-check vs canon §1 (Inbox
+  Triage product area PF-08), §6c (failure taxonomy classes + counts
+  verbatim if cited: 11 fabricated quotes / 9 overconfident trends / 8
+  wrong-customer of 40; the ≥0.92 + 100% quote-accuracy gate PF-27 cited
+  as the EXISTING AI Summaries pattern, never as this feature's own
+  agreed gate), §2 (Ji-won owns model quality PF-04; two squads — Triage
+  squad is the natural home). Must-checks: AI-mode sections all present
+  (Intended Model Behavior with must-nevers from intake, Data & Context,
+  Prompt Sketch fenced + labeled starter, Failure Modes table with
+  cited-vs-hypothesized labels, Evals & Quality Gate pointing at
+  /eval-plan, Cost & Latency = named open questions, NOT invented
+  numbers); success metric (user outcome) kept distinct from the model
+  quality gate; human-approval requirement from the prompt preserved as
+  a hard requirement; no invented effort estimates (July failure mode).
