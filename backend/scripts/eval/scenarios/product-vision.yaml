@@ -1,0 +1,27 @@
+skill: product-vision
+prompt: |
+  /product-vision Write a PR-FAQ for Signalboard 2027 for the leadership
+  offsite — dateline mid-2027. The Q2 strategy memo and the roadmap are in
+  the workspace.
+scripted_replies:
+  - >-
+    Press-release quotes must be fictional personas — do not put future
+    words in Anita Desai's or any real customer's mouth. Every claim in the
+    press release needs a today-status row in the bridge table. The vision
+    extends the upmarket bet — it doesn't replace it.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (today-facts: $4.2M ARR/312 customers/NRR 108%/
+  WAU — any of these cited as TODAY facts must be verbatim), §5 + §6b
+  (placed bets the vision must extend: upmarket PF-12, Salesforce Q3 PF-21,
+  SSO parked PF-23), §6c (quality gate — a vision claiming "hallucination-
+  free" contradicts the logged 40-failure reality unless bridged). THE
+  TRAP: vision quotes attributed to real people (Anita Desai, Maya, real
+  accounts) = high-sev fabrication; fictional persona/role-title quotes are
+  the correct genre convention and NOT errors. Must-checks: aspirational
+  labeling present at the top of the PR; Today-vs-Vision table covers every
+  PR capability claim with sourced today-status; future dateline computed
+  and labeled; internal FAQ includes the hard questions (what kills it,
+  cannibalization/cost); no invented today-metrics or market sizes;
+  strategy departures flagged as proposals, not continuity.

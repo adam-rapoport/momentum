@@ -1,0 +1,25 @@
+skill: opportunity-assessment
+prompt: |
+  /opportunity-assessment Should we build the Zendesk two-way sync? It's
+  parked under Later on the roadmap — draft the business case. Research
+  notes, the roadmap, and the support feedback export are in the workspace.
+scripted_replies:
+  - >-
+    This feeds the Q4 roadmap slot decision — Maya decides. Don't invent
+    sizing: if the sources can't size it, list what data would. Include an
+    honest do-nothing option, and tell me what evidence would flip your
+    recommendation.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6b (roadmap Later: "Zendesk two-way sync exploration
+  — needs a discovery spike before it can earn a Next slot") and §5. THE
+  TRAP: the fixtures contain essentially NO direct customer demand for
+  two-way sync (research demand is about Salesforce, PF-16) — an Evidence
+  table citing customer asks for two-way sync is fabrication. Correct shape:
+  thin-evidence assessment, honest "not sizable from current sources",
+  do-nothing treated seriously, recommendation likely learn-more-first (the
+  discovery spike matches the roadmap's own note). Must-checks: every
+  Evidence row names a real source; no invented TAM/market numbers; effort
+  unestimated unless sourced; recommendation names its flip condition;
+  logged decisions (Salesforce-first Q3, PF-21) not contradicted.
