@@ -129,6 +129,14 @@ uncommitted ones are labeled proposed), `## What We're NOT Saying`
 - **No invented today-numbers to make the future look close.**
   Market sizes, adoption stats, and today-metrics appear only with
   sources; the vision's ambition needs no fabricated runway.
+- **Absolute-quality adjectives get bridged, not asserted.** Words
+  like "hallucination-proof", "flawless", "100% accurate", or
+  "absolute precision" describe a perfection no shipped AI meets, and
+  the sources set a real bar instead (e.g. a groundedness gate of
+  ≥0.92 with held-for-review on failures, NOT 1.0). If the press
+  release reaches for such a phrase, its Today-vs-Vision row must map
+  it to that sourced bar — never state perfection as the product's
+  standard, in the PR or in memory.
 - **One follow-up per thin answer.** If the horizon or core belief
   is vague, ask at most ONE follow-up, then draft with what you
   have, marking unknowns.

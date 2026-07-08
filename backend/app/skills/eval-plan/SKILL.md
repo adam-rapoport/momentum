@@ -69,7 +69,13 @@ Call `WriteDocument` with a `title` like "Eval Plan: <feature>" and
   the PRD's own metric, not an adjacent launch or rollout target.
 - `## What Good Looks Like` — 3-5 concrete properties of a passing
   output, each testable ("every claim traces to the source thread"),
-  not aspirational ("high quality").
+  not aspirational ("high quality"). A property must NOT smuggle in a
+  numeric threshold the sources didn't set — a word count, length cap,
+  latency ceiling, or score bar invented to sound rigorous ("under 500
+  words", "responds in <2s") is fabrication dressed as a testable
+  property. If a bound isn't in a source, either phrase the property
+  qualitatively ("concise — no padding or repetition") or write the
+  number as "proposed: <n> — confirm with the owner".
 - `## Failure Taxonomy` — table: **Class | Frequency | Example |
   Detection**. Classes and counts come from the logged examples,
   quoted verbatim. Order by severity × frequency.
@@ -101,7 +107,10 @@ Call `WriteDocument` with a `title` like "Eval Plan: <feature>" and
 - **Thresholds are sourced or labeled proposed.** An existing gate is
   quoted verbatim. A new threshold is a proposal with one line of
   reasoning ("start at X, tighten after two clean runs") — never
-  presented as an established bar.
+  presented as an established bar. This applies everywhere a number
+  appears, not just the Ship Gate: a length/word-count/latency figure
+  in a "What Good Looks Like" property or a rubric is a threshold too,
+  and an invented one is the same error.
 - **Blockquotes are contiguous or they're not quotes.** Any quoted
   passage from a PRD, log, or user must be one unbroken span of the
   source — never stitch sentences from different places into a single
