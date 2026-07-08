@@ -97,6 +97,11 @@ Call `WriteDocument` with a `title` like "Sprint Plan: <sprint name>
 - **Quote velocity verbatim** ("completed 31 / 38 / 34 the last three
   sprints"). Never derive an average with more precision than the
   source, and never use velocity to inflate stated capacity.
+- **Never subdivide capacity by squad unless the source provides the
+  split.** Capacity is one number until the planning inputs break it
+  down; an invented per-squad allocation ("~14 Triage / ~22 Insights")
+  is fabricated arithmetic. If the user needs a split, ask for it or
+  mark it "split unknown".
 - **Protect logged commitments.** Check `type=decision` memory: if a
   decision committed something this sprint must enable (a deferred
   integration's start date, a gated launch), the plan either protects

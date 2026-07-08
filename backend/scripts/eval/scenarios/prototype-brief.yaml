@@ -1,0 +1,23 @@
+skill: prototype-brief
+prompt: |
+  /prototype-brief Turn the AI Summaries v2 PRD into a prototype brief
+  I can paste into Lovable — a clickable demo of the weekly digest
+  email plus a simple dashboard view of sentiment trends. The PRD is
+  in the workspace.
+scripted_replies:
+  - >-
+    Target Lovable for a clickable demo — the thing it must prove is
+    that a PM can absorb a week of feedback from the digest in under a
+    minute. Tool-default styling is fine; sample data should feel like
+    our real accounts.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (product areas, PF-08), the PRD facts
+  (PF-09..11), and §3 (customers). Must-checks: prototype scope stays
+  within the PRD's v2 features (PF-09/PF-10) — no invented
+  capabilities; the generation prompt is fully self-contained (no
+  references to "the PRD"/workspace docs inside the fenced prompt);
+  sample data either derives from workspace sources or is plainly
+  synthetic and internally consistent; screens 3-5 max; out-of-scope
+  section honestly lists what the demo fakes.

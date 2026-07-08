@@ -1,0 +1,22 @@
+skill: eval-plan
+prompt: |
+  /eval-plan Build an eval plan for AI Summaries v2. Ji-won's
+  failure-examples doc and the v2 PRD are both in the workspace — the
+  plan should be runnable by her team as-is.
+scripted_replies:
+  - >-
+    Work from Ji-won's doc — the gate thresholds in there are already
+    decided, so build the plan around them rather than proposing new
+    ones. Owner and cadence are in the docs too.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6c (AI Summaries v2 quality & eval program) and
+  PF-27..29, plus §2 (Ji-won's ownership, PF-04) and the PRD success
+  metric (PF-11). Must-checks: golden-set size and both ship-gate
+  conditions quoted verbatim (PF-27); failure-taxonomy classes and
+  counts trace to the fixture doc, worst class identified (PF-28); the
+  2026-05-14 hold-for-review decision cited and built on, not relaxed
+  (PF-29); eval ownership attributed correctly (PF-04); no invented
+  failure examples, counts, or thresholds; grader prompts encode the
+  specific rubric (not generic "be accurate").

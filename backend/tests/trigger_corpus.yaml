@@ -40,17 +40,17 @@ utterances:
   - {text: "what is a prd anyway?", expect: null}
   - {text: "remind me what a stakeholder is", expect: null}
   - {text: "what's our product strategy for next year?", expect: null,
-     note: "future wave: product-strategy must claim ONLY request phrasings, never this"}
+     note: "Wave 2 guard — product-strategy claims only request phrasings, never this"}
   - {text: "our pricing is too complicated", expect: null,
      note: "future wave: pricing-packaging keyword design must keep this null"}
   - {text: "how did the experiment go?", expect: null,
-     note: "future wave: experiment-brief keyword design must keep this null"}
+     note: "Wave 2 guard — experiment-brief keywords are verb-anchored, mentions stay null"}
   - {text: "the roadmap looks off to me", expect: null,
      note: "future wave: roadmap-update keyword design must keep this null"}
   - {text: "what's the vision here?", expect: null,
      note: "future wave: product-vision keyword design must keep this null"}
   - {text: "can you review these metrics real quick", expect: null,
-     note: "future wave: metrics-review keyword design must keep this null"}
+     note: "Wave 2 guard — metrics-review deliberately omits 'review the metrics' so this stays null"}
   - {text: "we need to plan the next sprint", expect: sprint-planning,
      note: "flipped from null when Wave 1 landed sprint-planning"}
   - {text: "help me with sprint planning for sprint 15", expect: sprint-planning}
@@ -63,9 +63,32 @@ utterances:
      note: "roadmap MENTIONS must not fire — keywords are verb-anchored"}
   - {text: "is the salesforce integration still on the roadmap?", expect: null}
   - {text: "velocity dipped last sprint", expect: null}
-  - {text: "draft okrs for q3", expect: null,
-     note: "Wave 2 flips this row to okr-planning when that skill lands"}
+  - {text: "draft okrs for q3", expect: okr-planning,
+     note: "flipped from null when Wave 2 landed okr-planning"}
   - {text: "customer feedback has been positive lately", expect: null}
+
+  # --- Wave 2 (2026-07): eval-plan, prototype-brief, product-strategy,
+  # --- launch-plan, metrics-review, okr-planning, experiment-brief ---
+  - {text: "write an eval plan for ai summaries", expect: eval-plan}
+  - {text: "draft evals for the new summarizer", expect: eval-plan}
+  - {text: "the evals came back mixed this week", expect: null,
+     note: "eval MENTIONS must not fire — keywords are verb-anchored"}
+  - {text: "put together a prototype brief for the digest flow", expect: prototype-brief}
+  - {text: "write a build prompt i can paste into cursor", expect: prototype-brief}
+  - {text: "we should prototype this before committing", expect: null,
+     note: "bare 'prototype' is not a keyword — intent talk stays null"}
+  - {text: "draft a product strategy for 2027", expect: product-strategy}
+  - {text: "we need a product strategy doc for the board", expect: product-strategy}
+  - {text: "put together a launch plan for ai summaries v2", expect: launch-plan}
+  - {text: "help me plan the launch for the ga release", expect: launch-plan}
+  - {text: "the launch went sideways last time", expect: null}
+  - {text: "run our weekly metrics review", expect: metrics-review}
+  - {text: "put together a metrics readout for q2", expect: metrics-review}
+  - {text: "help me set okrs for the quarter", expect: okr-planning}
+  - {text: "our okrs are slipping this quarter", expect: null,
+     note: "okr mentions stay null — only draft/write/set/plan okrs fire"}
+  - {text: "design an experiment for the onboarding change", expect: experiment-brief}
+  - {text: "set up an a/b test plan for the new digest email", expect: experiment-brief}
   - {text: "our biggest competitor just raised a round", expect: null}
   - {text: "the exec review went well yesterday", expect: null}
   - {text: "did the release go out?", expect: null}

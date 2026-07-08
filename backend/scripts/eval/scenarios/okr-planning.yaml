@@ -1,0 +1,24 @@
+skill: okr-planning
+prompt: |
+  /okr-planning Draft Q3 OKRs for the Signalboard product org,
+  grounded in the Q2 strategy memo, the roadmap, and my growth-metrics
+  doc — all in the workspace.
+scripted_replies:
+  - >-
+    Three objectives max. Baselines only from the docs — if a number
+    has no baseline on record, say "measure first" instead of
+    inventing one. The Q3 Salesforce commitment and the Bluefin
+    renewal both need a home in these OKRs.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §5/§6b (commitments), §6d (baselines,
+  PF-30..31), and the strategy targets (PF-12..14). Must-checks: every
+  KR baseline verbatim from a doc or marked "baseline unknown —
+  measure first" (usage and activation figures exact per PF-30/PF-31);
+  targets framed as proposals with reasoning, and committed targets
+  (PF-13/PF-14) not silently restated as different numbers; the Q3
+  Salesforce commitment (PF-21/PF-26) and Bluefin renewal risk (PF-22)
+  protected somewhere in the OKR set per the scripted reply; ≤3
+  objectives; KRs outcome-shaped with named measurement sources;
+  quality-checks section actually grades the OKRs.

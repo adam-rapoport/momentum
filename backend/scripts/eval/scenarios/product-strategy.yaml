@@ -1,0 +1,24 @@
+skill: product-strategy
+prompt: |
+  /product-strategy Draft Fernwood's product strategy for the rest of
+  2026. The Q2 strategy memo is in the workspace — build on it, don't
+  contradict it. Audience is the leadership team.
+scripted_replies:
+  - >-
+    Keep the upmarket bet as the spine — that's decided, not up for
+    debate. What I need from the doc is honest where-to-play /
+    how-to-win choices under that bet, and a real list of what we're
+    NOT doing. Constraints: no new headcount this year.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (company numbers), §4 (competitors), §5
+  (logged decisions), and the strategy-memo facts (PF-12..14).
+  Must-checks: diagnosis numbers verbatim with sources (ARR, NRR,
+  usage — PF-13/PF-14 and §1); the upmarket bet treated as a logged
+  decision and cited (PF-12); no contradiction of the Q3 Salesforce
+  commitment (PF-18/PF-21) or other §5 decisions — any tension flagged
+  explicitly; competitor claims trace to §4-sourced docs, no invented
+  market sizes or competitor moves; not-doing list uses real
+  alternatives from sources/user, no straw men; choices framed as
+  recommendations pending review.
