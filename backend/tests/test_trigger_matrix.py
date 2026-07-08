@@ -24,10 +24,14 @@ from app.core.skills import _FILLER_WORDS, _keyword_matches, detect_skill, load_
 CORPUS_PATH = Path(__file__).parent / "trigger_corpus.yaml"
 
 # Single-token trigger phrases allowed (unambiguous PM acronyms). Grows
-# deliberately — e.g. "premortem" — never with bare common nouns.
+# deliberately — never with bare common nouns.
 # "prfaq"/"pr-faq" added for Wave 3's product-vision ("pr faq" with a space
 # is two essential tokens and needs no allowlisting).
-ACRONYM_ALLOWLIST = {"adr", "qbr", "prfaq", "pr-faq"}
+# "premortem"/"pre-mortem" added for Wave 4's pre-mortem: both are single
+# whitespace-tokens (the hyphen doesn't split), and neither occurs in
+# ordinary PM chat — you only say "premortem" when you want one. The spaced
+# variant "pre mortem" is two essential tokens and needs no allowlisting.
+ACRONYM_ALLOWLIST = {"adr", "qbr", "prfaq", "pr-faq", "premortem", "pre-mortem"}
 
 # keyword -> skill that must win when that keyword, spoken as an utterance,
 # legitimately fires more than one skill's matcher. Every entry needs a

@@ -118,6 +118,35 @@ utterances:
   - {text: "write a prd for the ai triage feature", expect: write-prd,
      note: "Wave 3 guard — ai-feature-spec is a write-prd MODE; AI PRDs route to write-prd, no collision surface"}
 
+  # --- Wave 4 (2026-07): model-selection, pre-mortem, prompt-pack,
+  # --- ai-landscape, ai-risk-review (Tier-3) + influence-prep as a
+  # --- meeting-prep MODE (verb-anchored persuasion keywords) ---
+  - {text: "help me choose a model for ai summaries v2", expect: model-selection}
+  - {text: "compare models for the digest summarizer", expect: model-selection}
+  - {text: "write a model selection memo for the summarizer", expect: model-selection}
+  - {text: "the model is slow today", expect: null,
+     note: "bare 'model' is not a keyword — model-selection needs select/choose/compare/selection"}
+  - {text: "run a premortem on the ai summaries v2 launch", expect: pre-mortem}
+  - {text: "let's do a pre-mortem before we ship", expect: pre-mortem}
+  - {text: "put together a prompt pack for the support team", expect: prompt-pack}
+  - {text: "codify our triage workflow into reusable prompts", expect: prompt-pack}
+  - {text: "build a prompt pack for the support team", expect: prototype-brief,
+     note: "known overlap: 'build [a] prompt' is prototype-brief's keyword; 'build a prompt pack' mixes both verbs and prototype-brief wins the longer-phrase tiebreak. Canonical prompt-pack phrasings ('prompt pack', 'reusable prompts') are unambiguous; intake recovers this edge."}
+  - {text: "just write me a prompt", expect: null,
+     note: "bare 'prompt' is not a keyword — prompt-pack needs pack/library/reusable/context; prototype-brief needs build/lovable/v0"}
+  - {text: "write an ai landscape brief for the board", expect: ai-landscape}
+  - {text: "scan the ai landscape for us", expect: ai-landscape}
+  - {text: "what's the ai landscape look like these days", expect: null,
+     note: "bare 'ai landscape' deliberately dropped — mention-prone; needs brief/memo or the scan verb"}
+  - {text: "run an ai risk review before we launch digests", expect: ai-risk-review}
+  - {text: "responsible ai checklist for ai summaries", expect: ai-risk-review}
+  - {text: "is there ai risk in this feature?", expect: null,
+     note: "bare 'ai risk' is not a keyword — needs review/assessment/checklist"}
+  - {text: "prep me for a hard conversation with rachel about the pricing tier", expect: meeting-prep,
+     note: "influence-prep is a meeting-prep MODE; verb-anchored so past-tense mentions stay null"}
+  - {text: "that was a tough conversation", expect: null,
+     note: "validates the verb-anchor: bare 'tough conversation' must NOT fire — keyword is 'prep for a tough conversation'"}
+
   - {text: "our biggest competitor just raised a round", expect: null}
   - {text: "the exec review went well yesterday", expect: null}
   - {text: "did the release go out?", expect: null}
