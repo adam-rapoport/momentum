@@ -33,14 +33,28 @@ wasn't supplied, ask that one question, then):
 3. Call `ListDocuments` and look for (a) an existing strategy memo or
    vision doc — this draft extends or supersedes it, and must say
    which, (b) the roadmap, and (c) metrics/competitive docs that feed
-   the diagnosis. `ReadDocument` what you find.
+   the diagnosis. `ReadDocument` the PRIMARY sources in full — the
+   uploaded memo, metrics, and roadmap docs — BEFORE any previously
+   generated document. Recognize generated docs by their
+   deliverable-pattern titles ("OKRs:", "Product Strategy:", "Launch
+   Plan:", "Sprint Plan:", "Metrics Review:", "Eval Plan:",
+   "Experiment Brief:", "PRD:") — those are ASSISTANT OUTPUT, not
+   primaries, no matter how on-topic they look. Memory snippets are
+   not a substitute for reading the memo itself. When a generated doc
+   or memory disagrees with a primary, the primary wins and the
+   discrepancy gets flagged. You are not ready to draft until you
+   have read at least one uploaded primary in full.
 4. Present what you found in 2-3 bullets ("Here's the strategic
    picture I have — correct anything wrong"), then ask ONLY what's
    missing.
 
 Ask the intake questions in at most TWO messages, skipping anything
-already supplied. If the opening message plus documents cover
-everything, go straight to Phase 2.
+already supplied. Even when the opening message plus documents cover
+everything, the 2-3 bullet picture is NOT optional for this skill:
+post it — including every standing numeric target you found and how
+the draft will treat each — and end your turn so the user can steer
+before you draft. A strategy doc is too consequential to draft on an
+unconfirmed reading.
 
 First message:
 1. **Scope and horizon.** Whole product or one area, and through when?
@@ -101,12 +115,27 @@ Call `WriteDocument` with a `title` like "Product Strategy: <product>
   memory already commits a direction, the strategy cites it. If a
   recommendation would alter one, flag the conflict in its own
   sentence — never present a reversal as continuity.
+- **Carry standing targets forward verbatim.** If a strategy memo,
+  goal doc, or memory records a numeric target (ARR, NRR, usage), the
+  doc states that target exactly and says how the strategy treats it:
+  on track, missed (confront it), or proposed for reset (with
+  reasoning). Restating a committed target as something weaker
+  ("maintain current X" where the source says "raise to Y") — in the
+  body OR in Memory Updates — is fabrication by omission.
 - **The not-doing list uses real alternatives.** Only options the
   sources or the user actually surfaced. Inventing a strawman
   alternative to cut is fabrication with extra steps.
 - **No invented market sizes or competitor moves.** If the sources
   lack market sizing or competitor intent, the doc says so; it never
   estimates one to look complete.
+- **Numbers, targets, and claims come from PRIMARY sources only.**
+  Never take a target, baseline, renewal date, or stakeholder
+  position from a previously generated document or from memories
+  derived from one — verify in an uploaded primary or with the user.
+  If only a generated doc has it, write "(per the <title> doc,
+  unverified)" and never present it as committed. No matter how many
+  generated docs or memories repeat a claim, repetition is not
+  verification — one primary outranks any number of derived copies.
 - **One follow-up per thin answer.** If the trigger or constraints
   are vague, ask at most ONE follow-up, then draft with what you
   have, marking unknowns.

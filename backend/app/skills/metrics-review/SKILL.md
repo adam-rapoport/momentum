@@ -100,9 +100,23 @@ and `content_markdown` structured as:
 - **Confirmed vs hypothesis is a hard line.** A cause is confirmed
   only if a source or the user states it. Your inference — however
   plausible — is a hypothesis and carries the label.
-- **Never invent a target.** If no source sets one, the scorecard
-  says "no target set" — proposing a target is allowed only in
+- **Never invent a target — and generated docs cannot set one.** If
+  no primary source (strategy/OKR doc, the user) sets a target, the
+  scorecard says "no target set". Numbers proposed in previously
+  generated documents (a launch plan's proposed GA targets, a
+  strategy draft's goals) are NOT targets on record: mention them
+  only as "(proposed in <doc>, unverified)" and never build an
+  Off-Target section on them. Proposing a target is allowed only in
   Recommended Actions, labeled as a proposal.
+- **Date every number; reconcile conflicting sources out loud.**
+  Every scorecard figure carries its as-of date from its source. When
+  two sources disagree — or present the same figure for different
+  times — surface the discrepancy explicitly (Open Questions, or ask
+  the user) and say which source you treated as current and why.
+  Never silently merge conflicting sources into a trend, and never
+  reuse a metric's baseline as a later reading: a "recovery" needs a
+  dated post-dip data point from a source, not the old baseline
+  quoted twice.
 - **Segment-level claims need segment-level data.** Don't attribute
   an aggregate move to a segment/account unless a source makes the
   attribution.
@@ -111,6 +125,10 @@ and `content_markdown` structured as:
   marking gaps in Open Questions.
 
 ## Phase 3: Review
+
+Drafting is not finished until the review pause is requested: never
+end a turn between `WriteDocument` and `AwaitReview` — a saved doc
+with no review request is an incomplete deliverable, not a shortcut.
 
 Immediately after writing, call `AwaitReview` with:
 - `deliverable_kind: "metrics_review"`

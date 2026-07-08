@@ -172,10 +172,13 @@ class Runner:
 
     # -- running ---------------------------------------------------------
 
-    def _docs_on_disk(self) -> set[Path]:
+    def _docs_on_disk(self) -> set[tuple[Path, float]]:
+        # (path, mtime) pairs so a re-run that OVERWRITES an existing doc
+        # (same title -> same slug -> same path) still counts as a saved
+        # deliverable — path-only diffing silently missed updates.
         if self.docs_dir is None or not self.docs_dir.exists():
             return set()
-        return set(self.docs_dir.rglob("*.md"))
+        return {(p, p.stat().st_mtime) for p in self.docs_dir.rglob("*.md")}
 
     async def _one_turn(self, ws, transcript: list[str], skill_t0: float) -> dict:
         """Collect one assistant turn. Returns {'end': 'done'|'awaiting_review'|'error'|'timeout', ...}."""
@@ -282,7 +285,7 @@ class Runner:
                 else:
                     next_msg = None
 
-        new_docs = sorted(self._docs_on_disk() - docs_before)
+        new_docs = sorted({p for p, _ in self._docs_on_disk() - docs_before})
         meta["documents_saved"] = len(new_docs)
         meta["meets_min_documents"] = len(new_docs) >= sc.min_documents
         meta["total_seconds"] = round(time.time() - skill_t0, 1)

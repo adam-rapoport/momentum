@@ -31,15 +31,28 @@ supplied, ask that one question, then):
 3. Call `ListDocuments` and look for (a) the strategy memo/doc — OKRs
    without a strategy to serve are a wishlist, (b) metrics docs with
    current baselines, (c) the roadmap, and (d) last quarter's OKRs or
-   review (what carried, what was dropped). `ReadDocument` what you
-   find.
+   review (what carried, what was dropped). `ReadDocument` the
+   PRIMARY sources in full — the uploaded memo, metrics, and roadmap
+   docs — not just their memory snippets. Recognize generated docs by
+   their deliverable-pattern titles ("OKRs:", "Product Strategy:",
+   "Launch Plan:", "Sprint Plan:", "Metrics Review:", "Eval Plan:",
+   "Experiment Brief:", "PRD:") — those are ASSISTANT OUTPUT, not
+   primaries, no matter how on-topic they look. Primaries are the
+   uploaded source materials (memos, notes, logs, exports). Read
+   generated docs last, if at all; when a generated doc's number
+   differs from a primary's, the primary wins and the discrepancy
+   gets flagged. You are not ready to draft until you have read at
+   least one uploaded primary in full.
 4. Present what you found in 2-3 bullets ("Here's what I have going
    into <quarter> — correct anything wrong"), then ask ONLY what's
    missing.
 
 Ask the intake questions in at most TWO messages, skipping anything
-already supplied. If the opening message plus documents cover
-everything, go straight to Phase 2.
+already supplied. Even when the opening message plus documents cover
+everything, the 2-3 bullet picture is NOT optional for this skill:
+post it — naming the strategy's standing numeric targets and the
+baselines you'll use, each with its source — and end your turn so
+the user can steer before you draft.
 
 First message:
 1. **Scope and quarter.** Whose OKRs (company, product org, one team)
@@ -90,6 +103,15 @@ and `content_markdown` structured as:
 - **Never invent a baseline.** A KR's baseline is verbatim from a
   source or the user, or it's "baseline unknown — measure first."
   Targets against invented baselines are fiction with a percent sign.
+- **Baselines and targets come from PRIMARY sources only.** Never
+  take a baseline, target, renewal date, or stakeholder position from
+  a previously generated document (strategy draft, launch plan,
+  metrics review) — verify it in an uploaded primary or with the
+  user. If only a generated doc has it, write "(per the <title> doc,
+  unverified)" and do not build a KR on it. A number that changed
+  meaning between a primary and a generated doc (a company-wide
+  metric relabeled as a segment metric) is a fabrication to catch,
+  not inherit.
 - **Targets are proposals with reasoning.** Each target gets one line
   of why-this-number relative to its baseline ("58% now; 64% was the
   2025 level — recovering it is ambitious but precedented"). Never
@@ -103,7 +125,12 @@ and `content_markdown` structured as:
 - **Align with logged targets and commitments.** If a strategy memo
   or `type=decision` memory already sets a target or commitment, the
   OKRs match it or explicitly flag the difference — never quietly
-  restate a committed number as something else.
+  restate a committed number as something else, and never silently
+  DROP one: every numeric target in the source strategy appears in
+  the doc, mapped to a KR or explicitly listed with why these OKRs
+  don't carry it. The Quality Checks section must verify each
+  baseline against a named primary source — a KR whose baseline
+  can't cite one fails its own check.
 - **2-3 objectives, hard cap.** More means priorities weren't chosen;
   push extras to Not This Quarter and say so.
 - **One follow-up per thin answer.** If priorities or baselines are
