@@ -1,0 +1,28 @@
+skill: prompt-pack
+prompt: |
+  /prompt-pack Build a prompt pack for our Inbox Triage workflow — the team
+  tags and routes incoming feedback and I want to codify it into reusable
+  prompts. The PRD and the support feedback export are in the workspace.
+scripted_replies:
+  - >-
+    Base the prompts on our real triage flow from the PRD — don't hand me a
+    generic template. Bake in the guardrails from Ji-won's failure log: never
+    put quotation marks around words a customer didn't write, never
+    cross-attribute feedback between customers. Examples should use the real
+    feedback in the export, or be clearly labeled synthetic — never a made-up
+    customer quote passed off as real.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §1 (Inbox Triage = route + tag incoming feedback; the
+  four product areas PF-08), §6c (failure taxonomy: fabricated quotes 11/40
+  PF-28, wrong-customer attribution 8, stale-data 7; the 100% quote-accuracy
+  block PF-27) and the support-feedback-export.txt content. Must: prompts map
+  to the REAL triage steps (route / tag / prioritize by frequency + revenue
+  impact), NOT a generic "summarize this" template; a shared context block is
+  present; guardrails trace to the logged failure taxonomy with counts;
+  examples use sourced feedback from the export OR a clearly-labeled
+  [synthetic] placeholder. THE TRAP: a fabricated customer quote presented as
+  real anywhere in the pack is high-sev — it is the exact failure the pack
+  exists to prevent. Prompts are paste-ready (role / inputs / output format /
+  constraints). No invented model/tool capability claims.

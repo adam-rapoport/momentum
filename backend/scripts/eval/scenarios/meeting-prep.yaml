@@ -1,11 +1,41 @@
 skill: meeting-prep
+# Wave 4 (2026-07-07): swapped to the INFLUENCE-mode (persuasion) prompt to
+# gate influence-prep, which ships as a meeting-prep MODE (Adam's Wave-3
+# call). The base coordination-meeting scenario ("prep me for Tuesday's exec
+# review") is preserved by the July + Wave-1/2/3 baselines — nothing is lost;
+# this exercises the persuasion side. Mirrors write-prd's AI-mode swap in W3.
 prompt: |
-  /meeting-prep Prep me for Tuesday's weekly exec review (Maya's meeting —
-  the agenda is in the reference docs). I'm presenting Sprint 14 wrap and
-  AI Summaries v2 beta status.
+  /meeting-prep Prep me for a hard conversation with Rachel. She's pushing
+  for a 100+ seat volume tier with pooled AI Summaries credits, and I want to
+  talk her out of the pooled-credits part — it undercuts our usage-based
+  add-on. I need to win her buy-in on a volume tier WITHOUT pooled credits.
+scripted_replies:
+  - >-
+    Build the stakeholder map from what we actually know about Rachel — don't
+    guess her motives. Her objections should be the real ones (the deals lost
+    on per-seat cost), each with my evidence-based response. Give me a
+    specific ask and a fallback if she says no. Ground it in the usage-based
+    pricing decision and the win/loss data.
 expect:
   min_documents: 1
 grader_notes: |
-  Fact-check vs canon §2 (people), §5 (decisions), §6 (Sprint 14) and the
-  exec-meeting-agenda.txt fixture + planted-facts table. Check the S7 rule:
-  recommendations must not silently contradict logged decisions.
+  INFLUENCE-MODE gate. Fact-check vs canon §2 (Rachel Goldman — VP Sales,
+  joined Jan 2026 from EchoMetrics, owns revenue + the upmarket move, ends
+  every deal review with "what's the one thing blocking the close?" — PF-03),
+  §6e (her May 2026 rec = a 100+ seat volume tier with pooled AI Summaries
+  credits, explicitly NOT decided PF-35; win/loss: 6 of 14 lost mid-market
+  deals cited per-seat cost at 100+ seats PF-34; current pricing $49/$79
+  PF-33), §5 (D-04 usage-based add-on PF-20 — the decision pooled credits
+  would undercut). THE TRAP (influence-mode cardinal rule): the Stakeholder
+  Map's motives/incentives for Rachel must be SOURCED (her role, EchoMetrics
+  background, the per-seat-cost deal pressure) — inventing a fear, agenda, or
+  personal motive for a real person is fabrication. Objections grounded in her
+  real position (per-seat cost blocking 100+ seat deals), not straw men, each
+  with an evidence-based response. A SPECIFIC ask (volume tier WITHOUT pooled
+  credits) + a BATNA / if-she-says-no. Must NOT frame the pooled-credits tier
+  as already decided (PF-35). Confirm the influence sections are present
+  (Stakeholder Map, Likely Objections & Responses, Your Ask & Script, BATNA).
+  MODE-VS-SPLIT JUDGMENT (for the maintainer): note whether the persuasion
+  sections read as a coherent meeting-prep deliverable or whether they muddy
+  the base agenda — if the latter, the mode should be split into a standalone
+  influence-prep skill (the sections port over unchanged).

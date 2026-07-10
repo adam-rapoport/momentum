@@ -1,0 +1,32 @@
+skill: pre-mortem
+prompt: |
+  /pre-mortem Run a pre-mortem on the AI Summaries v2 GA launch — assume it's
+  shipped to the full base and it went badly. I want the real risks, sorted,
+  with owners.
+scripted_replies:
+  - >-
+    Ground the risks in what's actually on record — the eval gate, the
+    hold-for-review policy, the Salesforce deferral, the Bluefin at-risk
+    renewal, the still-open model-cost question. Label anything speculative a
+    hypothesis. Owners only if memory names them; otherwise "owner TBD" —
+    don't invent who's accountable. Sort into tigers / paper-tigers /
+    elephants, and give each paper-tiger the one-line reason it's overrated.
+expect:
+  min_documents: 1
+grader_notes: |
+  Fact-check vs canon §6c (eval gate 0.92+100% PF-27; hold-for-review PF-29 —
+  which does NOT scale to full-base GA volume, a real tiger), §6f (the model
+  choice/cost is still open, PF-36..38), §5 (Salesforce deferred to Q3 D-05/
+  PF-18; usage-based pricing D-04/PF-20), §6b (Bluefin Q3 renewal at-risk
+  PF-22), §2 (owners: Ji-won owns eval PF-04, Priya owns roadmap, Daniel eng,
+  Rachel sales). Must: risks grounded in the REAL launch (fabricated-quote
+  failure class, groundedness gate at full-base volume where hold-for-review
+  can't keep up, model cost at 312-digest/wk GA volume, Salesforce/Bluefin
+  context) or explicitly labeled hypothesis — no invented failure stated as
+  likely. All three buckets populated; each paper-tiger carries its "why
+  overrated" line; elephants grounded in a real tension (a deferred decision,
+  a stakeholder position, a cross-team handoff), NOT invented interpersonal
+  drama. Owners are real (from team/stakeholder memory) or "owner TBD" —
+  putting a name on a risk to look handled is the fail. Dateline: GA is
+  roadmap "Later (Q4+)" (§6b) — a firm invented launch date is wrong; expect
+  "Q4 2026" or "date TBD".

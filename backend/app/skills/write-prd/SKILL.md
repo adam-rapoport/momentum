@@ -129,8 +129,12 @@ Only enter this phase after you've completed Phase 1 intake.
      a guardrail.
    - `## Evals & Quality Gate` — the primary quality metric for the
      model's output, how it's checked pre-ship (grader, human review,
-     golden set), and the honest state of any threshold: an existing
-     gate is cited from its source; a new one is "proposed". Point at
+     golden set), and the honest state of any threshold. Do NOT coin a
+     new gate figure: if a gate already exists, cite its number
+     verbatim from the source; if none does, name the metric and leave
+     the number an explicit open question ("gate score TBD — Ji-won to
+     set") rather than inventing a plausible-looking "0.90". A
+     "proposed" gate still may not carry a fabricated number. Point at
      the eval-plan skill for the full evaluation plan — this section
      scopes it, it doesn't replace it.
    - `## Cost & Latency Budget` — per-request cost and latency
@@ -171,10 +175,15 @@ show format only, never values to reuse. When drafting, hold yourself to:
   even if the project feels obvious. Nothing is truly unambiguous to the
   team reading this cold.
 - **(AI mode) Model quality numbers are sourced or absent.** Never
-  invent accuracy figures, hallucination rates, token costs, or
-  latency numbers to fill the AI sections — logged failure examples
-  and priced sources or bust. A hypothesized failure mode is labeled
-  hypothesized.
+  invent accuracy figures, hallucination rates, token costs, latency
+  numbers, or gate scores to fill the AI sections — logged failure
+  examples and priced sources or bust. A hypothesized failure mode is
+  labeled hypothesized.
+- **Never invent an impact percentage.** Velocity/productivity/effort
+  effects ("cuts triage time 15-20%", "saves 3 eng-weeks") are claims,
+  not framing — cite the source or leave the magnitude out and note it
+  as an open question. A confident-sounding range you derived yourself
+  is fabrication.
 - **(AI mode) The success metric measures the user, the quality gate
   measures the model.** Keep them distinct: adoption/time-saved in
   Success Metrics; groundedness/accuracy in Evals & Quality Gate. One

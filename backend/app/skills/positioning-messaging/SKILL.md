@@ -116,6 +116,16 @@ Call `WriteDocument` with a `title` like "Positioning & Messaging:
 - **Named customers need clearance.** Citing a customer by name in
   outward-facing messaging is flagged as needing permission unless
   a source records approval.
+- **A prospect is not a win.** Evidence from an account that is
+  evaluating, trialing, or in an open deal is framed as exactly that
+  ("Northwind, in evaluation, told us…"), never as a closed win
+  ("chose us over EchoMetrics") — closed-win language requires a
+  source that records the win. Overstating a live deal as won is a
+  proof point sales will get caught on.
+- **Scrub internal IDs from an outward doc.** Positioning is
+  customer-facing: never leak a fixture/planted-fact label (PF-19),
+  tracker code, or memory annotation into it — cite the underlying
+  fact in plain language.
 - **One follow-up per thin answer.** If the alternative or the
   segment is vague, ask at most ONE follow-up, then draft with what
   you have, marking unknowns.
