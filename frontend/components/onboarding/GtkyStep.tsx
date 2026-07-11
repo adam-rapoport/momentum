@@ -166,7 +166,7 @@ export function GtkyStep({
               ? "Analyzing your document…"
               : dragOver
                 ? "Drop to upload"
-                : "Click to upload, or drag & drop — PDF, Word, Markdown, or text"}
+                : "Click to upload, or drag & drop — PDF, Word, PowerPoint, Excel, CSV, Markdown, or text"}
           </div>
           <div className="mt-1 text-[11.5px] text-ink-dim">
             We read it and pull out what&apos;s worth remembering — stored as private context in
@@ -176,7 +176,7 @@ export function GtkyStep({
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.docx,.md,.markdown,.txt"
+          accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.md,.markdown,.txt"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}

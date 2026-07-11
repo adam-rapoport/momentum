@@ -191,7 +191,7 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
       <input
         ref={fileRef}
         type="file"
-        accept=".pdf,.docx,.md,.markdown,.txt"
+        accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.md,.markdown,.txt"
         multiple
         className="hidden"
         onChange={(e) => void addFiles(e.target.files)}
@@ -265,7 +265,7 @@ export function ChatInput({ onSend, onCancel, isStreaming, big, autoFocus, seed 
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            title="Attach a document (PDF, Word, Markdown, text)"
+            title="Attach a document (PDF, Word, PowerPoint, Excel, CSV, Markdown, text)"
             aria-label="Attach a document"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-dim transition-colors hover:bg-inset hover:text-ink"
           >

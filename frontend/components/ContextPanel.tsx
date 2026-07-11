@@ -254,7 +254,7 @@ function MemoryTab() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.md,.markdown,.txt"
+        accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.md,.markdown,.txt"
         multiple
         className="hidden"
         onChange={(e) => handleFilesPicked(e.target.files)}

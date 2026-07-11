@@ -48,8 +48,9 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
         When you tell the agent something durable — a stakeholder&apos;s preferences, a decision
         and its rationale, how your team works — it saves a memory and uses it in every future
         conversation. Open the Memory panel (right side) to browse everything it knows. You can
-        also click &quot;Add from document&quot; there to upload a PDF, Word doc, markdown, or
-        text file: the agent reads it and turns the durable facts into memories.
+        also click &quot;Add from document&quot; there to upload a PDF, Word doc, PowerPoint,
+        Excel or CSV file, markdown, or text: the agent reads it and turns the durable
+        facts into memories.
       </>
     ),
   },
