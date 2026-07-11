@@ -22,6 +22,7 @@
         { "path": "$HOME/**" }
       ]
     },
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    "dialog:allow-save"
   ]
 }

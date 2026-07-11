@@ -37,6 +37,11 @@ dependencies = [
     # v0.3: PowerPoint + Excel upload ingestion (CSV/TSV use the stdlib).
     "python-pptx>=1.0",
     "openpyxl>=3.1",
+    # v0.3: document export — markdown → Word/PDF. Pure-Python by design:
+    # WeasyPrint-class engines need system cairo/pango we can't assume on a
+    # user's machine.
+    "mistune>=3.0",
+    "xhtml2pdf>=0.2.16",
 ]
 
 [project.optional-dependencies]

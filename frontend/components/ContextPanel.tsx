@@ -6,7 +6,7 @@ import { ExternalLink } from "@/components/ExternalLink";
 import { Chip, IconBtn, PixelIcon, PxLabel, Segmented, type PixelIconName } from "@/components/pm";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { isTauri, openLocalPath, revealInFolder } from "@/lib/desktop";
+import { isTauri, openLocalPath, revealInFolder, saveFileDialog } from "@/lib/desktop";
 import { useChatStore } from "@/lib/store";
 import { useUiStore } from "@/lib/uiStore";
 import type {
@@ -428,6 +428,9 @@ function formatUpdated(isoLike: string): string {
   }
 }
 
+type ExportFormat = "docx" | "pdf";
+type ExportStatus = "working" | "done" | "failed";
+
 function DocumentsTab() {
   const documents = useChatStore((s) => s.documents);
   const documentsLoadedAt = useChatStore((s) => s.documentsLoadedAt);
@@ -448,6 +451,55 @@ function DocumentsTab() {
   }, [documentsLoadedAt, setDocuments]);
 
   const grouped = useMemo(() => groupByBackend(documents), [documents]);
+
+  const [exportMenuFor, setExportMenuFor] = useState<string | null>(null);
+  const [exportStatus, setExportStatus] = useState<Record<string, ExportStatus>>({});
+
+  const clearStatus = (id: string, after: number) => {
+    setTimeout(() => {
+      setExportStatus((s) => {
+        const { [id]: _drop, ...rest } = s;
+        return rest;
+      });
+    }, after);
+  };
+
+  async function handleExport(d: DocumentArtifact, format: ExportFormat) {
+    setExportMenuFor(null);
+    const id = d.document_id;
+    setExportStatus((s) => ({ ...s, [id]: "working" }));
+    try {
+      if (desktop) {
+        const dest = await saveFileDialog(`${d.title}.${format}`, format);
+        if (!dest) {
+          // User cancelled the Save dialog — not an error.
+          setExportStatus((s) => {
+            const { [id]: _drop, ...rest } = s;
+            return rest;
+          });
+          return;
+        }
+        await api.exportDocumentToPath(id, format, dest);
+        void revealInFolder(dest);
+      } else {
+        const blob = await api.exportDocumentDownload(id, format);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${d.title}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+      setExportStatus((s) => ({ ...s, [id]: "done" }));
+      clearStatus(id, 2000);
+    } catch (err) {
+      console.error("[docs] export failed:", err);
+      setExportStatus((s) => ({ ...s, [id]: "failed" }));
+      clearStatus(id, 2500);
+    }
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto py-2.5">
@@ -486,31 +538,38 @@ function DocumentsTab() {
                     >
                       Open ↗
                     </ExternalLink>
-                  ) : desktop && d.file_path ? (
-                    <span className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => void openLocalPath(d.file_path as string)}
-                        className="rounded-[5px] border border-line bg-surface px-1.5 py-px text-[10.5px] font-semibold text-accent-text hover:bg-raised"
-                        title="Open in your default app"
-                      >
-                        Open
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void revealInFolder(d.file_path as string)}
-                        className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border border-line bg-surface text-ink-muted hover:bg-raised hover:text-ink"
-                        title="Show in Finder"
-                      >
-                        <PixelIcon name="folder" size={10} />
-                      </button>
-                    </span>
                   ) : (
-                    <span
-                      className="mt-[3px] shrink-0 font-mono text-[10px] text-ink-dim"
-                      title={d.file_path ?? undefined}
-                    >
-                      local
+                    <span className="flex shrink-0 items-center gap-1">
+                      {desktop && d.file_path && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void openLocalPath(d.file_path as string)}
+                            className="rounded-[5px] border border-line bg-surface px-1.5 py-px text-[10.5px] font-semibold text-accent-text hover:bg-raised"
+                            title="Open in your default app"
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void revealInFolder(d.file_path as string)}
+                            className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border border-line bg-surface text-ink-muted hover:bg-raised hover:text-ink"
+                            title="Show in Finder"
+                          >
+                            <PixelIcon name="folder" size={10} />
+                          </button>
+                        </>
+                      )}
+                      <ExportControl
+                        status={exportStatus[d.document_id]}
+                        menuOpen={exportMenuFor === d.document_id}
+                        onToggle={() =>
+                          setExportMenuFor((cur) =>
+                            cur === d.document_id ? null : d.document_id,
+                          )
+                        }
+                        onPick={(format) => void handleExport(d, format)}
+                      />
                     </span>
                   )}
                 </div>
@@ -520,6 +579,67 @@ function DocumentsTab() {
         })
       )}
     </div>
+  );
+}
+
+function ExportControl({
+  status,
+  menuOpen,
+  onToggle,
+  onPick,
+}: {
+  status?: ExportStatus;
+  menuOpen: boolean;
+  onToggle: () => void;
+  onPick: (format: ExportFormat) => void;
+}) {
+  const label =
+    status === "working"
+      ? "Exporting…"
+      : status === "done"
+        ? "Saved ✓"
+        : status === "failed"
+          ? "Failed"
+          : "Export";
+  return (
+    <span className="relative">
+      <button
+        type="button"
+        disabled={status === "working"}
+        onClick={onToggle}
+        className="rounded-[5px] border border-line bg-surface px-1.5 py-px text-[10.5px] font-semibold text-accent-text hover:bg-raised disabled:cursor-default disabled:opacity-60"
+        title="Export as Word or PDF"
+      >
+        {label}
+      </button>
+      {menuOpen && (
+        <>
+          {/* click-away layer */}
+          <button
+            type="button"
+            aria-label="Close export menu"
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={onToggle}
+          />
+          <div className="absolute right-0 top-[22px] z-20 w-[124px] rounded-[7px] border border-line bg-surface p-1 shadow-pop">
+            <button
+              type="button"
+              onClick={() => onPick("docx")}
+              className="block w-full rounded-[5px] px-2 py-1 text-left text-[11.5px] font-medium text-ink hover:bg-raised"
+            >
+              Word (.docx)
+            </button>
+            <button
+              type="button"
+              onClick={() => onPick("pdf")}
+              className="block w-full rounded-[5px] px-2 py-1 text-left text-[11.5px] font-medium text-ink hover:bg-raised"
+            >
+              PDF
+            </button>
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 

@@ -153,6 +153,42 @@ export const api = {
     return request<DocumentArtifact[]>(`/api/v1/documents${q}`);
   },
 
+  // Desktop export: the backend converts and writes straight to the path the
+  // user picked in the native Save dialog.
+  exportDocumentToPath: (documentId: string, format: "docx" | "pdf", destPath: string) =>
+    request<{ file_path: string }>(`/api/v1/documents/export`, {
+      method: "POST",
+      body: JSON.stringify({ document_id: documentId, format, dest_path: destPath }),
+    }),
+
+  // Web export: no dest_path → the converted bytes come back as a download.
+  // Raw fetch because request() JSON-parses every body.
+  exportDocumentDownload: async (
+    documentId: string,
+    format: "docx" | "pdf",
+  ): Promise<Blob> => {
+    const [base, token] = await Promise.all([getApiBase(), getBackendToken()]);
+    let res: Response;
+    try {
+      res = await fetch(`${base}/api/v1/documents/export`, {
+        method: "POST",
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "X-Momentum-Token": token } : {}),
+        },
+        body: JSON.stringify({ document_id: documentId, format }),
+      });
+    } catch (err) {
+      throw timeoutError(err, DEFAULT_TIMEOUT_MS) ?? err;
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(detailFromBody(text) || `${res.status} ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
   googleStatus: () =>
     request<GoogleStatus>(`/api/v1/integrations/google/status`),
   googleConnect: () =>

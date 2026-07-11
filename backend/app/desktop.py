@@ -128,6 +128,16 @@ def _selfcheck() -> int:
 
         assert googleapiclient.discovery.build is not None and Credentials is not None
 
+    def _doc_export() -> None:
+        # Full tiny conversions, not bare imports — xhtml2pdf/reportlab load
+        # fonts and data files at render time, exactly what a frozen build
+        # can silently omit.
+        from app.core.documents.export import export_markdown
+
+        sample = "# T\n\n| a | b |\n| - | - |\n| 1 | 2 |\n"
+        assert export_markdown(sample, "T", "docx")[:2] == b"PK"
+        assert export_markdown(sample, "T", "pdf")[:5] == b"%PDF-"
+
     try:
         check("cryptography Fernet round-trip", _crypto)
         check("trafilatura import + extract", _trafilatura)
@@ -138,6 +148,7 @@ def _selfcheck() -> int:
         check("openai SDK importable", _openai_sdk)
         check("anthropic SDK importable", _anthropic_sdk)
         check("google-api-python-client + oauth importable", _google_api_client)
+        check("markdown export (docx + pdf)", _doc_export)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
     print("selfcheck:", "PASS" if ok else "FAIL")

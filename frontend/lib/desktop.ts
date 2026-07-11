@@ -128,3 +128,29 @@ export async function revealInFolder(path: string): Promise<void> {
   if (!isTauri()) return;
   await invokeRaw("plugin:opener|reveal_item_in_dir", { path });
 }
+
+/**
+ * Native "Save As" dialog (desktop only). Returns the chosen absolute path,
+ * or null when the user cancels — or when we're in a browser, where callers
+ * fall back to a normal download. Raw invoke on purpose; see the note above
+ * invokeRaw for why the plugin npm packages are banned here.
+ */
+export async function saveFileDialog(
+  defaultName: string,
+  extension: string,
+): Promise<string | null> {
+  if (!isTauri()) return null;
+  try {
+    const path = await invokeRaw<string | null>("plugin:dialog|save", {
+      options: {
+        title: "Export document",
+        defaultPath: defaultName,
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+      },
+    });
+    return path ?? null;
+  } catch (err) {
+    console.error("[desktop] save dialog failed:", err);
+    return null;
+  }
+}
