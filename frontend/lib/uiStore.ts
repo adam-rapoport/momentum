@@ -5,7 +5,14 @@ import { api } from "@/lib/api";
 // store (lib/store.ts) so the WS/data layer stays untouched.
 
 export type ContextTab = "memory" | "documents";
-export type SettingsPane = "models" | "integrations" | "search" | "profile" | "help" | "about";
+export type SettingsPane =
+  | "models"
+  | "integrations"
+  | "search"
+  | "profile"
+  | "help"
+  | "whatsnew"
+  | "about";
 
 export interface UiProfile {
   display_name: string;
@@ -40,8 +47,12 @@ interface UiState {
   // Which Memory-pane categories are collapsed (keyed by memory type). Held in
   // the store so a collapse survives switching the Context panel's tabs.
   memoryCollapsed: Record<string, boolean>;
+  // True on the first launch after an update (version changed since the user
+  // last saw a "What's new" notice). Fresh installs never see it.
+  updateNotice: boolean;
 
   setContextPanelOpen: (open: boolean) => void;
+  dismissUpdateNotice: () => void;
   setContextTab: (tab: ContextTab) => void;
   toggleMemoryCategory: (type: string) => void;
   openSettings: (pane?: SettingsPane) => void;
@@ -54,6 +65,8 @@ interface UiState {
 }
 
 const PANEL_KEY = "pmom-context-open";
+const LAST_SEEN_VERSION_KEY = "pmom-last-seen-version";
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "";
 
 export const useUiStore = create<UiState>((set) => ({
   contextPanelOpen: true,
@@ -64,7 +77,16 @@ export const useUiStore = create<UiState>((set) => ({
   profile: null,
   queuedFirstMessage: null,
   memoryCollapsed: {},
+  updateNotice: false,
 
+  dismissUpdateNotice: () => {
+    set({ updateNotice: false });
+    try {
+      if (APP_VERSION) localStorage.setItem(LAST_SEEN_VERSION_KEY, APP_VERSION);
+    } catch {
+      // ignore
+    }
+  },
   setContextPanelOpen: (open) => {
     set({ contextPanelOpen: open });
     try {
@@ -101,6 +123,19 @@ export const useUiStore = create<UiState>((set) => ({
     try {
       const saved = localStorage.getItem(PANEL_KEY);
       if (saved !== null) set({ contextPanelOpen: saved === "1" });
+    } catch {
+      // ignore
+    }
+    try {
+      if (APP_VERSION) {
+        const seen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
+        if (seen === null) {
+          // Fresh install (or first run on this build) — nothing is "new".
+          localStorage.setItem(LAST_SEEN_VERSION_KEY, APP_VERSION);
+        } else if (seen !== APP_VERSION) {
+          set({ updateNotice: true });
+        }
+      }
     } catch {
       // ignore
     }

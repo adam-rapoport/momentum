@@ -9,6 +9,7 @@ import { IntegrationsPane } from "./IntegrationsPane";
 import { ModelsPane } from "./ModelsPane";
 import { ProfilePane } from "./ProfilePane";
 import { SearchPane } from "./SearchPane";
+import { WhatsNewPane } from "./WhatsNewPane";
 
 type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
 
@@ -18,6 +19,7 @@ const NAV: { key: SettingsPane; label: string; icon: PixelIconName }[] = [
   { key: "search", label: "Web search", icon: "globe" },
   { key: "profile", label: "Profile", icon: "user" },
   { key: "help", label: "How to use", icon: "doc" },
+  { key: "whatsnew", label: "What's new", icon: "sparkle" },
   { key: "about", label: "About", icon: "box" },
 ];
 
@@ -121,6 +123,7 @@ export function SettingsSheet() {
           {pane === "search" && <SearchPane connections={connections} onChanged={refresh} />}
           {pane === "profile" && <ProfilePane onChanged={refresh} />}
           {pane === "help" && <HelpPane />}
+          {pane === "whatsnew" && <WhatsNewPane />}
           {pane === "about" && <AboutPane />}
         </main>
       </div>

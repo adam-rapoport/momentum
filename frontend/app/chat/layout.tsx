@@ -5,6 +5,7 @@ import { BootGate } from "@/components/BootGate";
 import { ContextPanel } from "@/components/ContextPanel";
 import { SettingsSheet } from "@/components/settings/SettingsSheet";
 import { Sidebar } from "@/components/Sidebar";
+import { UpdateNotice } from "@/components/UpdateNotice";
 import { WsProvider } from "@/components/WsProvider";
 import { useUiStore } from "@/lib/uiStore";
 
@@ -44,6 +45,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           {contextPanelOpen && <ContextPanel />}
         </div>
         <SettingsSheet />
+        <UpdateNotice />
       </WsProvider>
     </BootGate>
   );
