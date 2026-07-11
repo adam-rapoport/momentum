@@ -172,26 +172,40 @@ fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell:
     Ok(())
 }
 
+/// Fire-and-forget OK-only info dialog — used for user-initiated updater
+/// feedback, where silence reads as "the button is broken" (Adam's chunk-3
+/// native pass, 2026-07-10).
+fn show_info_dialog(app: &AppHandle, title: &str, message: &str) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    app.dialog()
+        .message(message)
+        .title(title)
+        .kind(MessageDialogKind::Info)
+        .show(|_| {});
+}
+
 /// Check GitHub Releases for a newer signed build (release builds only) and,
-/// with the user's consent, install it and restart. Fully fail-quiet: an
-/// offline machine, a 404 (no release yet), or a bad signature only ever
-/// writes a log line — launch is never blocked and no error dialog is shown
-/// for a background check the user didn't ask for.
+/// with the user's consent, install it and restart. Background checks
+/// (`user_initiated: false` — startup + the 4h re-check) are fully
+/// fail-quiet: an offline machine, a 404 (no release yet), or a bad
+/// signature only ever writes a log line. A tray-menu "Check for updates…"
+/// (`user_initiated: true`) always answers with a dialog — up to date,
+/// unreachable, or the normal update prompt.
 #[cfg(not(debug_assertions))]
-fn spawn_update_check(app: &AppHandle) {
+fn spawn_update_check(app: &AppHandle, user_initiated: bool) {
     if UPDATE_CHECK_ACTIVE.swap(true, Ordering::SeqCst) {
         log::info!("[updater] check already in progress — skipping");
         return;
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_update_check(app).await;
+        run_update_check(app, user_initiated).await;
         UPDATE_CHECK_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
 
 #[cfg(not(debug_assertions))]
-async fn run_update_check(app: AppHandle) {
+async fn run_update_check(app: AppHandle, user_initiated: bool) {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     use tauri_plugin_updater::UpdaterExt;
 
@@ -200,6 +214,13 @@ async fn run_update_check(app: AppHandle) {
             Ok(u) => u,
             Err(e) => {
                 log::warn!("[updater] not available: {e}");
+                if user_initiated {
+                    show_info_dialog(
+                        &app,
+                        "Check for updates",
+                        "Update checking isn't available in this build.",
+                    );
+                }
                 return;
             }
         };
@@ -207,10 +228,26 @@ async fn run_update_check(app: AppHandle) {
             Ok(Some(u)) => u,
             Ok(None) => {
                 log::info!("[updater] up to date");
+                if user_initiated {
+                    let version = app.package_info().version.to_string();
+                    show_info_dialog(
+                        &app,
+                        "You're up to date",
+                        &format!("Momentum {version} is the latest version."),
+                    );
+                }
                 return;
             }
             Err(e) => {
                 log::info!("[updater] check skipped: {e}");
+                if user_initiated {
+                    show_info_dialog(
+                        &app,
+                        "Check for updates",
+                        "Couldn't reach the update server. Check your internet \
+                         connection and try again.",
+                    );
+                }
                 return;
             }
         };
@@ -391,9 +428,13 @@ pub fn run() {
                         }
                         "check-updates" => {
                             #[cfg(not(debug_assertions))]
-                            spawn_update_check(app);
+                            spawn_update_check(app, true);
                             #[cfg(debug_assertions)]
-                            log::info!("[updater] dev build — no update feed to check");
+                            show_info_dialog(
+                                app,
+                                "Check for updates",
+                                "This is a development build — there's no update feed to check.",
+                            );
                         }
                         "quit" => app.exit(0),
                         _ => {}
@@ -405,7 +446,7 @@ pub fn run() {
             // signed bundle to update). Runs in the background — the boot
             // screen and the update check never wait on each other.
             #[cfg(not(debug_assertions))]
-            spawn_update_check(app.handle());
+            spawn_update_check(app.handle(), false);
 
             // With close-to-hide the app can run for weeks without a relaunch,
             // and the updater used to check only at startup — re-check every
@@ -418,7 +459,7 @@ pub fn run() {
                     if EXITING.load(Ordering::SeqCst) {
                         break;
                     }
-                    spawn_update_check(&handle);
+                    spawn_update_check(&handle, false);
                 });
             }
 

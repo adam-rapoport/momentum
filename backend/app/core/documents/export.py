@@ -17,6 +17,7 @@ Known limits (fine for text-first business docs, revisit if users hit them):
 from __future__ import annotations
 
 import io
+import unicodedata
 from html import escape as html_escape
 
 import mistune
@@ -269,9 +270,78 @@ a { color: #0563C1; text-decoration: underline; }
 """
 
 
+# reportlab's base-14 fonts (Helvetica/Courier) cover only WinAnsi (cp1252);
+# anything outside renders as a black square. LLM-written markdown routinely
+# contains near-misses — U+2011 non-breaking hyphens inside compounds
+# ("mid‑market"), real minus signs, arrows, ≥/≤ — so map those to visually
+# equivalent WinAnsi text. En/em dashes, curly quotes, bullets and ellipses
+# are IN cp1252 and pass through untouched.
+_PDF_CHAR_FALLBACKS = {
+    "‐": "-",   # hyphen
+    "‑": "-",   # non-breaking hyphen (the "mid■market" bug, 2026-07-10)
+    "‒": "-",   # figure dash
+    "―": "—",  # horizontal bar → em dash
+    "−": "-",   # minus sign
+    "→": "->",
+    "←": "<-",
+    "↔": "<->",
+    "⇒": "=>",
+    "≤": "<=",
+    "≥": ">=",
+    "≠": "!=",
+    "≈": "~",
+    "≡": "=",
+    " ": " ",   # nbsp is in cp1252 but renders sturdier as a space
+    " ": " ",   # thin space
+    " ": " ",   # narrow no-break space
+    "​": "",    # zero-width space
+    "﻿": "",    # BOM / zero-width no-break
+    "✓": "v",   # ✓ — no glyph; a lowercase v reads as a check
+    "✔": "v",
+    "✗": "x",
+    "✘": "x",
+    "●": "•",  # ● → bullet
+    "◦": "•",  # ◦ → bullet
+    "■": "•",  # ■ → bullet
+    "▪": "•",
+    "★": "*",   # ★
+    "☆": "*",
+}
+
+
+def _pdf_safe(text: str) -> str:
+    out: list[str] = []
+    for ch in text:
+        mapped = _PDF_CHAR_FALLBACKS.get(ch)
+        if mapped is not None:
+            out.append(mapped)
+            continue
+        try:
+            ch.encode("cp1252")
+            out.append(ch)
+        except UnicodeEncodeError:
+            # Last resort: strip to a compatibility-decomposed base char
+            # (ﬁ → fi, ǎ → a). Anything still unmappable stays as-is — it
+            # renders as a box, same as before, rather than being dropped.
+            decomposed = unicodedata.normalize("NFKD", ch)
+            kept = "".join(c for c in decomposed if _cp1252_ok(c))
+            out.append(kept or ch)
+    return "".join(out)
+
+
+def _cp1252_ok(ch: str) -> bool:
+    try:
+        ch.encode("cp1252")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def _to_pdf(body: str, title: str) -> bytes:
     from xhtml2pdf import pisa
 
+    body = _pdf_safe(body)
+    title = _pdf_safe(title)
     # escape=True HTML-escapes any raw HTML in the markdown — predictable
     # output beats passing arbitrary tags into the PDF engine.
     render = mistune.create_markdown(escape=True, plugins=_MISTUNE_PLUGINS)

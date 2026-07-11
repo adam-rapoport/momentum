@@ -90,6 +90,29 @@ def test_unsupported_format_raises():
         export_markdown("body", "t", "rtf")
 
 
+def test_pdf_transliterates_non_winansi_glyphs():
+    """Adam's 2026-07-10 native-pass bug: LLM markdown carries U+2011
+    non-breaking hyphens ("mid‑market") and friends, which reportlab's
+    base-14 fonts render as black squares. They must come out as plain
+    equivalents — while en/em dashes (in cp1252) pass through untouched."""
+    pypdf = pytest.importorskip("pypdf")
+    md = (
+        "Growth was mid‑market focused: revenue −$3M → +$5M, "
+        "NPS ≥ 45 — a 100–500 seat segment."
+    )
+    data = export_markdown(md, "Range Check", "pdf")
+    text = "".join(p.extract_text() for p in pypdf.PdfReader(io.BytesIO(data)).pages)
+    assert "mid-market" in text
+    assert "-$3M" in text
+    assert "->" in text and ">=" in text
+    # cp1252-native punctuation is preserved, not flattened
+    assert "—" in text and "100–500" in text
+    # the docx path is untouched — real fonts have the real glyphs
+    docx = pytest.importorskip("docx")
+    doc = docx.Document(io.BytesIO(export_markdown(md, "Range Check", "docx")))
+    assert any("mid‑market" in p.text for p in doc.paragraphs)
+
+
 # ── endpoint (runs the real app against the migrated test DB) ──────────────
 
 API = "/api/v1/documents/export"
