@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "July 11, 2026",
+    title: "Scheduled tasks, exports & a menu-bar home",
+    highlights: [
+      "Scheduled tasks: save a prompt and a schedule — a morning briefing, a weekly digest — and Momentum runs it automatically, dropping results into your chat list marked ⏰. Skills work too, and anything send-like still waits for your approval.",
+      "Momentum now lives in your menu bar: closing the window keeps it running quietly (that's how scheduled tasks fire), and the Dock icon or the ≫ menu-bar icon brings it back. ⌘Q still quits completely.",
+      "Export any document as Word or PDF from the Documents panel — headings, tables, lists, and links all carry over.",
+      "Upload PowerPoint decks, Excel sheets, and CSV files everywhere you could already upload documents.",
+      "Check for updates any time from the menu-bar icon — and with the app running long-term, it now re-checks on its own every few hours.",
+      "This What's new panel: after each update, a one-time notice shows you what changed.",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "July 10, 2026",
     title: "20 new PM skills",
