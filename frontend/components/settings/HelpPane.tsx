@@ -61,7 +61,17 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
         When a skill produces a deliverable — a PRD, an update, release notes — it lands in the
         Documents panel. If you&apos;ve connected Google in Settings → Integrations, deliverables
         can be created as Google Docs you can share; otherwise they&apos;re saved as files on this
-        Mac.
+        Mac. Use a document&apos;s <em>Export</em> button to save a copy as Word or PDF.
+      </>
+    ),
+  },
+  {
+    title: "Closing vs quitting",
+    body: (
+      <>
+        Closing the window (red button) keeps Momentum running — it stays in the Dock and as a
+        ≫ icon in the menu bar, so reopening is instant. To fully quit, press ⌘Q or pick Quit
+        Momentum from the menu-bar icon; that stops everything, including the background engine.
       </>
     ),
   },

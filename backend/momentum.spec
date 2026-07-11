@@ -37,6 +37,11 @@ hiddenimports += collect_submodules("google.auth")
 hiddenimports += collect_submodules("google.oauth2")
 hiddenimports += collect_submodules("google.genai")
 hiddenimports += collect_submodules("googleapiclient")
+# reportlab (via xhtml2pdf, the v0.3 PDF exporter) loads its barcode widget
+# modules dynamically by name at import time — the frozen build's selfcheck
+# fails with ModuleNotFoundError: reportlab.graphics.barcode.code128 without
+# this. Collect the whole barcode subpackage; it's small.
+hiddenimports += collect_submodules("reportlab.graphics.barcode")
 # Our own package, so dynamically-referenced modules (tools, model clients,
 # skills loader) are all present in the frozen app.
 hiddenimports += collect_submodules("app")

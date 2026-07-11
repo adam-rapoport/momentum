@@ -88,5 +88,9 @@ Anyway** on first launch.
   backend. If another process holds port **8000** (e.g. a `uvicorn ... --reload`
   dev server), Momentum picks a free port automatically — but if the app still
   hangs, quit the other process and relaunch.
-- **Quitting:** use ⌘Q or close the window. The app shuts its backend down with
-  it — nothing is left running afterward.
+- **Closing vs quitting:** closing the window (red button) keeps Momentum
+  running in the background — it stays in the Dock and as a **≫ icon in the
+  menu bar**, so reopening is instant and scheduled work can keep running.
+  Click the Dock icon or the menu-bar icon to bring the window back. To fully
+  quit, press **⌘Q** or pick **Quit Momentum** from the menu-bar icon; that
+  shuts the backend down with it — nothing is left running afterward.

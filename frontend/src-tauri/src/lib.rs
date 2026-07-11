@@ -24,6 +24,11 @@ struct BackendPort(u16);
 /// True once the app has started exiting — a Terminated event caused by our
 /// own kill must not be reported as a crash (or trigger a respawn).
 static EXITING: AtomicBool = AtomicBool::new(false);
+/// Guards against stacked update prompts: the periodic re-check (see setup)
+/// or a tray-menu "Check for updates" could otherwise open a second dialog
+/// while one is already showing.
+#[cfg(not(debug_assertions))]
+static UPDATE_CHECK_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// Whether the single automatic respawn after an unexpected sidecar death has
 /// been used. One attempt only: a backend that dies twice is genuinely broken
 /// and respawn-looping it would just burn CPU and spam logs.
@@ -174,11 +179,23 @@ fn spawn_backend(app: &AppHandle, token: &str) -> Result<(), tauri_plugin_shell:
 /// for a background check the user didn't ask for.
 #[cfg(not(debug_assertions))]
 fn spawn_update_check(app: &AppHandle) {
+    if UPDATE_CHECK_ACTIVE.swap(true, Ordering::SeqCst) {
+        log::info!("[updater] check already in progress — skipping");
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        run_update_check(app).await;
+        UPDATE_CHECK_ACTIVE.store(false, Ordering::SeqCst);
+    });
+}
+
+#[cfg(not(debug_assertions))]
+async fn run_update_check(app: AppHandle) {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     use tauri_plugin_updater::UpdaterExt;
 
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    {
         let updater = match app.updater() {
             Ok(u) => u,
             Err(e) => {
@@ -256,7 +273,17 @@ fn spawn_update_check(app: &AppHandle) {
             }
             Err(e) => log::error!("[updater] install failed: {e}"),
         }
-    });
+    }
+}
+
+/// Bring the (possibly hidden) main window back — used by the Dock icon's
+/// "reopen" event and the tray menu.
+fn show_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
 }
 
 /// Terminate the backend sidecar AND its child worker. The PyInstaller one-file
@@ -291,6 +318,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![get_backend_token, get_backend_port, open_external])
+        // Mac-native close (v0.3): the red button HIDES the window instead of
+        // quitting. Momentum stays in the Dock and the menu bar; ⌘Q or the
+        // tray's Quit does a real exit (the RunEvent handler below kills the
+        // backend). The hidden webview keeps running, so reopening is instant
+        // — and the backend stays up for scheduled tasks.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .setup(move |app| {
             // File logging in RELEASE builds too (~/Library/Logs/<identifier>/):
             // the sidecar's stdout/stderr and shell events are only observable
@@ -311,11 +349,78 @@ pub fn run() {
 
             spawn_backend(app.handle(), &token)?;
 
+            // Menu-bar (tray) icon with the app's quick actions. Template
+            // image → macOS recolors it for light/dark menu bars itself.
+            {
+                use tauri::image::Image;
+                use tauri::menu::{MenuBuilder, MenuItemBuilder};
+                use tauri::tray::TrayIconBuilder;
+
+                let open = MenuItemBuilder::with_id("open", "Open Momentum").build(app)?;
+                let new_chat = MenuItemBuilder::with_id("new-chat", "New chat").build(app)?;
+                let check =
+                    MenuItemBuilder::with_id("check-updates", "Check for updates…").build(app)?;
+                let quit = MenuItemBuilder::with_id("quit", "Quit Momentum").build(app)?;
+                let menu = MenuBuilder::new(app)
+                    .item(&open)
+                    .item(&new_chat)
+                    .separator()
+                    .item(&check)
+                    .separator()
+                    .item(&quit)
+                    .build()?;
+                TrayIconBuilder::with_id("main-tray")
+                    .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+                    .icon_as_template(true)
+                    .tooltip("Momentum")
+                    .menu(&menu)
+                    .show_menu_on_left_click(true)
+                    .on_menu_event(|app, event| match event.id().as_ref() {
+                        "open" => show_main_window(app),
+                        "new-chat" => {
+                            show_main_window(app);
+                            // Reuse the app's own ⌘N handler (app/chat/layout.tsx):
+                            // pure client-side routing, no asset-protocol fetch —
+                            // the safe kind of webview poke (links-bug lesson).
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.eval(
+                                    "window.dispatchEvent(new KeyboardEvent('keydown', \
+                                     {key: 'n', metaKey: true}))",
+                                );
+                            }
+                        }
+                        "check-updates" => {
+                            #[cfg(not(debug_assertions))]
+                            spawn_update_check(app);
+                            #[cfg(debug_assertions)]
+                            log::info!("[updater] dev build — no update feed to check");
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
+                    })
+                    .build(app)?;
+            }
+
             // Ask-first self-update (release builds only; dev builds have no
             // signed bundle to update). Runs in the background — the boot
             // screen and the update check never wait on each other.
             #[cfg(not(debug_assertions))]
             spawn_update_check(app.handle());
+
+            // With close-to-hide the app can run for weeks without a relaunch,
+            // and the updater used to check only at startup — re-check every
+            // few hours so updates still reach long-running instances.
+            #[cfg(not(debug_assertions))]
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(4 * 60 * 60));
+                    if EXITING.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    spawn_update_check(&handle);
+                });
+            }
 
             // The window is shown immediately (tauri.conf.json `visible: true`) so
             // the user sees the web app's "Starting Momentum…" loading screen right
@@ -327,22 +432,30 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // Kill the backend (and its worker child) whenever the app is exiting,
-            // so no orphaned Python process keeps port 8000 bound. Handle both the
-            // request and the final exit to be robust to how the quit was triggered.
-            if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
-                // Flag first so the Terminated event from our own kill isn't
-                // treated as a crash; the swap also makes the kill idempotent
-                // when both ExitRequested and Exit fire.
-                if !EXITING.swap(true, Ordering::SeqCst) {
-                    eprintln!("[tauri] app exiting — terminating backend subtree");
-                    if let Some(pid) = app_handle.try_state::<BackendPid>() {
-                        let pid = *pid.0.lock().unwrap();
-                        if pid != 0 {
-                            terminate_backend(pid);
+            match event {
+                // Dock-icon click while the window is hidden (macOS "reopen") —
+                // bring the main window back.
+                #[cfg(target_os = "macos")]
+                RunEvent::Reopen { .. } => show_main_window(app_handle),
+                // Kill the backend (and its worker child) whenever the app is
+                // exiting, so no orphaned Python process keeps port 8000 bound.
+                // Handle both the request and the final exit to be robust to
+                // how the quit was triggered.
+                RunEvent::ExitRequested { .. } | RunEvent::Exit => {
+                    // Flag first so the Terminated event from our own kill isn't
+                    // treated as a crash; the swap also makes the kill idempotent
+                    // when both ExitRequested and Exit fire.
+                    if !EXITING.swap(true, Ordering::SeqCst) {
+                        eprintln!("[tauri] app exiting — terminating backend subtree");
+                        if let Some(pid) = app_handle.try_state::<BackendPid>() {
+                            let pid = *pid.0.lock().unwrap();
+                            if pid != 0 {
+                                terminate_backend(pid);
+                            }
                         }
                     }
                 }
+                _ => {}
             }
         });
 }
