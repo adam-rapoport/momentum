@@ -275,6 +275,12 @@ export function Sidebar() {
           New chat
           <span className="ml-auto font-mono text-[11px] opacity-70">⌘N</span>
         </Btn>
+        {/* Quiet secondary entry point (Adam's call: visible, but not New-chat
+            prominent) — same screen as Settings → Scheduled tasks. */}
+        <Btn onClick={() => openSettings("scheduled")} className="w-full !justify-start gap-[9px]">
+          <PixelIcon name="clock" size={12} />
+          Scheduled tasks
+        </Btn>
         <div className="relative">
           <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-dim">
             <PixelIcon name="search" size={11} />
