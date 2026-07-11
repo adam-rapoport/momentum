@@ -6,6 +6,7 @@ from app.models.session import Session
 from app.models.message import Message
 from app.models.memory_record import MemoryRecord
 from app.models.integration import Integration
+from app.models.scheduled_task import ScheduledTask
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "Message",
     "MemoryRecord",
     "Integration",
+    "ScheduledTask",
 ]

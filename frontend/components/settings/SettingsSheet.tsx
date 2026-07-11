@@ -8,6 +8,7 @@ import { HelpPane } from "./HelpPane";
 import { IntegrationsPane } from "./IntegrationsPane";
 import { ModelsPane } from "./ModelsPane";
 import { ProfilePane } from "./ProfilePane";
+import { SchedulePane } from "./SchedulePane";
 import { SearchPane } from "./SearchPane";
 import { WhatsNewPane } from "./WhatsNewPane";
 
@@ -17,6 +18,7 @@ const NAV: { key: SettingsPane; label: string; icon: PixelIconName }[] = [
   { key: "models", label: "Models", icon: "bolt" },
   { key: "integrations", label: "Integrations", icon: "plug" },
   { key: "search", label: "Web search", icon: "globe" },
+  { key: "scheduled", label: "Scheduled tasks", icon: "clock" },
   { key: "profile", label: "Profile", icon: "user" },
   { key: "help", label: "How to use", icon: "doc" },
   { key: "whatsnew", label: "What's new", icon: "sparkle" },
@@ -121,6 +123,7 @@ export function SettingsSheet() {
           {pane === "models" && <ModelsPane connections={connections} onChanged={refresh} />}
           {pane === "integrations" && <IntegrationsPane />}
           {pane === "search" && <SearchPane connections={connections} onChanged={refresh} />}
+          {pane === "scheduled" && <SchedulePane />}
           {pane === "profile" && <ProfilePane onChanged={refresh} />}
           {pane === "help" && <HelpPane />}
           {pane === "whatsnew" && <WhatsNewPane />}

@@ -198,3 +198,24 @@ export interface DocumentArtifact {
   google_doc_id: string | null;
   file_path: string | null;
 }
+
+export interface ScheduleSpec {
+  kind: "daily" | "weekdays" | "weekly" | "every_n_hours";
+  time?: string; // "HH:MM" local wall clock (daily/weekdays/weekly)
+  weekday?: number; // 0=Monday (weekly)
+  every_hours?: number; // every_n_hours
+}
+
+export interface ScheduledTaskRecord {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule: ScheduleSpec;
+  enabled: boolean;
+  catch_up_missed: boolean;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_status: string | null;
+  last_session_id: string | null;
+  created_at: string;
+}

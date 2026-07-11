@@ -154,6 +154,20 @@ export function Sidebar() {
       .catch((err) => console.error("failed to load sessions:", err));
   }, [setSessions]);
 
+  // Scheduled tasks finish in the background — often while the window is
+  // hidden in the menu bar — so refetch when the window regains focus and
+  // their ⏰ sessions appear without a manual reload.
+  useEffect(() => {
+    function onFocus() {
+      api
+        .listSessions()
+        .then(setSessions)
+        .catch(() => undefined);
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [setSessions]);
+
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);

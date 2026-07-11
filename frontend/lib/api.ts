@@ -3,6 +3,8 @@ import type {
   DocumentArtifact,
   MemoryRecordDetail,
   MemoryRecordSummary,
+  ScheduledTaskRecord,
+  ScheduleSpec,
   Session,
   SessionDetail,
 } from "./types";
@@ -188,6 +190,39 @@ export const api = {
     }
     return res.blob();
   },
+
+  // ── v0.3 scheduled tasks ──
+  listScheduledTasks: () => request<ScheduledTaskRecord[]>(`/api/v1/scheduled-tasks`),
+  createScheduledTask: (body: {
+    name: string;
+    prompt: string;
+    schedule: ScheduleSpec;
+    catch_up_missed?: boolean;
+  }) =>
+    request<ScheduledTaskRecord>(`/api/v1/scheduled-tasks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateScheduledTask: (
+    id: string,
+    body: Partial<{
+      name: string;
+      prompt: string;
+      schedule: ScheduleSpec;
+      enabled: boolean;
+      catch_up_missed: boolean;
+    }>,
+  ) =>
+    request<ScheduledTaskRecord>(`/api/v1/scheduled-tasks/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteScheduledTask: (id: string) =>
+    request<void>(`/api/v1/scheduled-tasks/${id}`, { method: "DELETE" }),
+  runScheduledTaskNow: (id: string) =>
+    request<{ status: string }>(`/api/v1/scheduled-tasks/${id}/run-now`, {
+      method: "POST",
+    }),
 
   googleStatus: () =>
     request<GoogleStatus>(`/api/v1/integrations/google/status`),

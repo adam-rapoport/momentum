@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
@@ -97,7 +97,16 @@ async def lifespan(app: FastAPI):
             logger.info("startup: refreshed/checked %d Google integration(s)", processed)
     except Exception as e:  # noqa: BLE001 — startup must not fail on a refresh hiccup
         logger.warning("startup Google token refresh pass skipped: %s", e)
+    # v0.3 scheduled tasks: the app's first long-running background loop.
+    # Started last so it ticks against a migrated, seeded DB; its immediate
+    # first tick is what runs tasks missed while the app was closed.
+    from app.core.scheduler import scheduler_loop
+
+    scheduler_task = asyncio.create_task(scheduler_loop())
     yield
+    scheduler_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await scheduler_task
     await engine.dispose()
 
 

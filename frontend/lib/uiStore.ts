@@ -9,6 +9,7 @@ export type SettingsPane =
   | "models"
   | "integrations"
   | "search"
+  | "scheduled"
   | "profile"
   | "help"
   | "whatsnew"

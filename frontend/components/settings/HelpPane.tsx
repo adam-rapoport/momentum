@@ -66,6 +66,18 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     ),
   },
   {
+    title: "Scheduled tasks",
+    body: (
+      <>
+        In Settings → Scheduled tasks you can save a prompt and a schedule — a morning
+        briefing, a weekly digest — and Momentum runs it automatically while the app is
+        running (including in the menu bar with the window closed). Each run lands in your
+        chat list marked ⏰. Sends still wait for your approval, and runs use your API keys
+        like any other chat.
+      </>
+    ),
+  },
+  {
     title: "Closing vs quitting",
     body: (
       <>
