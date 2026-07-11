@@ -138,6 +138,30 @@ def _selfcheck() -> int:
         assert export_markdown(sample, "T", "docx")[:2] == b"PK"
         assert export_markdown(sample, "T", "pdf")[:5] == b"%PDF-"
 
+    def _office_ingest() -> None:
+        # v0.3 upload formats. These imports are function-local in ingest.py,
+        # so a requirements-desktop.lock drift would otherwise surface only
+        # when a user uploads a file (the 2026-07-11 v0.3.0 CI failure was
+        # exactly this class of miss, caught for mistune by _doc_export).
+        import io
+
+        from openpyxl import Workbook
+
+        from app.core.ingest import parse_upload
+
+        workbook = Workbook()
+        workbook.active.append(["a", 1])
+        buf = io.BytesIO()
+        workbook.save(buf)
+        assert "a | 1" in parse_upload("t.xlsx", buf.getvalue()).text
+
+        from pptx import Presentation
+
+        deck = Presentation()
+        pbuf = io.BytesIO()
+        deck.save(pbuf)
+        parse_upload("t.pptx", pbuf.getvalue())  # empty deck parses cleanly
+
     try:
         check("cryptography Fernet round-trip", _crypto)
         check("trafilatura import + extract", _trafilatura)
@@ -149,6 +173,7 @@ def _selfcheck() -> int:
         check("anthropic SDK importable", _anthropic_sdk)
         check("google-api-python-client + oauth importable", _google_api_client)
         check("markdown export (docx + pdf)", _doc_export)
+        check("office ingest (pptx + xlsx)", _office_ingest)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
     print("selfcheck:", "PASS" if ok else "FAIL")
