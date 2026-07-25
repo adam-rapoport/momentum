@@ -2,7 +2,7 @@
 name = "app"
 # Keep in sync with tauri.conf.json (the source of truth for the app version),
 # backend/pyproject.toml and frontend/package.json.
-version = "0.3.0"
+version = "0.3.1"
 description = "Momentum desktop shell — Tauri 2 wrapper around the Next.js UI and the Python backend sidecar"
 authors = ["Adam Rapoport"]
 license = "MIT"

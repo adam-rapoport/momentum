@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.1",
+    date: "July 24, 2026",
+    title: "New models: Gemini 3.6 Flash & Claude Opus 5",
+    highlights: [
+      "Gemini 3.6 Flash — Google's newest fast model, with a free tier — is available in the model picker, via Google or OpenRouter.",
+      "Claude Opus 5 — Anthropic's most capable model — joins the picker too, via Anthropic or OpenRouter, at the same price as Opus 4.8.",
+      "Long Claude answers no longer risk getting cut off mid-thought.",
+      "Cost estimates refreshed against every provider's current price list, so the per-session cost display is accurate again.",
+      "Qwen3 32B was retired from the picker — Groq shut it down upstream; Qwen 3.6 27B is its successor and remains available.",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "July 11, 2026",
     title: "Scheduled tasks, exports & a menu-bar home",
