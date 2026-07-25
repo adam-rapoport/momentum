@@ -50,6 +50,9 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # exact 3.5/3.1-lite rates weren't published at time of writing, so these
     # mirror the equivalent 2.5 flash tiers as a close estimate for display.
     "gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    # Gemini 3.6 Flash per ai.google.dev/gemini-api/docs/pricing (2026-07-24);
+    # free-tier usage is $0.
+    "gemini-3.6-flash": ModelPricing("1.50", "7.50"),
     "gemini-3.1-flash-lite": ModelPricing("0.10", "0.40"),
     "gemini-2.5-pro": ModelPricing("2.50", "15.00"),
     "gemini-2.5-flash": ModelPricing("0.30", "2.50"),
@@ -75,12 +78,17 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # sessions that used it still display a cost.
     "claude-sonnet-4-6": ModelPricing("3.00", "15.00"),
     "claude-opus-4-8": ModelPricing("5.00", "25.00"),
+    # Opus 5 launched at the same rates as Opus 4.8 (platform.claude.com).
+    "claude-opus-5": ModelPricing("5.00", "25.00"),
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
     "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
     "anthropic/claude-haiku-4.5": ModelPricing("1.00", "5.00"),
     "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    # Rates live-verified against openrouter.ai/api/v1/models (2026-07-24).
+    "google/gemini-3.6-flash": ModelPricing("1.50", "7.50"),
+    "anthropic/claude-opus-5": ModelPricing("5.00", "25.00"),
     "anthropic/claude-sonnet-5": ModelPricing("3.00", "15.00"),
     # Retired from the picker (superseded by Sonnet 5) but kept for old sessions.
     "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),

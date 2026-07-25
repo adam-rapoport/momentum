@@ -39,7 +39,10 @@ except ImportError:  # pragma: no cover - exercised only without the SDK
     anthropic = None  # type: ignore[assignment]
     _ANTHROPIC_AVAILABLE = False
 
-MAX_TOKENS = 8192
+# max_tokens caps thinking + visible text together on Opus 5 (thinking is on
+# by default there), so 8192 risked truncated answers; every current Claude
+# model supports >=64k output, and unused budget costs nothing.
+MAX_TOKENS = 16000
 
 # Anthropic stop_reason -> the plain strings the rest of the app expects
 # (mirrors what the OpenAI-compat clients emit).
