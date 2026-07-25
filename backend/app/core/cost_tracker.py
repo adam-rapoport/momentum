@@ -31,10 +31,13 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "llama-3.1-8b-instant": ModelPricing("0.05", "0.08"),
     # Llama 4 Scout is our Sprint 2 default after the model hedge.
     "meta-llama/llama-4-scout-17b-16e-instruct": ModelPricing("0.11", "0.34"),
+    # Retired upstream (gone from Groq /v1/models by 2026-07-24); kept so old
+    # sessions still display a cost.
     "qwen/qwen3-32b": ModelPricing("0.29", "0.59"),
-    "qwen/qwen3.6-27b": ModelPricing("0.29", "0.59"),
-    "openai/gpt-oss-120b": ModelPricing("0.15", "0.75"),
-    "openai/gpt-oss-20b": ModelPricing("0.10", "0.50"),
+    # Rates below per groq.com/pricing, 2026-07-24.
+    "qwen/qwen3.6-27b": ModelPricing("0.60", "3.00"),
+    "openai/gpt-oss-120b": ModelPricing("0.15", "0.60"),
+    "openai/gpt-oss-20b": ModelPricing("0.075", "0.30"),
 
     # --- Google AI Studio ---
     # Sprint 4 "heavy" model. Free-tier is $0/$0; paid is $0.50/$3.00.
@@ -44,16 +47,17 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gemma-4-26b-a4b-it": ModelPricing("0", "0"),
     # Other plausible heavy-slot alternates; pricing is the paid-tier rate,
     # free-tier usage simply evaluates to $0 per the Google docs.
-    "gemini-3.1-pro-preview": ModelPricing("4.00", "18.00"),
-    "gemini-3.1-pro-preview-customtools": ModelPricing("4.00", "18.00"),
-    # Current Gemini 3.x flash tier (paid rates; free-tier usage is $0). The
-    # exact 3.5/3.1-lite rates weren't published at time of writing, so these
-    # mirror the equivalent 2.5 flash tiers as a close estimate for display.
-    "gemini-3.5-flash": ModelPricing("0.30", "2.50"),
+    # Base ≤200k-token rate; >200k-token turns bill tiered $4.00/$18.00.
+    "gemini-3.1-pro-preview": ModelPricing("2.00", "12.00"),
+    "gemini-3.1-pro-preview-customtools": ModelPricing("2.00", "12.00"),
+    # Current Gemini 3.x flash tier (paid rates; free-tier usage is $0), per
+    # ai.google.dev/gemini-api/docs/pricing 2026-07-24 — the June values were
+    # estimates recorded before Google published real 3.5/3.1-lite rates.
+    "gemini-3.5-flash": ModelPricing("1.50", "9.00"),
     # Gemini 3.6 Flash per ai.google.dev/gemini-api/docs/pricing (2026-07-24);
     # free-tier usage is $0.
     "gemini-3.6-flash": ModelPricing("1.50", "7.50"),
-    "gemini-3.1-flash-lite": ModelPricing("0.10", "0.40"),
+    "gemini-3.1-flash-lite": ModelPricing("0.25", "1.50"),
     "gemini-2.5-pro": ModelPricing("2.50", "15.00"),
     "gemini-2.5-flash": ModelPricing("0.30", "2.50"),
     "gemini-2.5-flash-lite": ModelPricing("0.10", "0.40"),
@@ -83,31 +87,36 @@ GROQ_PRICING: dict[str, ModelPricing] = {
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
+    # Rates re-verified against openrouter.ai/api/v1/models, 2026-07-24.
     "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
     "anthropic/claude-haiku-4.5": ModelPricing("1.00", "5.00"),
-    "google/gemini-3.5-flash": ModelPricing("0.30", "2.50"),
-    # Rates live-verified against openrouter.ai/api/v1/models (2026-07-24).
+    "google/gemini-3.5-flash": ModelPricing("1.50", "9.00"),
     "google/gemini-3.6-flash": ModelPricing("1.50", "7.50"),
     "anthropic/claude-opus-5": ModelPricing("5.00", "25.00"),
+    # Sticker price — OpenRouter currently passes through Anthropic's $2/$10
+    # intro discount (through 2026-08-31); recorded at sticker to match the
+    # native claude-sonnet-5 entry above.
     "anthropic/claude-sonnet-5": ModelPricing("3.00", "15.00"),
     # Retired from the picker (superseded by Sonnet 5) but kept for old sessions.
     "anthropic/claude-sonnet-4.6": ModelPricing("3.00", "15.00"),
     "openai/gpt-5": ModelPricing("1.25", "10.00"),
-    "deepseek/deepseek-chat-v3.1": ModelPricing("0.21", "0.79"),
+    "deepseek/deepseek-chat-v3.1": ModelPricing("0.25", "0.95"),
     "deepseek/deepseek-r1": ModelPricing("0.70", "2.50"),
-    "deepseek/deepseek-v4-flash": ModelPricing("0.09", "0.18"),
-    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
-    # Z.ai GLM + MiniMax via OpenRouter (rates per openrouter.ai/models,
-    # 2026-06-29). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
+    "deepseek/deepseek-v4-flash": ModelPricing("0.094", "0.188"),
+    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.13", "0.40"),
+    # Z.ai GLM + MiniMax via OpenRouter (rates per the openrouter.ai catalog,
+    # 2026-07-24). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
     # $0.60/$2.40); free-tier-style discounts just display a lower cost.
-    "z-ai/glm-5.2": ModelPricing("0.95", "3.00"),
-    "z-ai/glm-5": ModelPricing("0.60", "1.92"),
+    "z-ai/glm-5.2": ModelPricing("0.77", "2.41"),
+    "z-ai/glm-5": ModelPricing("0.95", "2.55"),
     "minimax/minimax-m3": ModelPricing("0.30", "1.20"),
 
-    # --- Mistral (per mistral.ai pricing; estimates — free tier is $0) ---
-    "mistral-small-latest": ModelPricing("0.10", "0.30"),
-    "mistral-medium-latest": ModelPricing("0.40", "2.00"),
-    "mistral-large-latest": ModelPricing("2.00", "6.00"),
+    # --- Mistral (per mistral.ai/pricing/api, 2026-07-24 — free tier is $0.
+    # Large 3 really is priced below Medium 3.5 now: Medium 3.5 is Mistral's
+    # newer, stronger flagship) ---
+    "mistral-small-latest": ModelPricing("0.15", "0.60"),
+    "mistral-medium-latest": ModelPricing("1.50", "7.50"),
+    "mistral-large-latest": ModelPricing("0.50", "1.50"),
 }
 
 _MILLION = Decimal("1000000")

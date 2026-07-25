@@ -52,7 +52,8 @@ class ModelEntry:
 # a Groq model: Groq's free tier ~6k tokens/min cap is smaller than the app's
 # per-turn context, so every Groq free turn 429s (see app.config.groq_model).
 # Groq models remain here and stay user-selectable (good on a paid Groq tier).
-# Model IDs below were re-verified against Groq's live /v1/models (2026-06-28).
+# Model IDs below were re-verified against Groq's live /v1/models (2026-07-24;
+# Qwen3 32B removed then — Groq retired it, qwen3.6-27b is its successor).
 REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
     ModelEntry(
@@ -71,14 +72,6 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Llama 3.3 70B (Groq)",
         role="either",
         notes="Larger Llama — stronger for drafting, still fast and free on Groq.",
-    ),
-    ModelEntry(
-        id="qwen/qwen3-32b",
-        context_window=131_072,
-        provider="groq",
-        display_name="Qwen3 32B (Groq)",
-        role="either",
-        notes="Capable mid-size open model, free on Groq. Strong all-rounder with tool use.",
     ),
     ModelEntry(
         id="qwen/qwen3.6-27b",
