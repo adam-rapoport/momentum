@@ -8,6 +8,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import settings
 from app.core import scheduler
@@ -22,6 +23,23 @@ LA = ZoneInfo("America/Los_Angeles")
 @pytest.fixture(autouse=True)
 def _fixed_tz(monkeypatch):
     monkeypatch.setattr(settings, "user_timezone", "America/Los_Angeles")
+
+
+@pytest.fixture
+async def loop_local_sessions(test_engine, monkeypatch):
+    """Bind the scheduler's own DB sessions to this test's engine.
+
+    run_task_now/tick open sessions via the app-global SessionLocal, whose
+    engine pools asyncpg connections across event loops — so on Postgres a
+    connection pooled by one test resurfaces in the next test's loop and
+    dies with "attached to a different loop". The function-scoped NullPool
+    test_engine keeps every connection on the current test's loop.
+    """
+    monkeypatch.setattr(
+        scheduler,
+        "SessionLocal",
+        async_sessionmaker(test_engine, expire_on_commit=False, class_=AsyncSession),
+    )
 
 
 def _la(y, m, d, hh, mm) -> datetime:
@@ -99,7 +117,7 @@ def _stub_engine(events):
     return fake_process_message
 
 
-async def test_run_task_now_persists_a_tagged_session(db, monkeypatch):
+async def test_run_task_now_persists_a_tagged_session(db, monkeypatch, loop_local_sessions):
     _user, project = await _default_ids(db)
     task = _make_task(project.id)
     task_id = task.id
@@ -129,7 +147,7 @@ async def test_run_task_now_persists_a_tagged_session(db, monkeypatch):
     assert chat.session_metadata["task_id"] == str(task_id)
 
 
-async def test_run_task_now_records_engine_failure(db, monkeypatch):
+async def test_run_task_now_records_engine_failure(db, monkeypatch, loop_local_sessions):
     _user, project = await _default_ids(db)
     task = _make_task(project.id)
     task_id = task.id
@@ -151,7 +169,7 @@ async def test_run_task_now_records_engine_failure(db, monkeypatch):
     assert fresh.next_run_at > datetime.now(timezone.utc)
 
 
-async def test_tick_skips_long_missed_run_when_catch_up_off(db, monkeypatch):
+async def test_tick_skips_long_missed_run_when_catch_up_off(db, monkeypatch, loop_local_sessions):
     _user, project = await _default_ids(db)
     task = _make_task(
         project.id,
@@ -178,7 +196,7 @@ async def test_tick_skips_long_missed_run_when_catch_up_off(db, monkeypatch):
     assert fresh.next_run_at > datetime.now(timezone.utc)
 
 
-async def test_tick_catches_up_missed_run_by_default(db, monkeypatch):
+async def test_tick_catches_up_missed_run_by_default(db, monkeypatch, loop_local_sessions):
     _user, project = await _default_ids(db)
     task = _make_task(
         project.id,
@@ -201,7 +219,7 @@ async def test_tick_catches_up_missed_run_by_default(db, monkeypatch):
     assert called == [(task_id, True)]  # marked late
 
 
-async def test_tick_runs_freshly_due_task_within_grace(db, monkeypatch):
+async def test_tick_runs_freshly_due_task_within_grace(db, monkeypatch, loop_local_sessions):
     """A run that came due seconds ago is normal tick jitter, not a miss —
     it runs even with catch-up off."""
     _user, project = await _default_ids(db)
@@ -227,7 +245,7 @@ async def test_tick_runs_freshly_due_task_within_grace(db, monkeypatch):
     assert called == [(task_id, False)]
 
 
-async def test_tick_ignores_disabled_tasks(db, monkeypatch):
+async def test_tick_ignores_disabled_tasks(db, monkeypatch, loop_local_sessions):
     _user, project = await _default_ids(db)
     task = _make_task(project.id, enabled=False)
     db.add(task)
