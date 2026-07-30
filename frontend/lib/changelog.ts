@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.2",
+    date: "July 29, 2026",
+    title: "New models: GPT-5.4/5.5/5.6, Kimi K3 & Claude Fable 5",
+    highlights: [
+      "OpenAI's newest generations join the picker: GPT-5.4 (plus mini and nano), GPT-5.5, and the GPT-5.6 trio — Luna (fast), Terra (balanced), and Sol (flagship). All on your OpenAI key.",
+      "Claude Fable 5 — Anthropic's new top model tier, above Opus — is available via Anthropic or OpenRouter.",
+      "Kimi K3 — Moonshot's flagship, with a 1M-token context window — is available via OpenRouter.",
+      "As always, every model can serve either the everyday or the heavy-drafting slot; the labels are just suggestions.",
+    ],
+  },
+  {
     version: "0.3.1",
     date: "July 24, 2026",
     title: "New models: Gemini 3.6 Flash & Claude Opus 5",
