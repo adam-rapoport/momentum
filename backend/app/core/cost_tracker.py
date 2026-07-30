@@ -69,6 +69,18 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gpt-5-mini": ModelPricing("0.25", "2.00"),
     "gpt-5-nano": ModelPricing("0.05", "0.40"),
     "gpt-5-pro": ModelPricing("15.00", "120.00"),
+    # GPT-5.4/5.5/5.6 generations per developers.openai.com/api/docs/pricing
+    # (2026-07-29) — standard-tier, short-context (<=272k) rates; longer
+    # inputs bill a higher tier we don't model. NOTE: OpenRouter's catalog
+    # shows batch/flex rates for some 5.6 tiers — these are the native
+    # standard rates, deliberately different from what OpenRouter displays.
+    "gpt-5.4": ModelPricing("2.50", "15.00"),
+    "gpt-5.4-mini": ModelPricing("0.75", "4.50"),
+    "gpt-5.4-nano": ModelPricing("0.20", "1.25"),
+    "gpt-5.5": ModelPricing("5.00", "30.00"),
+    "gpt-5.6-luna": ModelPricing("1.00", "6.00"),
+    "gpt-5.6-terra": ModelPricing("2.50", "15.00"),
+    "gpt-5.6-sol": ModelPricing("5.00", "30.00"),
     # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
@@ -84,6 +96,9 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "claude-opus-4-8": ModelPricing("5.00", "25.00"),
     # Opus 5 launched at the same rates as Opus 4.8 (platform.claude.com).
     "claude-opus-5": ModelPricing("5.00", "25.00"),
+    # Fable 5 — Anthropic's premium tier above Opus (platform.claude.com,
+    # 2026-07-29).
+    "claude-fable-5": ModelPricing("10.00", "50.00"),
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
@@ -93,6 +108,9 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "google/gemini-3.5-flash": ModelPricing("1.50", "9.00"),
     "google/gemini-3.6-flash": ModelPricing("1.50", "7.50"),
     "anthropic/claude-opus-5": ModelPricing("5.00", "25.00"),
+    "anthropic/claude-fable-5": ModelPricing("10.00", "50.00"),
+    # Kimi K3 per the openrouter.ai catalog, 2026-07-29.
+    "moonshotai/kimi-k3": ModelPricing("3.00", "15.00"),
     # Sticker price — OpenRouter currently passes through Anthropic's $2/$10
     # intro discount (through 2026-08-31); recorded at sticker to match the
     # native claude-sonnet-5 entry above.

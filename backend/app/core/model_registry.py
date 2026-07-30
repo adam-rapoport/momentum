@@ -181,6 +181,68 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="heavy",
         notes="OpenAI's most capable model for hard drafting/reasoning. Paid, pricey.",
     ),
+    # GPT-5.4 / 5.5 / 5.6 generations — IDs verified live against the OpenAI
+    # /v1/models API (2026-07-29). The 5.6 generation ships as three named
+    # tiers (Luna = light, Terra = mid, Sol = flagship) instead of
+    # nano/mini/full. The ultra-premium -pro tiers ($30/$180 per MTok) are
+    # deliberately not listed. The big models advertise ~1.05M context;
+    # recorded conservatively at 1M for the history window.
+    ModelEntry(
+        id="gpt-5.4",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-5.4 (OpenAI)",
+        role="either",
+        notes="Newer-generation flagship — 1M context, strong all-rounder. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5.4-mini",
+        context_window=400_000,
+        provider="openai",
+        display_name="GPT-5.4 mini (OpenAI)",
+        role="either",
+        notes="Faster, cheaper GPT-5.4 — a balanced everyday pick. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5.4-nano",
+        context_window=400_000,
+        provider="openai",
+        display_name="GPT-5.4 nano (OpenAI)",
+        role="light",
+        notes="Cheapest, fastest GPT-5.4 — a solid light pick. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5.5",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-5.5 (OpenAI)",
+        role="heavy",
+        notes="Stronger than GPT-5.4 for hard drafting/reasoning — 1M context. Paid, pricier.",
+    ),
+    ModelEntry(
+        id="gpt-5.6-luna",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-5.6 Luna (OpenAI)",
+        role="light",
+        notes="Newest generation's light tier — fast and cheap with 1M context. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5.6-terra",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-5.6 Terra (OpenAI)",
+        role="either",
+        notes="Newest generation's balanced tier — 1M context all-rounder. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-5.6-sol",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-5.6 Sol (OpenAI)",
+        role="heavy",
+        notes="Newest generation's flagship — strongest for hard drafting/reasoning. Paid, pricier.",
+    ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
     # the native SDK (app.core.anthropic_client), not an OpenAI-compat shim.
@@ -218,6 +280,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Claude Opus 5 (Anthropic)",
         role="heavy",
         notes="Anthropic's most capable model for hard drafting/reasoning — same price as Opus 4.8. Paid, pricier.",
+        client="anthropic_sdk",
+    ),
+    # Fable 5: thinking is always on and never configurable — our client
+    # already sends no `thinking` config (required; sending one 400s) and the
+    # 16k MAX_TOKENS budget covers thinking + response together.
+    ModelEntry(
+        id="claude-fable-5",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Fable 5 (Anthropic)",
+        role="heavy",
+        notes="Anthropic's top-tier model — strongest reasoning and long-horizon work, above Opus. Paid, premium pricing.",
         client="anthropic_sdk",
     ),
     # --- OpenRouter (pay-as-you-go aggregator) ---
@@ -262,6 +336,22 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Claude Opus 5 (OpenRouter)",
         role="heavy",
         notes="Anthropic's most capable model via OpenRouter — for the hardest drafting/reasoning.",
+    ),
+    ModelEntry(
+        id="anthropic/claude-fable-5",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Fable 5 (OpenRouter)",
+        role="heavy",
+        notes="Anthropic's top-tier model via OpenRouter — above Opus. Premium pricing.",
+    ),
+    ModelEntry(
+        id="moonshotai/kimi-k3",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Kimi K3 (OpenRouter)",
+        role="either",
+        notes="Moonshot's flagship — 1M context, strong reasoning and agentic tool use.",
     ),
     ModelEntry(
         id="anthropic/claude-sonnet-5",
