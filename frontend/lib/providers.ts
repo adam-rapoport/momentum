@@ -32,18 +32,18 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     credProvider: "llm:groq",
     name: "Groq",
     tiers: ["light", "heavy"],
-    pricing: "Free up to 14,400 requests/day · no credit card",
-    description: "Fast, free model for routine work. Great default to start with.",
+    pricing: "Free tier available · no credit card",
+    description: "Very fast open models (GPT-OSS, Qwen). Free tier is tight; best on a paid plan.",
     helpUrl: "https://console.groq.com/keys",
     helpText: 'Sign in at console.groq.com, then "Create API Key".',
     keyHint: "Starts with gsk_, ~56 chars",
     keyPrefix: "gsk_",
     keyLength: [40, 100],
-    // Free-tier defaults: gpt-oss-* need a PAID Groq developer tier, so the
-    // free Llama models are the defaults (8B light, 70B heavy).
+    // Groq retired its Llama models 2026-08-16; gpt-oss-* are its recommended
+    // replacements and now work on the free tier too.
     defaultModel: {
-      light: "llama-3.1-8b-instant",
-      heavy: "llama-3.3-70b-versatile",
+      light: "openai/gpt-oss-20b",
+      heavy: "openai/gpt-oss-120b",
     },
   },
   google: {
@@ -58,7 +58,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "AIza... on older keys — newer formats vary",
     keyPrefix: "AIza",
     keyLength: [35, 90],
-    defaultModel: { light: "gemini-3.5-flash", heavy: "gemini-3.5-flash" },
+    defaultModel: { light: "gemini-3.5-flash-lite", heavy: "gemini-3.7-flash" },
   },
   openai: {
     id: "openai",
@@ -66,13 +66,13 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     name: "OpenAI",
     tiers: ["light", "heavy"],
     pricing: "Paid · billing required on your OpenAI account",
-    description: "The GPT-5 family — nano, mini, GPT-5, and Pro. Paid; works as a light or heavy model.",
+    description: "The GPT-5.4 and 5.6 families. Paid; works as a light or heavy model.",
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: 'In OpenAI → API keys → "Create new secret key".',
     keyHint: "Starts with sk-",
     keyPrefix: "sk-",
     keyLength: [20, 200],
-    defaultModel: { light: "gpt-5-mini", heavy: "gpt-5" },
+    defaultModel: { light: "gpt-5.6-luna", heavy: "gpt-5.6-sol" },
   },
   anthropic: {
     id: "anthropic",
@@ -100,7 +100,7 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with sk-or-",
     keyPrefix: "sk-or-",
     keyLength: [30, 200],
-    defaultModel: { light: "openai/gpt-5-mini", heavy: "anthropic/claude-sonnet-5" },
+    defaultModel: { light: "google/gemini-3.7-flash", heavy: "anthropic/claude-sonnet-5" },
   },
   mistral: {
     id: "mistral",

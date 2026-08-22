@@ -51,30 +51,32 @@ class Settings(BaseSettings):
     # startup — so a fresh desktop user with no key can still boot to the
     # onboarding wizard and enter it there.
     groq_api_key: str | None = Field(None, alias="GROQ_API_KEY")
-    # Default LIGHT model (casual chat + short tool-using turns). Now a Google
-    # Gemini model, not Groq: Groq's FREE tier caps tokens-per-minute (~6k TPM)
+    # Default LIGHT model (casual chat + short tool-using turns). A Google
+    # Gemini model, not Groq: Groq's FREE tier caps tokens-per-minute (~8k TPM)
     # and the app sends an ~11-13K-token system prompt on every turn, so even a
-    # single casual turn 429s. Gemini 3.1 Flash Lite's free tier is quota-based
-    # with a far more generous per-minute allowance, so the default free
-    # experience just works (it also runs on Google's native genai SDK).
+    # single casual turn 429s. Gemini's free tier is quota-based with a far
+    # more generous per-minute allowance, so the default free experience just
+    # works (it also runs on Google's native genai SDK). Was
+    # gemini-3.1-flash-lite until 2026-08: Google announced its shutdown
+    # (2027-05-07) and names 3.5 Flash Lite as the replacement.
     # Groq models stay in the registry and remain user-selectable (good on a
     # paid Groq tier). The env-var alias stays GROQ_MODEL for .env back-compat
     # even though it's now a legacy name for "default light model".
-    groq_model: str = Field("gemini-3.1-flash-lite", alias="GROQ_MODEL")
+    groq_model: str = Field("gemini-3.5-flash-lite", alias="GROQ_MODEL")
     # "Heavy" model used for drafting turns (see app.core.model_router).
     # Name kept as `groq_heavy_model` for compatibility; the value can now
     # be ANY provider's model ID (Groq, Google, ...). Provider is inferred
     # from the model-name prefix by app.core.llm.
-    # Default heavy model: gemini-3.5-flash via the native Gen AI SDK path
-    # (app.core.google_genai_client). Replaces the earlier gemma-4-31b-it
-    # default, which the OpenAI-compat endpoint couldn't drive reliably for
-    # structured output — doc memory-extraction returned 0 items and some
-    # skills produced no deliverable (2026-06 testing). Gemini 3.5 Flash is
-    # stable, fast, cheap, and handles the tool-using skill workflows well.
+    # Default heavy model: gemini-3.7-flash via the native Gen AI SDK path
+    # (app.core.google_genai_client). Replaced gemini-3.5-flash 2026-08:
+    # 3.7 Flash is Google's strongest Flash and (at least through 2026-12-31)
+    # half 3.5 Flash's price, still with a free tier. 3.5 Flash itself had
+    # replaced the earlier gemma-4-31b-it default, which the OpenAI-compat
+    # endpoint couldn't drive reliably for structured output (2026-06 testing).
     # Env var alias stays GROQ_HEAVY_MODEL to avoid breaking existing .env
     # files; rename on next sprint if we keep accumulating providers.
     groq_heavy_model: str = Field(
-        "gemini-3.5-flash", alias="GROQ_HEAVY_MODEL"
+        "gemini-3.7-flash", alias="GROQ_HEAVY_MODEL"
     )
     groq_base_url: str = Field("https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
 

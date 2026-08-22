@@ -43,43 +43,26 @@ class ModelEntry:
 
 
 # Model IDs below were verified against each provider's live model-list API
-# (Groq /v1/models, Google /v1beta/models). When refreshing, re-check those
-# endpoints rather than trusting docs — providers retire IDs on their own
-# schedule. Removed June 2026: Gemini 2.5 (Google shutdown Oct 2026) and Llama 4
-# Scout (Groq deprecated it 2026-06-17 → openai/gpt-oss-* are the recommended
-# replacements — but gpt-oss-* turned out to need a PAID Groq developer tier,
-# NOT the free tier). The default LIGHT model is now gemini-3.1-flash-lite, not
-# a Groq model: Groq's free tier ~6k tokens/min cap is smaller than the app's
-# per-turn context, so every Groq free turn 429s (see app.config.groq_model).
-# Groq models remain here and stay user-selectable (good on a paid Groq tier).
-# Model IDs below were re-verified against Groq's live /v1/models (2026-07-24;
-# Qwen3 32B removed then — Groq retired it, qwen3.6-27b is its successor).
+# (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
+# /v1/models, Mistral /v1/models — all re-checked 2026-08-22). When
+# refreshing, re-check those endpoints rather than trusting docs — providers
+# retire IDs on their own schedule. Removed June 2026: Gemini 2.5 (Google
+# shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
+# llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
+# 2026-08-16; gpt-oss-* / qwen3.6-27b are its recommended replacements — and
+# all three now WORK ON THE FREE TIER, 8k TPM). The default LIGHT model is
+# gemini-3.5-flash-lite, not a Groq model: Groq's free-tier tokens/min cap is
+# smaller than the app's per-turn context, so every Groq free turn 429s (see
+# app.config.groq_model). Groq models remain here and stay user-selectable.
 REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
-    ModelEntry(
-        id="llama-3.1-8b-instant",
-        context_window=131_072,
-        provider="groq",
-        display_name="Llama 3.1 8B Instant (Groq)",
-        # "either" so Groq can fill the heavy slot too — fast and free.
-        role="either",
-        notes="Very fast and free on Groq, but the free tier's ~6k tokens/min cap is too small for this app's context — best on a paid Groq tier.",
-    ),
-    ModelEntry(
-        id="llama-3.3-70b-versatile",
-        context_window=131_072,
-        provider="groq",
-        display_name="Llama 3.3 70B (Groq)",
-        role="either",
-        notes="Larger Llama — stronger for drafting, still fast and free on Groq.",
-    ),
     ModelEntry(
         id="qwen/qwen3.6-27b",
         context_window=131_072,
         provider="groq",
         display_name="Qwen3.6 27B (Groq)",
         role="either",
-        notes="Newer Qwen — Groq's recommended replacement for the retired Llama 4 Scout. Free.",
+        notes="Groq's recommended heavy-slot replacement for its retired Llamas. Free tier, but the ~8k tokens/min cap is tight for this app — best on a paid Groq tier.",
     ),
     ModelEntry(
         id="openai/gpt-oss-20b",
@@ -87,7 +70,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="groq",
         display_name="GPT-OSS 20B (Groq)",
         role="either",
-        notes="Fast open model — needs a PAID Groq developer tier (not available on the free tier).",
+        notes="Fast open model — now on Groq's free tier too, though the ~8k tokens/min cap is tight for this app. Best on a paid Groq tier.",
     ),
     ModelEntry(
         id="openai/gpt-oss-120b",
@@ -95,7 +78,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="groq",
         display_name="GPT-OSS 120B (Groq)",
         role="heavy",
-        notes="Largest open model on Groq, strong reasoning — needs a PAID Groq developer tier.",
+        notes="Largest open model on Groq, strong reasoning — now on Groq's free tier too (tight ~8k tokens/min cap; best on a paid tier).",
     ),
     # --- Google: Gemma (open model, free tier) ---
     ModelEntry(
@@ -116,7 +99,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 3.1 Flash Lite (Google, native SDK)",
         role="light",
-        notes="Fastest, cheapest current Gemini. Runs on Google's native SDK.",
+        notes="Older Flash Lite — Google retires it May 2027; 3.5 Flash Lite is its successor. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    ModelEntry(
+        id="gemini-3.5-flash-lite",
+        context_window=1_048_576,
+        provider="google",
+        display_name="Gemini 3.5 Flash Lite (Google, native SDK)",
+        role="light",
+        notes="Fastest, cheapest current Gemini — the default light pick. Free tier. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -125,7 +117,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 3.5 Flash (Google, native SDK)",
         role="either",
-        notes="Fast, current all-rounder Gemini. Runs on Google's native SDK.",
+        notes="Fast all-rounder Gemini. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -134,7 +126,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 3.6 Flash (Google, native SDK)",
         role="either",
-        notes="Newest Flash — stronger than 3.5 Flash, has a free tier. Runs on Google's native SDK.",
+        notes="Strong Flash with a free tier (3.7 Flash has since superseded it). Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    ModelEntry(
+        id="gemini-3.7-flash",
+        context_window=1_048_576,
+        provider="google",
+        display_name="Gemini 3.7 Flash (Google, native SDK)",
+        role="either",
+        notes="Google's newest, strongest Flash — built for agents and tool use, free tier, half-price intro through Dec 2026. The default heavy pick.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -147,40 +148,11 @@ REGISTRY: tuple[ModelEntry, ...] = (
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
-    # IDs verified live against the OpenAI API (2026-06-21).
+    # IDs verified live against the OpenAI API (2026-08-22).
     # The gpt-4o generation is deprecated upstream and was removed here.
-    ModelEntry(
-        id="gpt-5",
-        context_window=400_000,
-        provider="openai",
-        display_name="GPT-5 (OpenAI)",
-        role="either",
-        notes="OpenAI's flagship. Paid — needs billing on your OpenAI key.",
-    ),
-    ModelEntry(
-        id="gpt-5-mini",
-        context_window=400_000,
-        provider="openai",
-        display_name="GPT-5 mini (OpenAI)",
-        role="either",
-        notes="Faster, cheaper GPT-5 — a balanced everyday pick. Paid.",
-    ),
-    ModelEntry(
-        id="gpt-5-nano",
-        context_window=400_000,
-        provider="openai",
-        display_name="GPT-5 nano (OpenAI)",
-        role="light",
-        notes="Cheapest, fastest GPT-5 — a solid light pick. Paid.",
-    ),
-    ModelEntry(
-        id="gpt-5-pro",
-        context_window=400_000,
-        provider="openai",
-        display_name="GPT-5 pro (OpenAI)",
-        role="heavy",
-        notes="OpenAI's most capable model for hard drafting/reasoning. Paid, pricey.",
-    ),
+    # Removed Aug 2026: the original gpt-5/-mini/-nano/-pro family — OpenAI
+    # announced a hard shutdown for 2026-12-11 (replacements: the 5.4 and 5.6
+    # generations below; 5.6 Luna is now cheaper than gpt-5-nano was).
     # GPT-5.4 / 5.5 / 5.6 generations — IDs verified live against the OpenAI
     # /v1/models API (2026-07-29). The 5.6 generation ships as three named
     # tiers (Luna = light, Terra = mid, Sol = flagship) instead of
@@ -261,7 +233,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="anthropic",
         display_name="Claude Sonnet 5 (Anthropic)",
         role="either",
-        notes="Anthropic's newest Sonnet — near-Opus quality for coding and reasoning at Sonnet pricing. The recommended heavy pick. Paid (intro pricing through Aug 2026).",
+        notes="Anthropic's newest Sonnet — near-Opus quality for coding and reasoning at Sonnet pricing ($2/$10, made permanent Aug 2026). A strong heavy pick. Paid.",
         client="anthropic_sdk",
     ),
     ModelEntry(
@@ -298,14 +270,6 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # One key unlocks models from many labs; ids are vendor/model. Curated
     # picks below — re-check openrouter.ai/models when refreshing.
     ModelEntry(
-        id="openai/gpt-5-mini",
-        context_window=400_000,
-        provider="openrouter",
-        display_name="GPT-5 mini (OpenRouter)",
-        role="light",
-        notes="Cheap, fast light pick via OpenRouter.",
-    ),
-    ModelEntry(
         id="anthropic/claude-haiku-4.5",
         context_window=200_000,
         provider="openrouter",
@@ -327,7 +291,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Gemini 3.6 Flash (OpenRouter)",
         role="either",
-        notes="Google's newest Flash via OpenRouter — stronger than 3.5 Flash.",
+        notes="Strong Google Flash via OpenRouter (3.7 Flash has since superseded it).",
+    ),
+    ModelEntry(
+        id="google/gemini-3.7-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Gemini 3.7 Flash (OpenRouter)",
+        role="either",
+        notes="Google's newest, strongest Flash via OpenRouter — built for agents and tool use.",
     ),
     ModelEntry(
         id="anthropic/claude-opus-5",
@@ -361,31 +333,12 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="Anthropic's newest Sonnet served via OpenRouter — a strong heavy pick.",
     ),
-    ModelEntry(
-        id="openai/gpt-5",
-        context_window=400_000,
-        provider="openrouter",
-        display_name="GPT-5 (OpenRouter)",
-        role="heavy",
-        notes="OpenAI's flagship via OpenRouter.",
-    ),
-    # Popular open-model picks via OpenRouter (live-verified 2026-06-28).
-    ModelEntry(
-        id="deepseek/deepseek-chat-v3.1",
-        context_window=163_840,
-        provider="openrouter",
-        display_name="DeepSeek V3.1 (OpenRouter)",
-        role="either",
-        notes="Popular, very cheap workhorse — strong general chat + drafting.",
-    ),
-    ModelEntry(
-        id="deepseek/deepseek-r1",
-        context_window=163_840,
-        provider="openrouter",
-        display_name="DeepSeek R1 (OpenRouter)",
-        role="heavy",
-        notes="DeepSeek's reasoning model — good for hard, multi-step drafting.",
-    ),
+    # Popular open-model picks via OpenRouter (live-verified 2026-08-22).
+    # Removed Aug 2026: DeepSeek V3.1 + R1 (line retired upstream — the V4
+    # models below are the successors), GLM 5 (two generations behind), the
+    # stale un-dated deepseek/deepseek-v4-flash slug (OpenRouter kept it
+    # pinned to the old April build; -0731 below is the current one), and
+    # OpenRouter's gpt-5/gpt-5-mini (OpenAI shutdown 2026-12-11).
     ModelEntry(
         id="meta-llama/llama-3.3-70b-instruct",
         context_window=131_072,
@@ -395,7 +348,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Popular open Llama — solid, low-cost all-rounder.",
     ),
     # Z.ai GLM + newer open agentic models via OpenRouter (live-verified
-    # 2026-06-29 against openrouter.ai/models).
+    # 2026-08-22 against openrouter.ai/models).
     ModelEntry(
         id="z-ai/glm-5.2",
         context_window=1_048_576,
@@ -405,20 +358,28 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Z.ai's GLM 5.2 — 1M context, strong at coding + agentic tool use. Cheap heavy pick.",
     ),
     ModelEntry(
-        id="z-ai/glm-5",
-        context_window=202_752,
+        id="z-ai/glm-5.3",
+        context_window=1_048_576,
         provider="openrouter",
-        display_name="GLM 5 (OpenRouter)",
+        display_name="GLM 5.3 (OpenRouter)",
         role="either",
-        notes="Z.ai's GLM 5 — a cheaper sibling of 5.2 for long-horizon agent work.",
+        notes="Z.ai's newest flagship — 1M context, stronger than 5.2 on complex coding and long-horizon agent work.",
     ),
     ModelEntry(
-        id="deepseek/deepseek-v4-flash",
-        context_window=1_048_576,
+        id="deepseek/deepseek-v4-flash-0731",
+        context_window=1_310_720,
         provider="openrouter",
         display_name="DeepSeek V4 Flash (OpenRouter)",
         role="either",
-        notes="Very cheap, fast MoE — 1M context, strong reasoning/coding. Great low-cost workhorse.",
+        notes="Very cheap, fast MoE — 1.3M context, refreshed July 2026 build with big agentic gains. Great low-cost workhorse.",
+    ),
+    ModelEntry(
+        id="deepseek/deepseek-v4-pro-0813",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="DeepSeek V4 Pro (OpenRouter)",
+        role="heavy",
+        notes="DeepSeek's flagship — 1M context, agent-first with strong tool use. Low-cost heavy pick.",
     ),
     ModelEntry(
         id="minimax/minimax-m3",
@@ -427,6 +388,30 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="MiniMax M3 (OpenRouter)",
         role="either",
         notes="1M context, strong coding/agentic tool use — mid-priced all-rounder.",
+    ),
+    ModelEntry(
+        id="qwen/qwen3.8-max",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Qwen3.8 Max (OpenRouter)",
+        role="heavy",
+        notes="Alibaba's largest flagship — 1M context, multimodal, strong reasoning.",
+    ),
+    ModelEntry(
+        id="x-ai/grok-4.6",
+        context_window=500_000,
+        provider="openrouter",
+        display_name="Grok 4.6 (OpenRouter)",
+        role="either",
+        notes="xAI's frontier model — flagship-level benchmarks at half flagship price, tuned for long agent runs.",
+    ),
+    ModelEntry(
+        id="meta/muse-spark-1.2",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Muse Spark 1.2 (OpenRouter)",
+        role="either",
+        notes="Meta's new closed model line — agentic and coding focus, mid-priced. Needs a one-time 18+ confirmation in your OpenRouter account settings first.",
     ),
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.

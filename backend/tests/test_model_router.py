@@ -84,10 +84,10 @@ def test_none_metadata_is_equivalent_to_empty(default_model, heavy_model):
 
 
 def test_user_preference_overrides_light_default_when_available():
-    # Llama 3.1 8B Instant is registered as a light model and Groq is the
+    # GPT-OSS 20B is registered light-capable ("either") and Groq is the
     # always-available provider, so this should win over the env default.
-    prefs = {"light_model": "llama-3.1-8b-instant"}
-    assert select_model("hi there", {}, user_preferences=prefs) == "llama-3.1-8b-instant"
+    prefs = {"light_model": "openai/gpt-oss-20b"}
+    assert select_model("hi there", {}, user_preferences=prefs) == "openai/gpt-oss-20b"
 
 
 def test_user_preference_overrides_heavy_default_for_slash_command():
@@ -236,7 +236,7 @@ def test_deep_flag_routes_to_heavy(heavy_model):
 
 def test_deep_flag_routes_heavy_even_with_light_preference(heavy_model):
     # /deep must win over a user's saved light-model preference.
-    prefs = {"light_model": "llama-3.1-8b-instant"}
+    prefs = {"light_model": "openai/gpt-oss-20b"}
     assert select_model("/deep quick question", {}, user_preferences=prefs) == heavy_model
 
 

@@ -165,14 +165,19 @@ def test_registered_slash_ids_keep_their_provider():
 
 
 def test_new_openrouter_models_registered_with_correct_provider():
-    """GLM 5.2 + complementary OpenRouter additions (2026-06-29): the exact
+    """Curated OpenRouter additions (last refreshed 2026-08-22): the exact
     live-verified slugs must resolve to the openrouter provider. A typo in a
     slug, or the slash->openrouter heuristic regressing, would be caught here."""
     expected = {
         "z-ai/glm-5.2",
-        "z-ai/glm-5",
-        "deepseek/deepseek-v4-flash",
+        "z-ai/glm-5.3",
+        "deepseek/deepseek-v4-flash-0731",
+        "deepseek/deepseek-v4-pro-0813",
         "minimax/minimax-m3",
+        "qwen/qwen3.8-max",
+        "x-ai/grok-4.6",
+        "meta/muse-spark-1.2",
+        "google/gemini-3.7-flash",
     }
     by_id = {m.id: m for m in REGISTRY}
     for mid in expected:

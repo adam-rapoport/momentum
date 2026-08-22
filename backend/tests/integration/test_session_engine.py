@@ -1707,10 +1707,11 @@ async def test_long_history_window_truncates_and_notes(
     Truncation is what's under test, so pin the turn model to a known
     131k-window registry entry. Resolving it from the default light model
     made the test silently environment-dependent: when the default became
-    gemini-3.1-flash-lite (~1M window), 600k of history stopped overflowing
-    and the assert failed — but only where no .env overrode the default (CI),
-    not on a dev machine whose .env picked a smaller model."""
-    monkeypatch.setattr(settings, "groq_model", "llama-3.1-8b-instant")
+    a ~1M-window Gemini, 600k of history stopped overflowing and the assert
+    failed — but only where no .env overrode the default (CI), not on a dev
+    machine whose .env picked a smaller model. (Pinned model swapped from
+    llama-3.1-8b-instant when Groq retired it, 2026-08.)"""
+    monkeypatch.setattr(settings, "groq_model", "openai/gpt-oss-20b")
     session = await _make_session(db, seeded)
     for t in range(1, 7):
         for role, seq_off, text in (("user", 0, f"question {t}"), ("assistant", 1, f"answer {t}")):

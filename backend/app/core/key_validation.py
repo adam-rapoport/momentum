@@ -40,8 +40,11 @@ ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models"
 # validation ping. (OpenAI and OpenRouter are validated via free, model-less
 # endpoints instead — see validate_key — so they're not listed here.)
 _PING_MODEL = {
-    "llm:groq": "llama-3.1-8b-instant",
-    "llm:google_ai": "gemini-2.5-flash",
+    # Groq retired its Llama models 2026-08-16; gpt-oss-20b is its cheapest
+    # surviving production model (free tier included).
+    "llm:groq": "openai/gpt-oss-20b",
+    # Gemini 2.5 shuts down Oct 2026 — ping the current cheap Flash Lite.
+    "llm:google_ai": "gemini-3.5-flash-lite",
     "search:perplexity": "sonar",
 }
 _BASE_URL = {

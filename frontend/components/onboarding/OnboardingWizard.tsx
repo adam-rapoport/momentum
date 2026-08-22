@@ -35,10 +35,13 @@ const STEPS: { key: StepKey; label: string }[] = [
 ];
 
 // Every provider can fill either slot; these are just the recommended
-// defaults to pre-select (Groq for fast light work, Google/Gemini for stronger
-// heavy drafting). The user can switch to any other provider from the cards.
+// defaults to pre-select. Google for BOTH slots: its free tier comfortably
+// fits the app's per-turn context, while Groq's free tokens/min cap doesn't
+// (~8k TPM vs an ~11-13k system prompt — every free Groq turn 429s), which
+// is also why the backend's default models are Gemini (app.config).
+// The user can switch to any other provider from the cards.
 const RECOMMENDED_PROVIDER: Record<"light" | "heavy", string> = {
-  light: "groq",
+  light: "google",
   heavy: "google",
 };
 
