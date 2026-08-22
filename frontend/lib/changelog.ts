@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.3",
+    date: "August 22, 2026",
+    title: "Model refresh: Gemini 3.7 Flash, DeepSeek V4 Pro, GLM 5.3 & more",
+    highlights: [
+      "Gemini 3.7 Flash — Google's strongest fast model, free tier included — joins the picker (Google or OpenRouter) and becomes the default heavy model for new setups. Gemini 3.5 Flash Lite joins as the new default light model.",
+      "New via OpenRouter: DeepSeek V4 Pro, GLM 5.3, Qwen3.8 Max, Grok 4.6, and Meta's Muse Spark 1.2 (Muse needs a one-time 18+ confirmation in your OpenRouter settings). DeepSeek V4 Flash was upgraded to its newest build.",
+      "Removed models that stopped working: Groq shut down its two Llama models on August 16 — if one was selected, Momentum now falls back automatically. Also retired: OpenAI's original GPT-5 family (OpenAI ends it in December; GPT-5.4 and 5.6 remain), DeepSeek V3.1/R1, and GLM 5.",
+      "Prices refreshed everywhere: Claude Sonnet 5's launch price ($2/$10) is now permanent, the GPT-5.6 family got big cuts (Luna −80%), and Gemini 3.6 Flash halved. Groq's surviving models now work on its free tier (though the free tier stays tight for this app).",
+    ],
+  },
+  {
     version: "0.3.2",
     date: "July 29, 2026",
     title: "New models: GPT-5.4/5.5/5.6, Kimi K3 & Claude Fable 5",
