@@ -44,7 +44,7 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-08-22). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-08-28). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule. Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
@@ -365,6 +365,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="Z.ai's newest flagship — 1M context, stronger than 5.2 on complex coding and long-horizon agent work.",
     ),
+    # Context window recorded at 1,048,576 — what Z.ai's own endpoint (and
+    # nearly every other) serves. OpenRouter's catalog headline says 1.31M,
+    # but only one reseller actually offers that much.
+    ModelEntry(
+        id="z-ai/glm-5.3-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="GLM 5.3 Flash (OpenRouter)",
+        role="either",
+        notes="The cheap, fast GLM 5.3 — about a twentieth the price of full 5.3 and still good at coding and long agent runs. The best value on the list.",
+    ),
     ModelEntry(
         id="deepseek/deepseek-v4-flash-0731",
         context_window=1_310_720,
@@ -396,6 +407,14 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Qwen3.8 Max (OpenRouter)",
         role="heavy",
         notes="Alibaba's largest flagship — 1M context, multimodal, strong reasoning.",
+    ),
+    ModelEntry(
+        id="qwen/qwen3.8-flash",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Qwen3.8 Flash (OpenRouter)",
+        role="either",
+        notes="Alibaba's cheap, fast Qwen3.8 — 1M context, tuned for coding and agent workflows. A good low-cost everyday pick.",
     ),
     ModelEntry(
         id="x-ai/grok-4.6",

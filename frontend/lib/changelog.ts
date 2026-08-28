@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.4",
+    date: "August 28, 2026",
+    title: "Two very cheap new models: Qwen3.8 Flash & GLM 5.3 Flash",
+    highlights: [
+      "GLM 5.3 Flash joins the picker via OpenRouter — the fast, budget version of GLM 5.3, at roughly a twentieth of its price. It handles coding and long agent runs well, and it's now the cheapest capable model on the list.",
+      "Qwen3.8 Flash also joins via OpenRouter — Alibaba's fast Qwen3.8 with a 1M-token context window, at a fraction of Qwen3.8 Max's price. A good everyday pick if you'd rather not spend much.",
+      "No models were removed this time: everything already in your picker is still running at its provider.",
+      "Cost estimates refreshed for the OpenRouter models — DeepSeek V4 Pro and DeepSeek V4 Flash got cheaper, Llama 3.3 70B and GLM 5.2 got pricier. Every other provider's prices were re-checked and are unchanged.",
+    ],
+  },
+  {
     version: "0.3.3",
     date: "August 22, 2026",
     title: "Model refresh: Gemini 3.7 Flash, DeepSeek V4 Pro, GLM 5.3 & more",

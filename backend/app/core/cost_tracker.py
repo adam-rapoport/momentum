@@ -35,7 +35,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # sessions still display a cost. Likewise the two Llamas above: Groq shut
     # them down 2026-08-16.
     "qwen/qwen3-32b": ModelPricing("0.29", "0.59"),
-    # Rates below re-confirmed on console.groq.com docs, 2026-08-22.
+    # Rates below re-confirmed on console.groq.com docs, 2026-08-28.
     "qwen/qwen3.6-27b": ModelPricing("0.60", "3.00"),
     "openai/gpt-oss-120b": ModelPricing("0.15", "0.60"),
     "openai/gpt-oss-20b": ModelPricing("0.075", "0.30"),
@@ -52,7 +52,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gemini-3.1-pro-preview": ModelPricing("2.00", "12.00"),
     "gemini-3.1-pro-preview-customtools": ModelPricing("2.00", "12.00"),
     # Current Gemini 3.x flash tier (paid rates; free-tier usage is $0), per
-    # ai.google.dev/gemini-api/docs/pricing 2026-08-22.
+    # ai.google.dev/gemini-api/docs/pricing 2026-08-28.
     "gemini-3.5-flash": ModelPricing("1.50", "9.00"),
     # 3.6 + 3.7 Flash: $0.75/$3.75 is Google's introductory rate through
     # 2026-12-31; both revert to $1.50/$7.50 on 2027-01-01 (bump these then).
@@ -72,7 +72,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gpt-5-nano": ModelPricing("0.05", "0.40"),
     "gpt-5-pro": ModelPricing("15.00", "120.00"),
     # GPT-5.4/5.5/5.6 generations per developers.openai.com/api/docs/pricing
-    # (2026-08-22) — standard-tier, short-context (<=272k) rates; longer
+    # (2026-08-28) — standard-tier, short-context (<=272k) rates; longer
     # inputs bill a higher tier we don't model. NOTE: OpenRouter's catalog
     # shows batch/flex rates for some 5.6 tiers — these are the native
     # standard rates, deliberately different from what OpenRouter displays.
@@ -90,7 +90,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
 
     # --- Anthropic (paid) ---
-    # Per platform.claude.com pricing, 2026-06.
+    # Per platform.claude.com pricing, re-confirmed 2026-08-28.
     "claude-haiku-4-5": ModelPricing("1.00", "5.00"),
     # $2/$10 launched as an intro price, made PERMANENT Aug 2026 (the planned
     # 2026-09-01 rise to $3/$15 was cancelled — platform.claude.com pricing).
@@ -107,7 +107,12 @@ GROQ_PRICING: dict[str, ModelPricing] = {
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
-    # Rates re-verified against openrouter.ai/api/v1/models, 2026-08-22.
+    # Rates re-verified against openrouter.ai/api/v1/models, 2026-08-28.
+    # NOTE for open models: OpenRouter lists many resellers per model at very
+    # different rates, and the catalog's headline rate follows whichever
+    # endpoint it currently defaults to — so these move between refreshes
+    # without the lab changing anything. Recorded at the headline rate, which
+    # is what a user routing through OpenRouter normally pays.
     "openai/gpt-5-mini": ModelPricing("0.25", "2.00"),
     "anthropic/claude-haiku-4.5": ModelPricing("1.00", "5.00"),
     "google/gemini-3.5-flash": ModelPricing("1.50", "9.00"),
@@ -129,20 +134,22 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "deepseek/deepseek-r1": ModelPricing("0.70", "2.50"),
     "deepseek/deepseek-v4-flash": ModelPricing("0.06", "0.12"),
     "z-ai/glm-5": ModelPricing("0.60", "1.92"),
-    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
+    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.71", "0.71"),
     # Current open-model picks (rates per the openrouter.ai catalog,
-    # 2026-08-22). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
+    # 2026-08-28). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
     # $0.60/$2.40); free-tier-style discounts just display a lower cost.
-    "z-ai/glm-5.2": ModelPricing("0.97", "3.04"),
+    "z-ai/glm-5.2": ModelPricing("1.19", "3.74"),
     "z-ai/glm-5.3": ModelPricing("1.40", "4.40"),
-    "deepseek/deepseek-v4-flash-0731": ModelPricing("0.08", "0.18"),
-    "deepseek/deepseek-v4-pro-0813": ModelPricing("1.12", "3.37"),
+    "z-ai/glm-5.3-flash": ModelPricing("0.075", "0.25"),
+    "deepseek/deepseek-v4-flash-0731": ModelPricing("0.07", "0.14"),
+    "deepseek/deepseek-v4-pro-0813": ModelPricing("0.66", "1.98"),
     "minimax/minimax-m3": ModelPricing("0.30", "1.20"),
     "qwen/qwen3.8-max": ModelPricing("2.00", "6.00"),
+    "qwen/qwen3.8-flash": ModelPricing("0.15", "0.47"),
     "x-ai/grok-4.6": ModelPricing("2.00", "6.00"),
     "meta/muse-spark-1.2": ModelPricing("1.25", "4.25"),
 
-    # --- Mistral (per mistral.ai/pricing/api, 2026-07-24 — free tier is $0.
+    # --- Mistral (per mistral.ai/pricing/api, 2026-08-28 — free tier is $0.
     # Large 3 really is priced below Medium 3.5 now: Medium 3.5 is Mistral's
     # newer, stronger flagship) ---
     "mistral-small-latest": ModelPricing("0.15", "0.60"),
