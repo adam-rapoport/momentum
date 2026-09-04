@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.5",
+    date: "September 4, 2026",
+    title: "Gemini 3.8 Flash and Claude Fable 5.1 join the picker",
+    highlights: [
+      "Gemini 3.8 Flash — Google's newest and smartest fast model, released this week — is available on your Google key or via OpenRouter. It's a solid step up from 3.7 Flash on coding and multi-step work, and it costs exactly the same: half price through the end of the year, free tier included.",
+      "Claude Fable 5.1 joins on your Anthropic key or via OpenRouter. It's better than Fable 5 at long refactors and long-running work, at the same price — so if you were already using Fable 5, 5.1 is a straight upgrade.",
+      "Qwen3.8 27B is now available on Groq, the newer build of the Qwen3.6 27B already in your picker.",
+      "No models were removed this time: everything already in your picker is still running at its provider.",
+      "Cost estimates refreshed for the OpenRouter models — Llama 3.3 70B is dramatically cheaper and DeepSeek V4 Flash slightly cheaper, while DeepSeek V4 Pro got pricier and GLM 5.2 a little cheaper. Every other provider's prices were re-checked and are unchanged.",
+    ],
+  },
+  {
     version: "0.3.4",
     date: "August 28, 2026",
     title: "Two very cheap new models: Qwen3.8 Flash & GLM 5.3 Flash",
