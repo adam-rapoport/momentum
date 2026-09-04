@@ -44,9 +44,13 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-08-28). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-09-04). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
-# retire IDs on their own schedule. Removed June 2026: Gemini 2.5 (Google
+# retire IDs on their own schedule. CAVEAT learned 2026-09-04: Mistral's
+# /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
+# is not necessarily retired — mistral-large-latest is absent on a free key
+# (403 "tier_not_allowed") but still current on mistral.ai/pricing.
+# Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
 # llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
 # 2026-08-16; gpt-oss-* / qwen3.6-27b are its recommended replacements — and
@@ -62,7 +66,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="groq",
         display_name="Qwen3.6 27B (Groq)",
         role="either",
-        notes="Groq's recommended heavy-slot replacement for its retired Llamas. Free tier, but the ~8k tokens/min cap is tight for this app — best on a paid Groq tier.",
+        notes="Groq's recommended heavy-slot replacement for its retired Llamas (Qwen3.8 27B below is the newer build). Free tier, but the ~8k tokens/min cap is tight for this app — best on a paid Groq tier.",
+    ),
+    # Context window recorded at the 131,042 Groq's own /v1/models reports for
+    # this build — slightly under the round 131,072 its siblings advertise.
+    ModelEntry(
+        id="qwen/qwen3.8-27b",
+        context_window=131_042,
+        provider="groq",
+        display_name="Qwen3.8 27B (Groq)",
+        role="either",
+        notes="Newer Qwen on Groq — better at coding and tool use than Qwen3.6 27B. Free tier, but the ~8k tokens/min cap is tight for this app; best on a paid Groq tier.",
     ),
     ModelEntry(
         id="openai/gpt-oss-20b",
@@ -135,7 +149,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 3.7 Flash (Google, native SDK)",
         role="either",
-        notes="Google's newest, strongest Flash — built for agents and tool use, free tier, half-price intro through Dec 2026. The default heavy pick.",
+        notes="Strong Flash built for agents and tool use — free tier, half-price intro through Dec 2026. The default heavy pick.",
+        client="genai_sdk",
+    ),
+    ModelEntry(
+        id="gemini-3.8-flash",
+        context_window=1_048_576,
+        provider="google",
+        display_name="Gemini 3.8 Flash (Google, native SDK)",
+        role="either",
+        notes="Google's newest, smartest Flash — big gains over 3.7 Flash on coding, agents and multi-step reasoning. Free tier, half-price intro through Dec 2026. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -263,7 +286,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="anthropic",
         display_name="Claude Fable 5 (Anthropic)",
         role="heavy",
-        notes="Anthropic's top-tier model — strongest reasoning and long-horizon work, above Opus. Paid, premium pricing.",
+        notes="Anthropic's previous top-tier model — very strong reasoning and long-horizon work, above Opus. Paid, premium pricing.",
+        client="anthropic_sdk",
+    ),
+    # Fable 5.1 inherits Fable 5's always-on thinking: same client path, same
+    # rule that no `thinking` config may be sent.
+    ModelEntry(
+        id="claude-fable-5-1",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Fable 5.1 (Anthropic)",
+        role="heavy",
+        notes="Anthropic's newest top-tier model — better than Fable 5 at agentic coding, long refactors and long-running work. Same price as Fable 5. Paid, premium pricing.",
         client="anthropic_sdk",
     ),
     # --- OpenRouter (pay-as-you-go aggregator) ---
@@ -299,7 +333,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Gemini 3.7 Flash (OpenRouter)",
         role="either",
-        notes="Google's newest, strongest Flash via OpenRouter — built for agents and tool use.",
+        notes="Strong Google Flash via OpenRouter — built for agents and tool use.",
+    ),
+    ModelEntry(
+        id="google/gemini-3.8-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Gemini 3.8 Flash (OpenRouter)",
+        role="either",
+        notes="Google's newest, smartest Flash via OpenRouter — big gains over 3.7 Flash on coding and agent work.",
     ),
     ModelEntry(
         id="anthropic/claude-opus-5",
@@ -315,7 +357,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Claude Fable 5 (OpenRouter)",
         role="heavy",
-        notes="Anthropic's top-tier model via OpenRouter — above Opus. Premium pricing.",
+        notes="Anthropic's previous top-tier model via OpenRouter — above Opus. Premium pricing.",
+    ),
+    ModelEntry(
+        id="anthropic/claude-fable-5.1",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Fable 5.1 (OpenRouter)",
+        role="heavy",
+        notes="Anthropic's newest top-tier model via OpenRouter — better than Fable 5 at agentic coding and long-running work. Premium pricing.",
     ),
     ModelEntry(
         id="moonshotai/kimi-k3",
@@ -432,6 +482,11 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="Meta's new closed model line — agentic and coding focus, mid-priced. Needs a one-time 18+ confirmation in your OpenRouter account settings first.",
     ),
+    # Muse Spark 1.3 (released 2026-09-02, same $1.25/$4.25) was evaluated for
+    # the Sep 2026 refresh and NOT added: its live smoke 403s with
+    # "missing_attestation_types: age_18plus" even though the 1.2 gate is
+    # already satisfied, so it can't be verified end-to-end. Revisit next
+    # refresh.
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.
     ModelEntry(
