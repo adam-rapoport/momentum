@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.6",
+    date: "September 11, 2026",
+    title: "GPT-6 Astra joins the picker",
+    highlights: [
+      "GPT-6 Astra — OpenAI's new flagship generation — is available on your OpenAI key or via OpenRouter. It's built for long, multi-step work like deep research, big refactors and long documents. It's the priciest model on the list at $10 per million words in and $50 out, so it's a heavy-slot pick for when you want the best, not an everyday one.",
+      "If you use OpenRouter, this is the first OpenAI model back in your picker since the original GPT-5 family was retired in August.",
+      "DeepSeek V4.1 Flash joins via OpenRouter — DeepSeek's newest cheap, fast model, built on a new architecture that handles long context better than V4 Flash. Still very inexpensive, and V4 Flash stays in the picker alongside it.",
+      "Qwen3.8 Max now points at Alibaba's dated build of the same model. OpenRouter stopped listing the old name, so Momentum switched to the one it still publishes — same model, same price, nothing to do on your end.",
+      "Cost estimates refreshed: Kimi K3 and DeepSeek V4 Pro are meaningfully cheaper, and GLM 5.3 Flash's estimate was corrected upward — it had been showing a discounted bulk rate rather than the price a normal turn actually pays. Every other provider's prices were re-checked and are unchanged.",
+    ],
+  },
+  {
     version: "0.3.5",
     date: "September 4, 2026",
     title: "Gemini 3.8 Flash and Claude Fable 5.1 join the picker",
