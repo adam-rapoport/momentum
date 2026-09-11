@@ -165,7 +165,7 @@ def test_registered_slash_ids_keep_their_provider():
 
 
 def test_new_openrouter_models_registered_with_correct_provider():
-    """Curated OpenRouter additions (last refreshed 2026-08-22): the exact
+    """Curated OpenRouter additions (last refreshed 2026-09-11): the exact
     live-verified slugs must resolve to the openrouter provider. A typo in a
     slug, or the slash->openrouter heuristic regressing, would be caught here."""
     expected = {
@@ -173,11 +173,14 @@ def test_new_openrouter_models_registered_with_correct_provider():
         "z-ai/glm-5.3",
         "deepseek/deepseek-v4-flash-0731",
         "deepseek/deepseek-v4-pro-0813",
+        "deepseek/deepseek-v4.1-flash",
         "minimax/minimax-m3",
-        "qwen/qwen3.8-max",
+        # Dated slug: OpenRouter de-listed the un-dated qwen/qwen3.8-max.
+        "qwen/qwen3.8-max-0902",
         "x-ai/grok-4.6",
         "meta/muse-spark-1.2",
         "google/gemini-3.7-flash",
+        "openai/gpt-6-astra",
     }
     by_id = {m.id: m for m in REGISTRY}
     for mid in expected:

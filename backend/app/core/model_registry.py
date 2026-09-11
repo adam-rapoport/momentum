@@ -44,7 +44,7 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-09-04). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-09-11). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule. CAVEAT learned 2026-09-04: Mistral's
 # /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
@@ -236,7 +236,20 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openai",
         display_name="GPT-5.6 Sol (OpenAI)",
         role="heavy",
-        notes="Newest generation's flagship — strongest for hard drafting/reasoning. Paid, pricier.",
+        notes="GPT-5.6 generation's flagship — very strong for hard drafting/reasoning. Paid, pricier.",
+    ),
+    # GPT-6: the new generation, live on OpenAI's /v1/models 2026-09-11. Only
+    # the base tier is listed — gpt-6-astra-pro is the ultra-premium tier this
+    # registry deliberately skips, same as the -pro tiers of 5.4/5.5/5.6.
+    # Advertises ~1.05M context; recorded conservatively at 1M for the history
+    # window, matching the other big OpenAI entries.
+    ModelEntry(
+        id="gpt-6-astra",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-6 Astra (OpenAI)",
+        role="heavy",
+        notes="OpenAI's newest and strongest model — built for long, multi-step work like deep research, big refactors and long documents. Paid, premium pricing.",
     ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
@@ -367,6 +380,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="heavy",
         notes="Anthropic's newest top-tier model via OpenRouter — better than Fable 5 at agentic coding and long-running work. Premium pricing.",
     ),
+    # First OpenAI twin on OpenRouter since the gpt-5 family was retired in
+    # Aug 2026 — restores OpenAI access for OpenRouter-only users. Context
+    # recorded at 1M like the native entry (catalog advertises 1.05M).
+    ModelEntry(
+        id="openai/gpt-6-astra",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-6 Astra (OpenRouter)",
+        role="heavy",
+        notes="OpenAI's newest and strongest model via OpenRouter — for the hardest, longest-running drafting and reasoning. Premium pricing.",
+    ),
     ModelEntry(
         id="moonshotai/kimi-k3",
         context_window=1_048_576,
@@ -435,6 +459,14 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Very cheap, fast MoE — 1.3M context, refreshed July 2026 build with big agentic gains. Great low-cost workhorse.",
     ),
     ModelEntry(
+        id="deepseek/deepseek-v4.1-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="DeepSeek V4.1 Flash (OpenRouter)",
+        role="either",
+        notes="DeepSeek's newest cheap, fast model — a new architecture that handles long context better than V4 Flash. Still very low-cost.",
+    ),
+    ModelEntry(
         id="deepseek/deepseek-v4-pro-0813",
         context_window=1_048_576,
         provider="openrouter",
@@ -450,8 +482,13 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="1M context, strong coding/agentic tool use — mid-priced all-rounder.",
     ),
+    # Replaced the un-dated qwen/qwen3.8-max slug on 2026-09-11: OpenRouter
+    # dropped that slug from its catalog (it still routes here, silently
+    # resolving to -0902, but a de-listed alias can stop working without
+    # notice — same reason the un-dated deepseek-v4-flash slug went in Aug).
+    # Same model, same $2/$6 rate.
     ModelEntry(
-        id="qwen/qwen3.8-max",
+        id="qwen/qwen3.8-max-0902",
         context_window=1_000_000,
         provider="openrouter",
         display_name="Qwen3.8 Max (OpenRouter)",
@@ -485,8 +522,8 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # Muse Spark 1.3 (released 2026-09-02, same $1.25/$4.25) was evaluated for
     # the Sep 2026 refresh and NOT added: its live smoke 403s with
     # "missing_attestation_types: age_18plus" even though the 1.2 gate is
-    # already satisfied, so it can't be verified end-to-end. Revisit next
-    # refresh.
+    # already satisfied, so it can't be verified end-to-end. Re-checked
+    # 2026-09-11 — identical 403, so still not added.
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.
     ModelEntry(

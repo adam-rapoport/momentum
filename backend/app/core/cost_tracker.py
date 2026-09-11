@@ -88,6 +88,12 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "gpt-5.6-luna": ModelPricing("0.20", "1.20"),
     "gpt-5.6-terra": ModelPricing("2.00", "12.00"),
     "gpt-5.6-sol": ModelPricing("4.00", "20.00"),
+    # GPT-6 Astra, added 2026-09-11 at the official standard short-context
+    # rate (developers.openai.com/api/docs/pricing). Prompts over 272k bill a
+    # higher $20/$75 tier we don't model. NOTE: OpenRouter's catalog shows
+    # gpt-5.6-sol at $2/$10, half the official $4/$20 above — the usual
+    # OpenRouter batch-rate gotcha; the native rates here come from OpenAI.
+    "gpt-6-astra": ModelPricing("10.00", "50.00"),
     # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
@@ -112,7 +118,7 @@ GROQ_PRICING: dict[str, ModelPricing] = {
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
-    # Rates re-verified against openrouter.ai/api/v1/models, 2026-09-04.
+    # Rates re-verified against openrouter.ai/api/v1/models, 2026-09-11.
     # NOTE for open models: OpenRouter lists many resellers per model at very
     # different rates, and the catalog's headline rate follows whichever
     # endpoint it currently defaults to — so these move between refreshes
@@ -130,7 +136,12 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "anthropic/claude-fable-5": ModelPricing("10.00", "50.00"),
     # Fable 5.1 at Anthropic's official $10/$50 (the ":batch" slug is $5/$25).
     "anthropic/claude-fable-5.1": ModelPricing("10.00", "50.00"),
-    "moonshotai/kimi-k3": ModelPricing("3.00", "15.00"),
+    # GPT-6 Astra via OpenRouter — its catalog rate matches OpenAI's official
+    # standard rate here, so no batch-rate discrepancy to correct.
+    "openai/gpt-6-astra": ModelPricing("10.00", "50.00"),
+    # Kimi K3 cut from $3.00/$15.00 between the Sep 4 and Sep 11 refreshes
+    # (OpenRouter's headline endpoint; the ":batch" slug is still $3/$15).
+    "moonshotai/kimi-k3": ModelPricing("2.34", "11.70"),
     # $2/$10 made permanent Aug 2026 (matches the native entry above).
     "anthropic/claude-sonnet-5": ModelPricing("2.00", "10.00"),
     # Retired from the picker (superseded by Sonnet 5) but kept for old sessions.
@@ -146,15 +157,26 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # between the Aug and Sep refreshes (was $0.71/$0.71).
     "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
     # Current open-model picks (rates per the openrouter.ai catalog,
-    # 2026-09-04). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
+    # 2026-09-11). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
     # $0.60/$2.40); free-tier-style discounts just display a lower cost.
     "z-ai/glm-5.2": ModelPricing("0.966", "3.036"),
     "z-ai/glm-5.3": ModelPricing("1.40", "4.40"),
-    "z-ai/glm-5.3-flash": ModelPricing("0.075", "0.25"),
+    # Corrected 2026-09-11: $0.075/$0.25 was the ":batch" rate. The headline
+    # endpoint a normal turn routes to charges double that.
+    "z-ai/glm-5.3-flash": ModelPricing("0.15", "0.50"),
     "deepseek/deepseek-v4-flash-0731": ModelPricing("0.065", "0.18"),
-    "deepseek/deepseek-v4-pro-0813": ModelPricing("1.1154", "3.3462"),
+    # DeepSeek bills these two on a UTC clock: the rate below is the headline
+    # (off-peak) one OpenRouter reports, and peak hours cost roughly double —
+    # V4 Pro $1.122/$3.366 (00:00-14:00 UTC), V4.1 Flash $0.30/$1.20
+    # (01:00-04:00 and 06:00-10:00 UTC, weekdays). Recorded at the headline
+    # rate per the note above; a peak turn displays under its true cost.
+    "deepseek/deepseek-v4-pro-0813": ModelPricing("0.5808", "1.7424"),
+    "deepseek/deepseek-v4.1-flash": ModelPricing("0.15", "0.60"),
     "minimax/minimax-m3": ModelPricing("0.30", "1.20"),
+    # Retired from the picker 2026-09-11 (OpenRouter de-listed the un-dated
+    # slug); kept so old sessions still display a cost.
     "qwen/qwen3.8-max": ModelPricing("2.00", "6.00"),
+    "qwen/qwen3.8-max-0902": ModelPricing("2.00", "6.00"),
     "qwen/qwen3.8-flash": ModelPricing("0.15", "0.47"),
     "x-ai/grok-4.6": ModelPricing("2.00", "6.00"),
     "meta/muse-spark-1.2": ModelPricing("1.25", "4.25"),
