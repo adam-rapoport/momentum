@@ -44,30 +44,28 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-09-11). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-09-18). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
-# retire IDs on their own schedule. CAVEAT learned 2026-09-04: Mistral's
+# retire IDs on their own schedule; Groq proved the point again in Sep 2026
+# (see qwen3.6-27b below). CAVEAT learned 2026-09-04: Mistral's
 # /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
 # is not necessarily retired — mistral-large-latest is absent on a free key
-# (403 "tier_not_allowed") but still current on mistral.ai/pricing.
+# (403 "tier_not_allowed") but still current on mistral.ai/pricing
+# (re-confirmed 2026-09-18: same 403, still $0.50/$1.50 on the pricing page).
 # Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
 # llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
-# 2026-08-16; gpt-oss-* / qwen3.6-27b are its recommended replacements — and
-# all three now WORK ON THE FREE TIER, 8k TPM). The default LIGHT model is
+# 2026-08-16; gpt-oss-* were its recommended replacements — and
+# all now WORK ON THE FREE TIER, 8k TPM). Removed Sep 2026: qwen/qwen3.6-27b —
+# Groq dropped it from /v1/models and it now hard-fails with
+# "model_not_found", with NO notice on console.groq.com/docs/deprecations
+# (which still lists it as a replacement for the retired Llamas). Exactly why
+# the live API wins over the docs page. The default LIGHT model is
 # gemini-3.5-flash-lite, not a Groq model: Groq's free-tier tokens/min cap is
 # smaller than the app's per-turn context, so every Groq free turn 429s (see
 # app.config.groq_model). Groq models remain here and stay user-selectable.
 REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
-    ModelEntry(
-        id="qwen/qwen3.6-27b",
-        context_window=131_072,
-        provider="groq",
-        display_name="Qwen3.6 27B (Groq)",
-        role="either",
-        notes="Groq's recommended heavy-slot replacement for its retired Llamas (Qwen3.8 27B below is the newer build). Free tier, but the ~8k tokens/min cap is tight for this app — best on a paid Groq tier.",
-    ),
     # Context window recorded at the 131,042 Groq's own /v1/models reports for
     # this build — slightly under the round 131,072 its siblings advertise.
     ModelEntry(
@@ -76,7 +74,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="groq",
         display_name="Qwen3.8 27B (Groq)",
         role="either",
-        notes="Newer Qwen on Groq — better at coding and tool use than Qwen3.6 27B. Free tier, but the ~8k tokens/min cap is tight for this app; best on a paid Groq tier.",
+        notes="Groq's Qwen — strong at coding and tool use, and the successor to the retired Qwen3.6 27B. Free tier, but the ~8k tokens/min cap is tight for this app; best on a paid Groq tier.",
     ),
     ModelEntry(
         id="openai/gpt-oss-20b",
@@ -523,7 +521,8 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # the Sep 2026 refresh and NOT added: its live smoke 403s with
     # "missing_attestation_types: age_18plus" even though the 1.2 gate is
     # already satisfied, so it can't be verified end-to-end. Re-checked
-    # 2026-09-11 — identical 403, so still not added.
+    # 2026-09-18 — identical 403 for the third week running, so still not
+    # added; it stays out until OpenRouter's gate can actually be cleared.
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.
     ModelEntry(
