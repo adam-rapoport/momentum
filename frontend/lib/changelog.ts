@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.7",
+    date: "September 18, 2026",
+    title: "Qwen3.6 27B removed — Groq shut it down",
+    highlights: [
+      "Groq switched off Qwen3.6 27B without notice, so it's been removed from the picker. If you had it selected, Momentum now quietly falls back to another model you have set up — there's nothing you need to do, and no more failed turns. Qwen3.8 27B, its direct successor, is still there and is the natural replacement.",
+      "Cost estimates refreshed. GLM 5.2 is now roughly half what it was, GLM 5.3 Flash and DeepSeek V4 Flash got a little cheaper, and Kimi K3 came down again. DeepSeek V4 Pro went up slightly. These are OpenRouter's own rates moving around, not a change to what Momentum charges — it charges nothing.",
+      "Every other provider was re-checked against its live catalogue and official price list: Google, OpenAI, Anthropic, Mistral and the rest of Groq are all unchanged.",
+    ],
+  },
+  {
     version: "0.3.6",
     date: "September 11, 2026",
     title: "GPT-6 Astra joins the picker",
