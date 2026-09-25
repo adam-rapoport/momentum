@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.8",
+    date: "September 25, 2026",
+    title: "Claude Opus 5.5 and two more GPT-6 models join the picker",
+    highlights: [
+      "Claude Opus 5.5 — Anthropic's newest Opus, out this week — is available on your Anthropic key or via OpenRouter. It's better than Opus 5 at multi-step coding and long agent runs, and it's the first Opus that costs less than the one before it: $4 per million words in and $20 out, down from $5 and $25. If you were using Opus 5, 5.5 is a straight upgrade for less money.",
+      "GPT-6 Luna and GPT-6 Sol fill in the rest of OpenAI's new generation, on your OpenAI key or via OpenRouter. Luna is now the cheapest model in the whole picker at $0.10 in and $0.50 out — half the price of GPT-5.6 Luna — and Sol gives you GPT-6 quality for a fraction of Astra's price, at $2 and $10. If you use OpenRouter, this is the first time you've had a cheap OpenAI option since the original GPT-5 family was retired in August.",
+      "Grok 4.7 joins via OpenRouter, xAI's newer frontier model. Its headline rate is 20% below Grok 4.6, but be aware xAI now attaches a much larger hidden prompt to every turn, so a short turn can actually cost more than it did on 4.6 — Momentum's cost estimate reflects what you're really billed. Grok 4.6 stays in the picker alongside it.",
+      "Nothing was removed this time: every model in your picker is still running at its provider.",
+      "Cost estimates refreshed on OpenRouter's open models, where the rate follows whichever reseller OpenRouter is routing to that week: GLM 5.3 Flash is half what it was, DeepSeek V4 Pro is down by roughly half, DeepSeek V4 Flash is cheaper to send and dearer to receive, and Kimi K3 and GLM 5.2 went back up. Google, OpenAI, Anthropic, Mistral and Groq prices were all re-checked against their official pages and are unchanged.",
+    ],
+  },
+  {
     version: "0.3.7",
     date: "September 18, 2026",
     title: "Qwen3.6 27B removed — Groq shut it down",
