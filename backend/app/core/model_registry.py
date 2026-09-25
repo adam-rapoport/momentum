@@ -44,14 +44,14 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-09-18). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-09-25). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule; Groq proved the point again in Sep 2026
 # (see qwen3.6-27b below). CAVEAT learned 2026-09-04: Mistral's
 # /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
 # is not necessarily retired — mistral-large-latest is absent on a free key
 # (403 "tier_not_allowed") but still current on mistral.ai/pricing
-# (re-confirmed 2026-09-18: same 403, still $0.50/$1.50 on the pricing page).
+# (re-confirmed 2026-09-25: same 403, still $0.50/$1.50 on the pricing page).
 # Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
 # llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
@@ -66,11 +66,12 @@ class ModelEntry:
 # app.config.groq_model). Groq models remain here and stay user-selectable.
 REGISTRY: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
-    # Context window recorded at the 131,042 Groq's own /v1/models reports for
-    # this build — slightly under the round 131,072 its siblings advertise.
+    # Context window follows Groq's own /v1/models: it reported 131,042 for the
+    # August build and the round 131,072 its siblings advertise as of
+    # 2026-09-25, so this now matches the rest of the Groq list.
     ModelEntry(
         id="qwen/qwen3.8-27b",
-        context_window=131_042,
+        context_window=131_072,
         provider="groq",
         display_name="Qwen3.8 27B (Groq)",
         role="either",
@@ -249,6 +250,26 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="heavy",
         notes="OpenAI's newest and strongest model — built for long, multi-step work like deep research, big refactors and long documents. Paid, premium pricing.",
     ),
+    # GPT-6's other two tiers landed on /v1/models 2026-09-22, completing the
+    # generation: Luna (fast/cheap) and Sol (high-end but far cheaper than
+    # Astra). Same ~1.05M advertised context, recorded at 1M like the rest.
+    # The -pro variants of both are the ultra-premium tiers we skip.
+    ModelEntry(
+        id="gpt-6-luna",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-6 Luna (OpenAI)",
+        role="light",
+        notes="OpenAI's cheapest current model and half the price of GPT-5.6 Luna — fast, with a 1M context. A strong light pick. Paid.",
+    ),
+    ModelEntry(
+        id="gpt-6-sol",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-6 Sol (OpenAI)",
+        role="either",
+        notes="GPT-6's high-end tier at a fraction of Astra's price — very strong for demanding drafting and reasoning, 1M context. Paid.",
+    ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
     # the native SDK (app.core.anthropic_client), not an OpenAI-compat shim.
@@ -285,7 +306,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="anthropic",
         display_name="Claude Opus 5 (Anthropic)",
         role="heavy",
-        notes="Anthropic's most capable model for hard drafting/reasoning — same price as Opus 4.8. Paid, pricier.",
+        notes="Previous-generation Opus — still excellent for hard drafting/reasoning. Paid, pricier.",
+        client="anthropic_sdk",
+    ),
+    ModelEntry(
+        id="claude-opus-5-5",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Opus 5.5 (Anthropic)",
+        role="heavy",
+        notes="Anthropic's newest Opus and the strongest Claude below Fable — better than Opus 5 at multi-step coding and long agent runs, and cheaper ($4/$20 vs $5/$25). Paid.",
         client="anthropic_sdk",
     ),
     # Fable 5: thinking is always on and never configurable — our client
@@ -360,7 +390,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Claude Opus 5 (OpenRouter)",
         role="heavy",
-        notes="Anthropic's most capable model via OpenRouter — for the hardest drafting/reasoning.",
+        notes="Previous-generation Opus via OpenRouter — still excellent for hard drafting/reasoning.",
+    ),
+    ModelEntry(
+        id="anthropic/claude-opus-5.5",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Opus 5.5 (OpenRouter)",
+        role="heavy",
+        notes="Anthropic's newest Opus via OpenRouter — better than Opus 5 at multi-step coding and long agent runs, and cheaper.",
     ),
     ModelEntry(
         id="anthropic/claude-fable-5",
@@ -388,6 +426,25 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="GPT-6 Astra (OpenRouter)",
         role="heavy",
         notes="OpenAI's newest and strongest model via OpenRouter — for the hardest, longest-running drafting and reasoning. Premium pricing.",
+    ),
+    # Astra was the only OpenAI twin here, at $10/$50 — these two give
+    # OpenRouter-only users a cheap OpenAI light pick and a mid-priced
+    # high-end one for the first time since the gpt-5 family was retired.
+    ModelEntry(
+        id="openai/gpt-6-luna",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-6 Luna (OpenRouter)",
+        role="light",
+        notes="OpenAI's cheapest current model via OpenRouter — fast, 1M context, the best-value light pick here.",
+    ),
+    ModelEntry(
+        id="openai/gpt-6-sol",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-6 Sol (OpenRouter)",
+        role="either",
+        notes="GPT-6's high-end tier via OpenRouter at a fraction of Astra's price — strong for demanding drafting and reasoning.",
     ),
     ModelEntry(
         id="moonshotai/kimi-k3",
@@ -507,7 +564,19 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Grok 4.6 (OpenRouter)",
         role="either",
-        notes="xAI's frontier model — flagship-level benchmarks at half flagship price, tuned for long agent runs.",
+        notes="xAI's previous frontier model — strong benchmarks at a low price, tuned for long agent runs.",
+    ),
+    # Smoke-tested 2026-09-25: works, but xAI attaches a much bigger hidden
+    # system prompt than 4.6 did (~1,250 input tokens on a one-line turn vs
+    # ~217), so the 20% lower per-token rate does NOT make every short turn
+    # cheaper. Cost math is still faithful — we bill what OpenRouter reports.
+    ModelEntry(
+        id="x-ai/grok-4.7",
+        context_window=500_000,
+        provider="openrouter",
+        display_name="Grok 4.7 (OpenRouter)",
+        role="either",
+        notes="xAI's newest frontier model — better than Grok 4.6 at long-running coding and agent work, at a 20% lower per-token rate.",
     ),
     ModelEntry(
         id="meta/muse-spark-1.2",
@@ -521,7 +590,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     # the Sep 2026 refresh and NOT added: its live smoke 403s with
     # "missing_attestation_types: age_18plus" even though the 1.2 gate is
     # already satisfied, so it can't be verified end-to-end. Re-checked
-    # 2026-09-18 — identical 403 for the third week running, so still not
+    # 2026-09-25 — identical 403 for the fourth week running, so still not
     # added; it stays out until OpenRouter's gate can actually be cleared.
     # --- Mistral ---
     # The -latest aliases track Mistral's current generation automatically.
