@@ -203,7 +203,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openai",
         display_name="GPT-5.4 nano (OpenAI)",
         role="light",
-        notes="Cheapest, fastest GPT-5.4 — a solid light pick. Paid.",
+        notes="Older light pick — OpenAI retires it April 2027; GPT-6 Luna is its named successor and already cheaper. Paid.",
     ),
     ModelEntry(
         id="gpt-5.5",
@@ -270,6 +270,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="GPT-6's high-end tier at a fraction of Astra's price — very strong for demanding drafting and reasoning, 1M context. Paid.",
     ),
+    # GPT-6.1 Sol landed on /v1/models 2026-09-29 — an upgrade on GPT-6 Sol at
+    # the identical $2/$10 standard rate, so it simply supersedes it. Its -pro
+    # twin is the ultra-premium tier this registry skips.
+    ModelEntry(
+        id="gpt-6.1-sol",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-6.1 Sol (OpenAI)",
+        role="either",
+        notes="OpenAI's newest high-end model — better than GPT-6 Sol at agentic coding and document-heavy work, for the same price. 1M context. Paid.",
+    ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
     # the native SDK (app.core.anthropic_client), not an OpenAI-compat shim.
@@ -289,6 +300,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Claude Sonnet 5 (Anthropic)",
         role="either",
         notes="Anthropic's newest Sonnet — near-Opus quality for coding and reasoning at Sonnet pricing ($2/$10, made permanent Aug 2026). A strong heavy pick. Paid.",
+        client="anthropic_sdk",
+    ),
+    # Sonnet 5.5 (2026-09-28) succeeds Sonnet 5 at the same $2/$10 standard
+    # rate (platform.claude.com). Anthropic's own deprecation page now names it
+    # the recommended replacement for the retiring Sonnet 4.5.
+    ModelEntry(
+        id="claude-sonnet-5-5",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Sonnet 5.5 (Anthropic)",
+        role="either",
+        notes="Anthropic's newest Sonnet — a direct upgrade on Sonnet 5 for building features and fixing bugs, at the same $2/$10 price. A strong heavy pick. Paid.",
         client="anthropic_sdk",
     ),
     ModelEntry(
@@ -447,6 +470,14 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="GPT-6's high-end tier via OpenRouter at a fraction of Astra's price — strong for demanding drafting and reasoning.",
     ),
     ModelEntry(
+        id="openai/gpt-6.1-sol",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-6.1 Sol (OpenRouter)",
+        role="either",
+        notes="OpenAI's newest high-end model via OpenRouter — better than GPT-6 Sol at agentic coding and document-heavy work, for the same price.",
+    ),
+    ModelEntry(
         id="moonshotai/kimi-k3",
         context_window=1_048_576,
         provider="openrouter",
@@ -460,7 +491,15 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Claude Sonnet 5 (OpenRouter)",
         role="either",
-        notes="Anthropic's newest Sonnet served via OpenRouter — a strong heavy pick.",
+        notes="Anthropic's previous Sonnet served via OpenRouter — a strong heavy pick.",
+    ),
+    ModelEntry(
+        id="anthropic/claude-sonnet-5.5",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Sonnet 5.5 (OpenRouter)",
+        role="either",
+        notes="Anthropic's newest Sonnet via OpenRouter — a direct upgrade on Sonnet 5 at the same price.",
     ),
     # Popular open-model picks via OpenRouter (live-verified 2026-08-22).
     # Removed Aug 2026: DeepSeek V3.1 + R1 (line retired upstream — the V4
@@ -505,9 +544,12 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="The cheap, fast GLM 5.3 — about a twentieth the price of full 5.3 and still good at coding and long agent runs. The best value on the list.",
     ),
+    # Context corrected 2026-10-02: OpenRouter's catalog now reports 1,048,576
+    # for the headline endpoint (was 1.31M — that reseller is no longer the
+    # default), so the history window follows what a user actually gets.
     ModelEntry(
         id="deepseek/deepseek-v4-flash-0731",
-        context_window=1_310_720,
+        context_window=1_048_576,
         provider="openrouter",
         display_name="DeepSeek V4 Flash (OpenRouter)",
         role="either",
@@ -568,15 +610,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     # Smoke-tested 2026-09-25: works, but xAI attaches a much bigger hidden
     # system prompt than 4.6 did (~1,250 input tokens on a one-line turn vs
-    # ~217), so the 20% lower per-token rate does NOT make every short turn
-    # cheaper. Cost math is still faithful — we bill what OpenRouter reports.
+    # ~217). As of 2026-10-02 its 20% launch discount has ended and OpenRouter
+    # lists it level with 4.6 at $2/$6, so short turns now cost MORE than on
+    # 4.6. Cost math is still faithful — we bill what OpenRouter reports.
     ModelEntry(
         id="x-ai/grok-4.7",
         context_window=500_000,
         provider="openrouter",
         display_name="Grok 4.7 (OpenRouter)",
         role="either",
-        notes="xAI's newest frontier model — better than Grok 4.6 at long-running coding and agent work, at a 20% lower per-token rate.",
+        notes="xAI's newest frontier model — better than Grok 4.6 at long-running coding and agent work. Now the same per-token price as 4.6 (its launch discount ended Oct 2026).",
     ),
     ModelEntry(
         id="meta/muse-spark-1.2",

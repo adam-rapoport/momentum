@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.9",
+    date: "October 2, 2026",
+    title: "Claude Sonnet 5.5 and GPT-6.1 Sol join the picker",
+    highlights: [
+      "Claude Sonnet 5.5 — Anthropic's newest Sonnet, out last week — is now in the picker on your Anthropic key or via OpenRouter. It's a straight upgrade on Sonnet 5 for building features and fixing bugs, and it costs exactly the same: $2 per million words in, $10 out. If you were on Sonnet 5, there's no reason not to switch.",
+      "GPT-6.1 Sol is OpenAI's newest high-end model, and it's the same deal: better than GPT-6 Sol at coding and document-heavy work, at the identical $2 and $10. Available on your OpenAI key or via OpenRouter.",
+      "Grok 4.7's launch discount has ended. It now costs the same per word as Grok 4.6 ($2 in, $6 out) rather than 20% less, and because xAI attaches a large hidden prompt to every Grok 4.7 turn, short messages now cost a bit more on 4.7 than on 4.6. The note under the picker says so, and your running cost total was already accurate either way.",
+      "Refreshed prices across the OpenRouter models so your cost total keeps matching your real bill. The big movers: DeepSeek V4 Flash is now almost free to read with (input dropped to under a cent per million words) but four times pricier for long answers, DeepSeek V4.1 Flash doubled, GLM 5.3 Flash went back up after September's dip, and Kimi K3 came down 10%.",
+      "Nothing was removed this week — every model in the picker is still live at its provider.",
+    ],
+  },
+  {
     version: "0.3.8",
     date: "September 25, 2026",
     title: "Claude Opus 5.5 and two more GPT-6 models join the picker",
