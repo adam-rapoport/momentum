@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.10",
+    date: "October 9, 2026",
+    title: "Claude Haiku 5.5 — a tenth of Haiku 4.5's price",
+    highlights: [
+      "Claude Haiku 5.5, Anthropic's newest small model, landed two days ago and is now in the picker on your Anthropic key or via OpenRouter. It is the biggest price drop we've passed on all year: $0.10 per million words in and $0.50 out, against Haiku 4.5's $1 and $5. That is a tenth of the cost, and it also handles 1 million words of context instead of 200,000, and Anthropic rates it the fastest model of its current lineup. If you use Haiku 4.5 for your light slot, switching is close to a free upgrade.",
+      "One thing to know about it: Haiku 5.5 is the only model in the picker whose price depends on how long your message is. Anything under 100,000 words of context gets the headline rate above; go over that and it costs five times more. Momentum's running cost total shows the cheaper rate, so a very long conversation on Haiku 5.5 will bill higher than the figure you see. The note under the picker says so too.",
+      "Haiku 4.5 stays available and keeps working — nothing to do if you would rather not move. Your Anthropic default is also unchanged.",
+      "Refreshed prices across the OpenRouter models so your cost total keeps matching your real bill. The big movers: Kimi K3 is 81% cheaper to send to, GLM 5.2 and GLM 5.3 are now nearly free to read with but dearer for long answers, DeepSeek V4 Flash got cheaper again on input, and Llama 3.3 70B went back up after September's cheap routing.",
+      "Nothing was removed this week — every model in the picker is still live at its provider.",
+    ],
+  },
+  {
     version: "0.3.9",
     date: "October 2, 2026",
     title: "Claude Sonnet 5.5 and GPT-6.1 Sol join the picker",
