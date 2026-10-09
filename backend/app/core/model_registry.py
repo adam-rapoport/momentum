@@ -44,14 +44,18 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-09-25). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-10-09). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule; Groq proved the point again in Sep 2026
 # (see qwen3.6-27b below). CAVEAT learned 2026-09-04: Mistral's
 # /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
 # is not necessarily retired — mistral-large-latest is absent on a free key
 # (403 "tier_not_allowed") but still current on mistral.ai/pricing
-# (re-confirmed 2026-09-25: same 403, still $0.50/$1.50 on the pricing page).
+# (re-confirmed 2026-10-09: same 403, still absent from the list, and the
+# pricing page still carries Mistral Large 3 at $0.50/$1.50 — it now also
+# lists a "Mistral Large 4" on sale at $0.68/$2.09, but which build the
+# -latest alias resolves to CANNOT be verified on this key, so the entry
+# keeps its unchanged, verified $0.50/$1.50).
 # Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
 # llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
@@ -290,7 +294,24 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="anthropic",
         display_name="Claude Haiku 4.5 (Anthropic)",
         role="light",
-        notes="Anthropic's fastest, cheapest model — a strong light pick. Paid.",
+        notes="Older Haiku — Haiku 5.5 is faster, 10x cheaper and has a far bigger context, so prefer it. Paid.",
+        client="anthropic_sdk",
+    ),
+    # Haiku 5.5 (2026-10-07) supersedes Haiku 4.5: 1M context instead of 200k
+    # and $0.10/$0.50 instead of $1/$5. NOTE its price is tiered by PROMPT
+    # LENGTH, the only model here priced that way — prompts over 100k tokens
+    # bill $0.50/$2.50, which the cost tracker does not model (it records the
+    # ≤100k rate), so a turn with a very long history displays under its true
+    # cost. Haiku 4.5's retirement floor ("not sooner than 2026-10-15") has now
+    # passed, though Anthropic has announced no shutdown and still lists it
+    # Active.
+    ModelEntry(
+        id="claude-haiku-5-5",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Haiku 5.5 (Anthropic)",
+        role="light",
+        notes="Anthropic's fastest and cheapest model — 1M context and a tenth of Haiku 4.5's price. The best Claude light pick. Paid (prompts over 100k tokens cost 5x more).",
         client="anthropic_sdk",
     ),
     ModelEntry(
@@ -373,7 +394,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Claude Haiku 4.5 (OpenRouter)",
         role="light",
-        notes="Anthropic's fast, cheap model via OpenRouter — a strong light pick.",
+        notes="Older Haiku via OpenRouter — Haiku 5.5 is faster, 10x cheaper and has a far bigger context, so prefer it.",
+    ),
+    # Haiku 5.5's OpenRouter twin. Same prompt-length pricing caveat as the
+    # native entry above; OpenRouter's catalog agrees with Anthropic's official
+    # $0.10/$0.50 here (its ":batch" slug is the half-price $0.05/$0.25 one).
+    ModelEntry(
+        id="anthropic/claude-haiku-5.5",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Haiku 5.5 (OpenRouter)",
+        role="light",
+        notes="Anthropic's fastest, cheapest model via OpenRouter — 1M context, a tenth of Haiku 4.5's price, the best-value light pick here (prompts over 100k tokens cost 5x more).",
     ),
     ModelEntry(
         id="google/gemini-3.5-flash",
