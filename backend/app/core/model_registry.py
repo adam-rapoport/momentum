@@ -44,18 +44,24 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-10-09). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-10-16). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule; Groq proved the point again in Sep 2026
 # (see qwen3.6-27b below). CAVEAT learned 2026-09-04: Mistral's
 # /v1/models is filtered to the CALLING KEY'S TIER, so a model missing from it
 # is not necessarily retired — mistral-large-latest is absent on a free key
 # (403 "tier_not_allowed") but still current on mistral.ai/pricing
-# (re-confirmed 2026-10-09: same 403, still absent from the list, and the
-# pricing page still carries Mistral Large 3 at $0.50/$1.50 — it now also
+# (re-confirmed 2026-10-16: same 403 "tier_not_allowed", still absent from the
+# list, and the
+# pricing page still carries Mistral Large 3 at $0.50/$1.50 — it also still
 # lists a "Mistral Large 4" on sale at $0.68/$2.09, but which build the
 # -latest alias resolves to CANNOT be verified on this key, so the entry
 # keeps its unchanged, verified $0.50/$1.50).
+# Learned 2026-10-16: a provider can retire an id WITHOUT removing it from
+# /v1/models — Google deprecated gemini-3.5-flash and gemini-3.7-flash on
+# 2026-10-08 and now silently serves their successors under the old ids. The
+# only way to catch that is to read the response's modelVersion on a real
+# turn, which this refresh now does for any id a changelog calls deprecated.
 # Removed June 2026: Gemini 2.5 (Google
 # shutdown Oct 2026) and Llama 4 Scout. Removed Aug 2026: Groq's
 # llama-3.1-8b-instant and llama-3.3-70b-versatile (Groq shut both down
@@ -128,13 +134,23 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Fastest, cheapest current Gemini — the default light pick. Free tier. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
+    # DEPRECATED UPSTREAM 2026-10-08 (ai.google.dev changelog + deprecations):
+    # Google kept the id serving but now ROUTES IT AUTOMATICALLY to
+    # gemini-3.6-flash, confirmed on a live turn 2026-10-16 (request
+    # gemini-3.5-flash -> response modelVersion "gemini-3.6-flash"). No
+    # shutdown date announced and the id is still in /v1beta/models, so this is
+    # not yet a retirement — but anyone picking it gets 3.6 Flash, so the note
+    # says to pick 3.6 or 3.8 directly. Price deliberately NOT changed: Google
+    # no longer lists a rate for this id at all, so what it actually bills for
+    # a routed turn is unverifiable, and guessing is worse than the last
+    # verified rate (see cost_tracker).
     ModelEntry(
         id="gemini-3.5-flash",
         context_window=1_048_576,
         provider="google",
         display_name="Gemini 3.5 Flash (Google, native SDK)",
         role="either",
-        notes="Fast all-rounder Gemini. Runs on Google's native SDK.",
+        notes="Retired by Google — picking this now actually runs Gemini 3.6 Flash, so choose 3.6 or 3.8 Flash directly instead. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -146,13 +162,22 @@ REGISTRY: tuple[ModelEntry, ...] = (
         notes="Strong Flash with a free tier (3.7 Flash has since superseded it). Runs on Google's native SDK.",
         client="genai_sdk",
     ),
+    # DEPRECATED UPSTREAM 2026-10-08, same as 3.5 Flash above: Google now
+    # routes this id to gemini-3.8-flash (confirmed live 2026-10-16 — request
+    # gemini-3.7-flash -> response modelVersion "gemini-3.8-flash"). No
+    # shutdown date announced, so the entry stays for now. ***THIS ID IS THE
+    # APP'S DEFAULT HEAVY MODEL*** (app.config.groq_heavy_model, and
+    # providers.ts google.heavy / openrouter.light) — changing a default is
+    # Adam's call, so it is deliberately left alone here and flagged in the PR
+    # instead. The recorded price already matches 3.8 Flash's rate, so cost
+    # math stays correct whichever one actually serves the turn.
     ModelEntry(
         id="gemini-3.7-flash",
         context_window=1_048_576,
         provider="google",
         display_name="Gemini 3.7 Flash (Google, native SDK)",
         role="either",
-        notes="Strong Flash built for agents and tool use — free tier, half-price intro through Dec 2026. The default heavy pick.",
+        notes="Retired by Google — picking this now actually runs Gemini 3.8 Flash (same price, free tier), so choose 3.8 Flash directly instead. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     ModelEntry(
@@ -171,6 +196,21 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Gemini 3 Pro (Google, native SDK)",
         role="heavy",
         notes="Strongest current Gemini for drafting. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    # Gemini 4 Argon — Google's new flagship, GA on 2026-10-13 (ai.google.dev
+    # changelog) and live on /v1beta/models with modelVersion "gemini-4-argon"
+    # on a real turn, so it is NOT an alias for anything else. First Gemini 4
+    # generation model in the picker. NO FREE TIER (the pricing page says so
+    # explicitly) — unlike every other Gemini entry here, so a free-key user
+    # who selects it will be billed.
+    ModelEntry(
+        id="gemini-4-argon",
+        context_window=1_048_576,
+        provider="google",
+        display_name="Gemini 4 Argon (Google, native SDK)",
+        role="heavy",
+        notes="Google's newest and strongest model — built for complex coding, maths/science and long multi-step agent work. Half price through Nov 2026. No free tier: this one always bills. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
@@ -439,6 +479,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="Google's newest, smartest Flash via OpenRouter — big gains over 3.7 Flash on coding and agent work.",
     ),
+    # Gemini 4 Argon's OpenRouter twin. Rate taken from Google's official
+    # pricing page, but checked both ways here: a live turn billed exactly
+    # $2/$10, so OpenRouter is NOT showing the batch rate for this one (its
+    # ":batch" slug is the half-price $1/$5 one).
+    ModelEntry(
+        id="google/gemini-4-argon",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Gemini 4 Argon (OpenRouter)",
+        role="heavy",
+        notes="Google's newest and strongest model via OpenRouter — for complex coding, maths/science and long agent runs. Half price through Nov 2026.",
+    ),
     ModelEntry(
         id="anthropic/claude-opus-5",
         context_window=1_000_000,
@@ -660,6 +712,21 @@ REGISTRY: tuple[ModelEntry, ...] = (
         display_name="Muse Spark 1.2 (OpenRouter)",
         role="either",
         notes="Meta's new closed model line — agentic and coding focus, mid-priced. Needs a one-time 18+ confirmation in your OpenRouter account settings first.",
+    ),
+    # Muse Wonder (2026-10-12) — Meta's frontier tier above the Muse Spark
+    # line. Unlike Muse Spark 1.3 (still 18+-gated and still unverifiable, see
+    # below) this one smoke-tested clean on 2026-10-16 with no attestation
+    # error. CAVEAT measured on that turn: reasoning is MANDATORY and cannot be
+    # switched off, and it spent 473 reasoning tokens to answer "OK" — billed
+    # as output, so even trivial turns cost real money at $4/$20. The note says
+    # so because this is the priciest per-short-turn model on the list.
+    ModelEntry(
+        id="meta/muse-wonder",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Muse Wonder (OpenRouter)",
+        role="heavy",
+        notes="Meta's new top-tier model — its strongest for hard coding and long agent runs, well above Muse Spark. Always thinks before answering, so even short turns cost a few cents. Premium pricing.",
     ),
     # Muse Spark 1.3 (released 2026-09-02, same $1.25/$4.25) was evaluated for
     # the Sep 2026 refresh and NOT added: its live smoke 403s with

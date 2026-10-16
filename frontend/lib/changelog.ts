@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.11",
+    date: "October 16, 2026",
+    title: "Gemini 4 Argon and Muse Wonder join the picker",
+    highlights: [
+      "Gemini 4 Argon is in the picker — Google's newest and strongest model, released three days ago, on your Google key or via OpenRouter. It's built for the hard stuff: complex coding, maths and science, and long multi-step work where it has to keep track of what it did twenty steps ago. Right now it costs $2 per million words in and $10 out, which is Google's launch price through November 30; it goes to $4 and $20 on December 1.",
+      "One thing to know before you pick it: Gemini 4 Argon has no free tier. Every other Gemini in the picker gives you some free usage on a Google key, and this one doesn't — turns on it always bill. The note under the picker says so too.",
+      "Muse Wonder is Meta's new top-tier model, available via OpenRouter. It's a big step up from Muse Spark for hard coding and long agent runs, and it's the one model here that always thinks before it answers — you can't turn that off. That thinking is billed as output, so even a one-line reply costs a couple of cents. Worth it for hard work, pricey for quick questions.",
+      "Heads up on two Google models you may be using: Google retired Gemini 3.5 Flash and Gemini 3.7 Flash last week. They both still work, but Google now quietly runs their replacements instead — pick Gemini 3.5 Flash and you actually get 3.6 Flash; pick 3.7 Flash and you get 3.8 Flash. Nothing breaks and your costs stay accurate, but the picker now tells you this, and you're better off choosing 3.6 or 3.8 Flash directly. If Gemini 3.7 Flash is your drafting model, it's still your drafting model and it's still working.",
+      "Refreshed prices across the OpenRouter models so your cost total keeps matching your real bill. The big movers: GLM 5.2 flipped around completely — ten times dearer to send to but well under half the price for long answers — while GLM 5.3 Flash flipped the other way and is now the cheapest model here to send text to. Kimi K3 came down another 39% on input, DeepSeek V4.1 Flash halved back to where it was two weeks ago, and Llama 3.3 70B got cheap again.",
+      "Nothing was removed this week — every model in the picker is still live at its provider.",
+    ],
+  },
+  {
     version: "0.3.10",
     date: "October 9, 2026",
     title: "Claude Haiku 5.5 — a tenth of Haiku 4.5's price",
