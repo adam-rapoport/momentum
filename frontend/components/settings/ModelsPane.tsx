@@ -111,7 +111,10 @@ function SlotCard({
 
   function dismissNudge() {
     if (!nudgeKey) return;
-    const next = [...dismissedNudges.filter((k) => k !== nudgeKey), nudgeKey];
+    // Re-read storage first: the light and heavy cards each hold their own
+    // copy of this list, so writing back only OUR copy would erase a
+    // dismissal the other card saved a moment ago.
+    const next = [...new Set([...readDismissedNudges(), ...dismissedNudges, nudgeKey])];
     setDismissedNudges(next);
     try {
       localStorage.setItem(DISMISSED_NUDGES_KEY, JSON.stringify(next));
