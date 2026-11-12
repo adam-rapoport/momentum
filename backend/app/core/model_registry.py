@@ -17,9 +17,10 @@ Adding a model:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.config import settings
+from app.core.cost_tracker import GROQ_PRICING
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,16 @@ class ModelEntry:
     # matches the 128k that every current entry meets or exceeds; set the
     # real value when adding a model.
     context_window: int = 128_000
+    # Picker curation (v0.4.0). Both are FILLED IN FROM THE TWO TABLES BELOW
+    # THE ENTRY LIST (RECOMMENDED / SUPERSEDED_BY) when REGISTRY is built — do
+    # not set them on individual entries, so the curation stays in one place.
+    #   recommended   -> shown first in the picker, under "Recommended".
+    #   superseded_by -> id of the newer model that replaces this one. Moves
+    #                    this entry under "Older models" (hidden until the user
+    #                    asks) and, when the successor costs the same or less,
+    #                    drives the "Newer version available" nudge.
+    recommended: bool = False
+    superseded_by: str | None = None
 
 
 # Model IDs below were verified against each provider's live model-list API
@@ -81,7 +92,7 @@ class ModelEntry:
 # gemini-3.5-flash-lite, not a Groq model: Groq's free-tier tokens/min cap is
 # smaller than the app's per-turn context, so every Groq free turn 429s (see
 # app.config.groq_model). Groq models remain here and stay user-selectable.
-REGISTRY: tuple[ModelEntry, ...] = (
+_ENTRIES: tuple[ModelEntry, ...] = (
     # --- Groq (fast inference; free tier gated only by rate limits) ---
     # Context window follows Groq's own /v1/models: it reported 131,042 for the
     # August build and the round 131,072 its siblings advertise as of
@@ -890,6 +901,95 @@ REGISTRY: tuple[ModelEntry, ...] = (
 )
 
 
+# --- Picker curation -------------------------------------------------------
+# RECOMMENDED: the short list shown first in each provider's dropdown. The
+# rule: Momentum's own default for a slot (frontend/lib/providers.ts), plus
+# the CURRENT mainstream light / mid / heavy tier from that provider. Premium
+# flagships (Fable, GPT-6 Astra, Gemini 4) are deliberately NOT here — they
+# sit under "More models", where their notes explain what the extra money
+# buys. Keep this tight: a long "Recommended" list recommends nothing.
+RECOMMENDED: frozenset[str] = frozenset({
+    # Groq
+    "openai/gpt-oss-20b", "openai/gpt-oss-120b",
+    # Google
+    "gemini-3.5-flash-lite", "gemini-3.8-flash",
+    # OpenAI
+    "gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol",
+    # Anthropic
+    "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5",
+    # OpenRouter
+    "google/gemini-3.8-flash", "anthropic/claude-haiku-5.5", "openai/gpt-6-luna",
+    "anthropic/claude-sonnet-5.5", "openai/gpt-6.1-sol", "anthropic/claude-opus-5.5",
+    # Mistral
+    "mistral-small-latest", "mistral-large-4",
+})
+
+# SUPERSEDED_BY: old id -> the id of the model that directly replaces it
+# (always the same provider). Chains are fine and expected — Fable 5 -> 5.1
+# -> 5.2 — and `upgrade_for` walks them to the newest one.
+#
+# Only list a pair when the newer model is a like-for-like successor in the
+# same tier. Being listed here does TWO things: the old model moves under
+# "Older models" in the picker, and — ONLY if the successor costs the same or
+# less on both input and output (checked live against cost_tracker, never
+# assumed) — the user is nudged to switch. So a pricier successor is safe to
+# list: the old model is tidied away but nobody is nudged into a bigger bill.
+#
+# Deliberately NOT listed: Grok 4.6 -> 4.7 (same per-token rate, but 4.7's
+# much larger hidden prompt makes short turns cost MORE, so "same price"
+# would mislead), and Gemini 3 Pro -> Gemini 4 (Gemini 4's launch price
+# doubles on 2026-12-01 and it has no free tier).
+SUPERSEDED_BY: dict[str, str] = {
+    # Google
+    "gemini-3.1-flash-lite": "gemini-3.5-flash-lite",
+    "gemini-3.5-flash": "gemini-3.6-flash",
+    "gemini-3.6-flash": "gemini-3.8-flash",
+    "gemini-3.7-flash": "gemini-3.8-flash",
+    # OpenAI — light tier, mid tier, high tier
+    "gpt-5.4-nano": "gpt-6-luna",
+    "gpt-5.6-luna": "gpt-6-luna",
+    "gpt-5.4-mini": "gpt-5.6-terra",
+    "gpt-5.6-terra": "gpt-6.1-terra",
+    "gpt-5.4": "gpt-5.5",
+    "gpt-5.5": "gpt-5.6-sol",
+    "gpt-5.6-sol": "gpt-6-sol",
+    "gpt-6-sol": "gpt-6.1-sol",
+    # Anthropic
+    "claude-haiku-4-5": "claude-haiku-5-5",
+    "claude-sonnet-5": "claude-sonnet-5-5",
+    "claude-opus-4-8": "claude-opus-5",
+    "claude-opus-5": "claude-opus-5-5",
+    "claude-fable-5": "claude-fable-5-1",
+    "claude-fable-5-1": "claude-fable-5-2",
+    # OpenRouter
+    "anthropic/claude-haiku-4.5": "anthropic/claude-haiku-5.5",
+    "anthropic/claude-sonnet-5": "anthropic/claude-sonnet-5.5",
+    "anthropic/claude-opus-5": "anthropic/claude-opus-5.5",
+    "anthropic/claude-fable-5": "anthropic/claude-fable-5.1",
+    "anthropic/claude-fable-5.1": "anthropic/claude-fable-5.2",
+    "google/gemini-3.5-flash": "google/gemini-3.6-flash",
+    "google/gemini-3.6-flash": "google/gemini-3.8-flash",
+    "google/gemini-3.7-flash": "google/gemini-3.8-flash",
+    "openai/gpt-6-sol": "openai/gpt-6.1-sol",
+    "moonshotai/kimi-k3": "moonshotai/kimi-k3.1-pro",
+    "minimax/minimax-m3": "minimax/minimax-m3.1-flash",
+    "z-ai/glm-5.2": "z-ai/glm-5.3",
+    "deepseek/deepseek-v4-flash-0731": "deepseek/deepseek-v4.1-flash",
+    # Mistral — Large 4 is Mistral's named replacement for both
+    "mistral-medium-latest": "mistral-large-4",
+    "mistral-large-latest": "mistral-large-4",
+}
+
+REGISTRY: tuple[ModelEntry, ...] = tuple(
+    replace(
+        m,
+        recommended=m.id in RECOMMENDED,
+        superseded_by=SUPERSEDED_BY.get(m.id),
+    )
+    for m in _ENTRIES
+)
+
+
 # Name-prefix heuristics for models that are NOT in the registry (raw env-var
 # overrides). The registry entry is always consulted first — these exist only
 # so a user pointing GROQ_MODEL/GROQ_HEAVY_MODEL at an unregistered ID still
@@ -1018,3 +1118,41 @@ def get_model(model_id: str) -> ModelEntry | None:
         if m.id == model_id:
             return m
     return None
+
+
+def upgrade_for(
+    model_id: str, configured_providers: set[str] | None = None
+) -> ModelEntry | None:
+    """The newer model worth nudging a user on `model_id` toward, or None.
+
+    Walks the SUPERSEDED_BY chain and returns the NEWEST successor that is
+    (a) usable right now — in the registry with its provider configured — and
+    (b) no more expensive than the current model on BOTH input and output,
+    per the live price table. Returning None is the common, safe answer: no
+    successor, a pricier successor, an unpriced model, or a provider the user
+    hasn't connected all mean "say nothing".
+    """
+    entry = get_model(model_id)
+    current = GROQ_PRICING.get(model_id)
+    if entry is None or current is None:
+        return None
+    best: ModelEntry | None = None
+    seen = {model_id}
+    next_id = entry.superseded_by
+    while next_id and next_id not in seen:  # `seen` makes a bad cycle harmless
+        seen.add(next_id)
+        candidate = get_model(next_id)
+        if candidate is None:
+            break
+        price = GROQ_PRICING.get(candidate.id)
+        if (
+            price is not None
+            and price.input <= current.input
+            and price.output <= current.output
+            and is_model_available(
+                candidate.id, configured_providers=configured_providers
+            )
+        ):
+            best = candidate
+        next_id = candidate.superseded_by
+    return best

@@ -1,6 +1,7 @@
 "use client";
 import { Banner, Btn, PixelIcon, PmLogo, PxLabel } from "@/components/pm";
 import { KeyInput } from "@/components/settings/KeyInput";
+import { ModelSelect } from "@/components/settings/ModelSelect";
 import { type ModelEntry } from "@/lib/api";
 import {
   providersForTier,
@@ -154,20 +155,11 @@ export function ModelStep({
                   )}
 
                   {providerModels.length > 1 && (
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <label className="text-[12.5px] font-medium text-ink-muted">Model</label>
-                      <select
-                        value={modelPick}
-                        onChange={(e) => setState({ ...state, model: e.target.value })}
-                        className="rounded-[7px] border border-line-strong bg-surface px-2 py-1.5 text-[13px] text-ink"
-                      >
-                        {providerModels.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <ModelSelect
+                      models={providerModels}
+                      value={modelPick}
+                      onChange={(id) => setState({ ...state, model: id })}
+                    />
                   )}
 
                   <div className="rounded-[12px] border border-line bg-surface p-4">

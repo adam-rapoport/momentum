@@ -368,6 +368,23 @@ export interface ModelEntry {
   display_name: string;
   role: "light" | "heavy" | "either";
   notes: string;
+  // Picker curation (v0.4.0): `recommended` models lead the dropdown;
+  // a model with `superseded_by` (the id of its replacement) is grouped
+  // under "Older models".
+  recommended: boolean;
+  superseded_by: string | null;
+  // USD per 1M tokens as decimal strings; null when the backend has no price.
+  input_per_mtok: string | null;
+  output_per_mtok: string | null;
+}
+
+// "Newer version available" suggestion for the model a slot is running: a
+// direct successor on the same provider that costs the same or less.
+export interface ModelUpgrade {
+  from_id: string;
+  to_id: string;
+  to_name: string;
+  cheaper: boolean; // false = same price exactly
 }
 
 // One installed model on the user's local Ollama server (dynamic — whatever
@@ -389,6 +406,9 @@ export interface ModelPreferences {
   // Full registry, unfiltered by configured providers — lets the onboarding
   // wizard offer a model choice before any key is saved.
   registry_models: ModelEntry[];
+  // null when there is nothing worth suggesting for that slot.
+  light_upgrade: ModelUpgrade | null;
+  heavy_upgrade: ModelUpgrade | null;
 }
 
 export interface ModelPreferencesUpdate {

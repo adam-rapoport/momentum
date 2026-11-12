@@ -20,7 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core import credentials
 from app.core.default_user import get_default_user
-from app.core.model_registry import REGISTRY, get_available_models, is_model_available
+from app.core.cost_tracker import GROQ_PRICING
+from app.core.model_registry import (
+    REGISTRY,
+    ModelEntry,
+    get_available_models,
+    is_model_available,
+    upgrade_for,
+)
 from app.core.search import DEFAULT_PROVIDER, VALID_PROVIDERS
 from app.dependencies import get_db
 from app.models import Organization
@@ -61,6 +68,36 @@ class ModelPreferencesUpdate(BaseModel):
     )
 
 
+def _model_view(m: ModelEntry) -> dict:
+    """A registry entry as the picker sees it: the entry's own fields plus its
+    price per million tokens (strings, so no float rounding on the way out).
+    None when the model has no price entry — the picker then shows no price
+    rather than a wrong one."""
+    view = asdict(m)
+    pricing = GROQ_PRICING.get(m.id)
+    view["input_per_mtok"] = str(pricing.input) if pricing else None
+    view["output_per_mtok"] = str(pricing.output) if pricing else None
+    return view
+
+
+def _upgrade_view(model_id: str, configured: set[str]) -> dict | None:
+    """The "Newer version available" nudge for the model a slot is running,
+    or None. All the judgement lives in model_registry.upgrade_for — this only
+    shapes its answer for the UI."""
+    target = upgrade_for(model_id, configured_providers=configured)
+    if target is None:
+        return None
+    current, new = GROQ_PRICING[model_id], GROQ_PRICING[target.id]
+    return {
+        "from_id": model_id,
+        "to_id": target.id,
+        "to_name": target.display_name,
+        # upgrade_for guarantees "no more expensive on either side"; this
+        # says whether it is strictly cheaper somewhere, for the wording.
+        "cheaper": new.input < current.input or new.output < current.output,
+    }
+
+
 def _public_view(user_preferences: dict, configured: set[str]) -> dict:
     light_pick = user_preferences.get("light_model") or None
     heavy_pick = user_preferences.get("heavy_model") or None
@@ -69,11 +106,24 @@ def _public_view(user_preferences: dict, configured: set[str]) -> dict:
     # only about which turns route where, not which models you're allowed to
     # pick. (role stays on each entry as a hint, but doesn't gate the picker.)
     available_all = [
-        asdict(m)
+        _model_view(m)
         for m in get_available_models(role=None, configured_providers=configured)
     ]
     available_light = available_all
     available_heavy = available_all
+
+    effective_light = (
+        light_pick
+        if light_pick
+        and is_model_available(light_pick, configured_providers=configured)
+        else settings.groq_model
+    )
+    effective_heavy = (
+        heavy_pick
+        if heavy_pick
+        and is_model_available(heavy_pick, configured_providers=configured)
+        else settings.groq_heavy_model
+    )
 
     return {
         "light_model": light_pick,
@@ -81,19 +131,13 @@ def _public_view(user_preferences: dict, configured: set[str]) -> dict:
         # The FULL registry, unfiltered by configured providers — the
         # onboarding wizard offers a model choice BEFORE the key is saved.
         # The PUT endpoint still validates picks against what's configured.
-        "registry_models": [asdict(m) for m in REGISTRY],
-        "effective_light_model": (
-            light_pick
-            if light_pick
-            and is_model_available(light_pick, configured_providers=configured)
-            else settings.groq_model
-        ),
-        "effective_heavy_model": (
-            heavy_pick
-            if heavy_pick
-            and is_model_available(heavy_pick, configured_providers=configured)
-            else settings.groq_heavy_model
-        ),
+        "registry_models": [_model_view(m) for m in REGISTRY],
+        "effective_light_model": effective_light,
+        "effective_heavy_model": effective_heavy,
+        # "Newer version available" nudges for what each slot is running now
+        # (null when there is nothing worth suggesting).
+        "light_upgrade": _upgrade_view(effective_light, configured),
+        "heavy_upgrade": _upgrade_view(effective_heavy, configured),
         "available_light_models": available_light,
         "available_heavy_models": available_heavy,
     }
