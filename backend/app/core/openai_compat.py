@@ -49,6 +49,39 @@ def _strip_thought_signatures(messages: list[dict]) -> list[dict]:
     return cleaned if cleaned is not None else messages
 
 
+def _delta_text(content: object) -> str:
+    """The user-visible text carried by one streamed delta's `content`.
+
+    Almost every provider sends a plain string. Mistral's reasoning models
+    (Mistral Large 4, verified live 2026-11-11) instead send a LIST of typed
+    parts on the same Chat Completions wire: `{"type": "thinking", ...}` for
+    the model's reasoning and `{"type": "text", "text": ...}` for the answer,
+    sometimes both in one delta. Appending that list to the text buffer used
+    to kill the turn ("expected str instance, list found").
+
+    Keep the text parts and drop the reasoning — the same treatment Gemma's
+    `<thought>` blocks get in google_client: reasoning is never shown to the
+    user or stored in history. Anything unrecognised yields "" rather than
+    raising, so a new part type degrades to missing text, not a dead turn.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for part in content:
+        if isinstance(part, str):
+            parts.append(part)
+            continue
+        if isinstance(part, dict):
+            kind, text = part.get("type"), part.get("text")
+        else:  # SDK may hand back typed objects instead of dicts
+            kind, text = getattr(part, "type", None), getattr(part, "text", None)
+        if kind == "text" and isinstance(text, str):
+            parts.append(text)
+    return "".join(parts)
+
+
 async def stream_chat(
     client: AsyncOpenAI,
     messages: list[dict],
@@ -85,8 +118,10 @@ async def stream_chat(
             choice = chunk.choices[0]
             delta = choice.delta
             if delta and delta.content:
-                collected_text.append(delta.content)
-                yield StreamChunk(text=delta.content)
+                text = _delta_text(delta.content)
+                if text:
+                    collected_text.append(text)
+                    yield StreamChunk(text=text)
             if delta and getattr(delta, "tool_calls", None):
                 for tc_delta in delta.tool_calls:
                     idx = tc_delta.index
