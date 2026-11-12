@@ -16,8 +16,23 @@ import {
   type Tier,
 } from "@/lib/providers";
 import { KeyInput } from "./KeyInput";
+import { ModelSelect, shortModelName } from "./ModelSelect";
 
 type ConnMap = Partial<Record<KeyProvider, ConnectionStatus>>;
+
+// "Not now" on a newer-version nudge is remembered per (old → new) pair on
+// this Mac, so the same suggestion never nags twice — but when a still-newer
+// model replaces the suggestion, that is a new pair and it is offered once.
+const DISMISSED_NUDGES_KEY = "momentum.upgrade-nudge.dismissed";
+
+function readDismissedNudges(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DISMISSED_NUDGES_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : [];
+  } catch {
+    return []; // storage unavailable or corrupt — just show the nudge
+  }
+}
 
 const SLOT_COPY: Record<Tier, { title: string; sub: string }> = {
   light: {
@@ -69,6 +84,8 @@ function SlotCard({
   // Local Ollama server state — fetched live when the Ollama pill is shown.
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[] | null>(null);
   const [ollamaBase, setOllamaBase] = useState<string | null>(null);
+  const [dismissedNudges, setDismissedNudges] = useState<string[]>([]);
+  useEffect(() => setDismissedNudges(readDismissedNudges()), []);
 
   function loadPrefs() {
     api.getModelPreferences().then(setPrefs).catch(() => setPrefs(null));
@@ -86,6 +103,25 @@ function SlotCard({
       : prefs.effective_heavy_model
     : "";
   const effectiveEntry = available.find((m) => m.id === effectiveId) ?? null;
+  // Newer-version nudge for what this slot runs now (the backend only sends
+  // one when the successor costs the same or less).
+  const upgrade = prefs ? (tier === "light" ? prefs.light_upgrade : prefs.heavy_upgrade) : null;
+  const nudgeKey = upgrade ? `${upgrade.from_id}->${upgrade.to_id}` : null;
+  const showNudge = !!upgrade && !!nudgeKey && !dismissedNudges.includes(nudgeKey);
+
+  function dismissNudge() {
+    if (!nudgeKey) return;
+    // Re-read storage first: the light and heavy cards each hold their own
+    // copy of this list, so writing back only OUR copy would erase a
+    // dismissal the other card saved a moment ago.
+    const next = [...new Set([...readDismissedNudges(), ...dismissedNudges, nudgeKey])];
+    setDismissedNudges(next);
+    try {
+      localStorage.setItem(DISMISSED_NUDGES_KEY, JSON.stringify(next));
+    } catch {
+      // storage unavailable — dismissed for this visit only
+    }
+  }
   // Ollama models are dynamic (never in the registry list), so the effective
   // id is the only signal that this slot runs on the local provider.
   const isOllamaActive = effectiveId.startsWith("ollama:");
@@ -288,6 +324,31 @@ function SlotCard({
         </Btn>
       </div>
 
+      {showNudge && upgrade && (
+        <div className="mt-3.5">
+          <Banner kind="info" title="Newer version available">
+            <span>
+              {shortModelName(upgrade.to_name)} replaces{" "}
+              {effectiveEntry ? shortModelName(effectiveEntry.display_name) : "this model"}
+              {upgrade.cheaper ? " and costs less." : " at the same price."}
+            </span>
+            <span className="mt-2 flex flex-wrap gap-2">
+              <Btn
+                size="sm"
+                kind="primary"
+                disabled={saving}
+                onClick={() => onSelectModel(upgrade.to_id)}
+              >
+                {saving ? "Switching…" : `Switch to ${shortModelName(upgrade.to_name)}`}
+              </Btn>
+              <Btn size="sm" kind="ghost" disabled={saving} onClick={dismissNudge}>
+                Not now
+              </Btn>
+            </span>
+          </Banner>
+        </div>
+      )}
+
       {expanded && (
         <div className="mt-3.5 border-t border-line-faint pt-3.5">
           <div className="flex flex-wrap gap-2">
@@ -373,21 +434,13 @@ function SlotCard({
                 )
               ) : (
                 providerModels.length > 1 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <label className="text-[12.5px] text-ink-muted">Model</label>
-                    <select
-                      value={slotPick}
-                      disabled={saving}
-                      onChange={(e) => onSelectModel(e.target.value)}
-                      className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-[13px] text-ink"
-                    >
-                      {providerModels.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <ModelSelect
+                    className="mt-3"
+                    models={providerModels}
+                    value={slotPick}
+                    disabled={saving}
+                    onChange={onSelectModel}
+                  />
                 )
               )}
             </div>

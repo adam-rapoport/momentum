@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.0",
+    date: "November 11, 2026",
+    title: "A tidier model picker, upgrade suggestions, and 10 new models",
+    highlights: [
+      "The model picker is easier to read. Each provider's list is now grouped: a short Recommended list first, then More models, with older generations tucked behind a “Show older models” switch. Nothing was removed — the switch brings every model back, and the model you're using always stays visible. It matters most on OpenRouter, where the list had grown to nearly 40 models.",
+      "Under the picker you now see what you've chosen: a one-line description and its price (per million tokens, in and out).",
+      "Momentum now tells you when there's a newer version of the model you're using. In Settings → Models, if your model has a direct successor that costs the same or less, you'll see a “Newer version available” note with a one-click switch. It only ever suggests something the same price or cheaper, and “Not now” makes it go away.",
+      "Three new flagship models, each on its own key or via OpenRouter: Claude Fable 5.2 (Anthropic's newest top model, and 20% cheaper than Fable 5.1 at $8 in and $40 out), Gemini 4 Carbon (Google's newest, built for long, reasoning-heavy work — half price through November 30, and no free tier), and GPT-6.1 Terra (half the price of GPT-6.1 Sol at $1 in and $5 out). Also new via OpenRouter: Muse Ember, Kimi K3.1 Pro and MiniMax M3.1 Flash.",
+      "Mistral Large 4 is in the picker and is now the suggested Mistral heavy model. Unlike the older Mistral Large, it works on a free Mistral key. The older one stays in the list for paid Mistral plans.",
+      "The models Momentum suggests when you connect a provider are now the current generation: Gemini 3.8 Flash, Claude Haiku 5.5 and Sonnet 5.5, GPT-6 Luna and GPT-6.1 Sol. Each costs the same or less than the one it replaces. Anything you picked yourself is left exactly as it is. If you never picked a heavy model, yours moves from Gemini 3.7 Flash to 3.8 Flash — the model Google was already running in its place.",
+      "Refreshed prices across the OpenRouter models so your cost total keeps matching your real bill.",
+      "Updating from 0.3.4? This also brings the seven model updates listed below — 25 more models, including the GPT-6 family, the Claude 5.5 family and Gemini 4 Argon.",
+    ],
+  },
+  {
     version: "0.3.11",
     date: "October 16, 2026",
     title: "Gemini 4 Argon and Muse Wonder join the picker",

@@ -74,6 +74,10 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # BUMP THIS THEN (ai.google.dev/gemini-api/docs/pricing, read 2026-10-16).
     # No free tier for this model, so every turn on it bills.
     "gemini-4-argon": ModelPricing("2.00", "10.00"),
+    # Gemini 4 Carbon (GA 2026-11-10): the same dated launch rate as Argon —
+    # $2/$10 "until Nov 30, 2026", $4.00/$20.00 from 2026-12-01 — BUMP BOTH
+    # THEN (aistudio.google.com/docs/pricing, read 2026-11-11). No free tier.
+    "gemini-4-carbon": ModelPricing("2.00", "10.00"),
     "gemini-3.5-flash-lite": ModelPricing("0.30", "2.50"),
     "gemini-3.1-flash-lite": ModelPricing("0.25", "1.50"),
     "gemini-2.5-pro": ModelPricing("2.50", "15.00"),
@@ -93,7 +97,9 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # shows batch/flex rates for some 5.6 tiers — these are the native
     # standard rates, deliberately different from what OpenRouter displays.
     # The whole 5.6 family was cut Jul/Aug 2026 (Luna -80%); Sol's $4/$20 is
-    # labeled promotional "at least through 2026-11-21" — re-check after.
+    # labeled promotional — as of 2026-11-11 OpenAI's page says the promo is
+    # "available until November 30, 2026" and does not state the rate after;
+    # RE-CHECK ON 2026-12-01. All rates below re-confirmed 2026-11-11.
     "gpt-5.4": ModelPricing("2.50", "15.00"),
     "gpt-5.4-mini": ModelPricing("0.75", "4.50"),
     "gpt-5.4-nano": ModelPricing("0.20", "1.25"),
@@ -117,12 +123,16 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # — identical to GPT-6 Sol's, so 6.1 is a free upgrade. Long-context
     # (>272k) tier not modeled, same as its siblings.
     "gpt-6.1-sol": ModelPricing("2.00", "10.00"),
+    # GPT-6.1 Terra at OpenAI's official standard short-context rate
+    # (developers.openai.com/api/docs/pricing, 2026-11-11) — half of 6.1 Sol.
+    # Long-context (>272k) tier $2/$7.50 not modeled, same as its siblings.
+    "gpt-6.1-terra": ModelPricing("1.00", "5.00"),
     # Legacy (kept so old sessions still display a cost):
     "gpt-4o": ModelPricing("2.50", "10.00"),
     "gpt-4o-mini": ModelPricing("0.15", "0.60"),
 
     # --- Anthropic (paid) ---
-    # Per platform.claude.com pricing, re-confirmed 2026-10-16.
+    # Per platform.claude.com pricing, re-confirmed 2026-11-11.
     "claude-haiku-4-5": ModelPricing("1.00", "5.00"),
     # Haiku 5.5 (2026-10-07) is the ONLY model here priced by PROMPT LENGTH:
     # $0.10/$0.50 for prompts up to 100k tokens, $0.50/$2.50 above that
@@ -151,10 +161,13 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # differs only in cache-read rate, which this tracker doesn't model.
     "claude-fable-5": ModelPricing("10.00", "50.00"),
     "claude-fable-5-1": ModelPricing("10.00", "50.00"),
+    # Fable 5.2 (2026-11-09) is the first Fable priced UNDER its predecessor:
+    # $8/$40 standard, not promotional (platform.claude.com, 2026-11-11).
+    "claude-fable-5-2": ModelPricing("8.00", "40.00"),
 
     # --- OpenRouter (mirrors the underlying labs' rates; OpenRouter adds a
     # small fee on credits, not per-token — close enough for display) ---
-    # Rates re-verified against openrouter.ai/api/v1/models, 2026-10-16.
+    # Rates re-verified against openrouter.ai/api/v1/models, 2026-11-11.
     # NOTE for open models: OpenRouter lists many resellers per model at very
     # different rates, and the catalog's headline rate follows whichever
     # endpoint it currently defaults to — so these move between refreshes
@@ -171,6 +184,12 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # 3.7 + 3.8 Flash at Google's native standard rate — OpenRouter lists a
     # separate ":batch" slug at half these rates, the known OpenRouter gotcha.
     "google/gemini-3.7-flash": ModelPricing("0.75", "3.75"),
+    # OPEN QUESTION (2026-11-11): OpenRouter's catalog now lists 3.8 Flash at
+    # $0.825/$4.125 — 10% over Google's official $0.75/$3.75, so not the usual
+    # half-price batch gotcha. Could not be settled either way: two live turns
+    # came back with usage and billed cost reported as 0. Left at Google's
+    # official rate per the standing rule for Google/OpenAI/Anthropic twins;
+    # re-check next refresh, and if a turn reports a real cost, trust that.
     "google/gemini-3.8-flash": ModelPricing("0.75", "3.75"),
     # Gemini 4 Argon twin at Google's official $2/$10 launch rate. Verified
     # BOTH ways: the catalog shows $2/$10 and a live turn billed exactly that
@@ -178,6 +197,10 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # slug is the half-price $1/$5 one. Rises to $4/$20 on 2026-12-01 with the
     # native entry above.
     "google/gemini-4-argon": ModelPricing("2.00", "10.00"),
+    # Gemini 4 Carbon twin at Google's official $2/$10 launch rate (catalog
+    # agrees; ":batch" is the half-price slug). Rises to $4/$20 on 2026-12-01
+    # with the native entry above.
+    "google/gemini-4-carbon": ModelPricing("2.00", "10.00"),
     "anthropic/claude-opus-5": ModelPricing("5.00", "25.00"),
     # Opus 5.5 at Anthropic's official $4/$20 — OpenRouter's catalog agrees
     # here; its ":batch" slug is the half-price $2/$10 one.
@@ -185,6 +208,8 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "anthropic/claude-fable-5": ModelPricing("10.00", "50.00"),
     # Fable 5.1 at Anthropic's official $10/$50 (the ":batch" slug is $5/$25).
     "anthropic/claude-fable-5.1": ModelPricing("10.00", "50.00"),
+    # Fable 5.2 at Anthropic's official $8/$40 (the ":batch" slug is $4/$20).
+    "anthropic/claude-fable-5.2": ModelPricing("8.00", "40.00"),
     # GPT-6 Astra via OpenRouter — its catalog rate matches OpenAI's official
     # standard rate here, so no batch-rate discrepancy to correct. Same for
     # the Luna and Sol twins added 2026-09-25 (both taken from OpenAI's page;
@@ -195,10 +220,17 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # GPT-6.1 Sol twin at OpenAI's official $2/$10 (OpenRouter's catalog agrees;
     # the ":batch" slug is the usual half-price one).
     "openai/gpt-6.1-sol": ModelPricing("2.00", "10.00"),
+    # GPT-6.1 Terra twin at OpenAI's official $1/$5 (catalog agrees for the
+    # plain slug; ":batch" is the half-price one).
+    "openai/gpt-6.1-terra": ModelPricing("1.00", "5.00"),
     # Kimi K3 keeps oscillating with OpenRouter's default endpoint ($3/$15 →
-    # $2.34/$11.70 → $2.10/$10.95 → $3/$15 → $2.70/$13.50 → $0.50/$12.00 → now
-    # $0.304/$11.936). Input has drifted down another 39%, output barely moves.
-    "moonshotai/kimi-k3": ModelPricing("0.304", "11.936"),
+    # $2.34/$11.70 → $2.10/$10.95 → $3/$15 → $2.70/$13.50 → $0.50/$12.00 →
+    # $0.304/$11.936 → now $0.192/$16.00). Input keeps falling, output is back
+    # up to its dearest yet.
+    "moonshotai/kimi-k3": ModelPricing("0.192", "16.00"),
+    # Kimi K3.1 Pro at the catalog headline rate (2026-11-11). Same lopsided
+    # shape as K3 — cheap input, dear output — and likely to move the same way.
+    "moonshotai/kimi-k3.1-pro": ModelPricing("0.2375", "8.4085"),
     # $2/$10 made permanent Aug 2026 (matches the native entry above).
     "anthropic/claude-sonnet-5": ModelPricing("2.00", "10.00"),
     # Sonnet 5.5 twin at Anthropic's official $2/$10 (the ":batch" slug is $1/$5).
@@ -213,37 +245,42 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     "deepseek/deepseek-v4-flash": ModelPricing("0.06", "0.12"),
     "z-ai/glm-5": ModelPricing("0.60", "1.92"),
     # Llama 3.3 70B: the headline endpoint keeps moving between resellers
-    # ($0.71/$0.71 → $0.10/$0.32 → $0.22/$0.50 → back to $0.10/$0.32, the same
-    # cheap reseller September saw). Still a cheap all-rounder.
-    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.10", "0.32"),
+    # ($0.71/$0.71 → $0.10/$0.32 → $0.22/$0.50 → $0.10/$0.32 → and by
+    # 2026-11-11 back to the dear $0.71/$0.71 one). Not the bargain it was.
+    "meta-llama/llama-3.3-70b-instruct": ModelPricing("0.71", "0.71"),
     # Current open-model picks (rates per the openrouter.ai catalog,
-    # 2026-10-16). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
+    # 2026-11-11). MiniMax M3's $0.30/$1.20 is a promotional rate (regular
     # $0.60/$2.40); free-tier-style discounts just display a lower cost.
-    # GLM 5.2's headline endpoint swung right back out of the lopsided shape
-    # it had last week ($0.06/$6.00 → $0.62/$2.42): input is 10x dearer and
-    # output 2.5x cheaper, so it is now the better pick for long ANSWERS and
-    # the worse one for long reading. GLM 5.3 stayed lopsided, input up to
-    # $0.079 with output unchanged.
-    "z-ai/glm-5.2": ModelPricing("0.62", "2.42"),
-    "z-ai/glm-5.3": ModelPricing("0.079", "4.80"),
-    # GLM 5.3 Flash flipped lopsided too ($0.15/$0.50 → $0.0143/$0.90):
-    # input is now a tenth of what it was, output nearly double. Still the
-    # cheapest input on the whole list.
-    "z-ai/glm-5.3-flash": ModelPricing("0.0143", "0.90"),
-    # V4 Flash's headline endpoint keeps diverging: input back up to $0.0080
-    # (was $0.0046, $0.0077 before that) with output steady at $1.28 for the
-    # third week. Cheap for long-context reading, not cheap for long answers.
-    "deepseek/deepseek-v4-flash-0731": ModelPricing("0.0080", "1.28"),
+    # GLM 5.2's headline endpoint swung back INTO the lopsided shape
+    # ($0.62/$2.42 → $0.007/$6.80): nearly free to read with, dear for long
+    # answers. GLM 5.3 went the other way and evened out ($0.079/$4.80 →
+    # $0.0699/$1.40), so it is now the cheaper of the two for long answers.
+    "z-ai/glm-5.2": ModelPricing("0.007", "6.80"),
+    "z-ai/glm-5.3": ModelPricing("0.0699", "1.40"),
+    # GLM 5.3 Flash un-flipped ($0.0143/$0.90 → $0.0399/$0.0784): input is
+    # nearly 3x dearer but output is a twelfth of what it was — now by far the
+    # cheapest OUTPUT on the whole list.
+    "z-ai/glm-5.3-flash": ModelPricing("0.0399", "0.0784"),
+    # V4 Flash's headline endpoint moved again ($0.0080/$1.28 →
+    # $0.0434/$0.30): input 5x dearer, output a quarter of what it was.
+    "deepseek/deepseek-v4-flash-0731": ModelPricing("0.0434", "0.30"),
     # DeepSeek bills these two on a UTC clock: the rate below is the headline
     # (off-peak) one OpenRouter reports, and peak hours cost roughly double —
     # V4 Pro $1.32/$3.96 (00:00-14:00 UTC), V4.1 Flash $0.30/$1.20
     # (01:00-04:00 and 06:00-10:00 UTC, weekdays). Recorded at the headline
     # rate per the note above; a peak turn displays under its true cost.
-    # V4 Pro's off-peak rate held at $0.66/$1.98 this week; V4.1 Flash halved
-    # straight back to $0.15/$0.60 (it had doubled to $0.30/$1.20 last week).
-    "deepseek/deepseek-v4-pro-0813": ModelPricing("0.66", "1.98"),
-    "deepseek/deepseek-v4.1-flash": ModelPricing("0.15", "0.60"),
+    # By 2026-11-11 both headline rates had moved a long way: V4 Pro went
+    # lopsided ($0.66/$1.98 → $0.111/$4.44 — a sixth the input, over double
+    # the output) and V4.1 Flash dropped to $0.022/$0.40 (from $0.15/$0.60).
+    # OpenRouter also now lists a dated "deepseek-v4.1-flash-1017" snapshot at
+    # $0.30/$1.20; the un-dated slug below is still listed and still answers,
+    # so it stays — WATCH for it being de-listed like V4 Flash's was in Aug.
+    "deepseek/deepseek-v4-pro-0813": ModelPricing("0.111", "4.44"),
+    "deepseek/deepseek-v4.1-flash": ModelPricing("0.022", "0.40"),
     "minimax/minimax-m3": ModelPricing("0.30", "1.20"),
+    # MiniMax M3.1 Flash at the catalog rate (2026-11-11) — half of M3's
+    # current promotional rate.
+    "minimax/minimax-m3.1-flash": ModelPricing("0.15", "0.60"),
     # Retired from the picker 2026-09-11 (OpenRouter de-listed the un-dated
     # slug); kept so old sessions still display a cost.
     "qwen/qwen3.8-max": ModelPricing("2.00", "6.00"),
@@ -259,15 +296,18 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     # and billed as output, so short turns are expensive: the 2026-10-16 smoke
     # turn spent 473 reasoning tokens to say "OK" (~$0.0099 for one line).
     "meta/muse-wonder": ModelPricing("4.00", "20.00"),
+    # Muse Ember (2026-11-09), Meta's smallest Muse, at the catalog rate.
+    "meta/muse-ember": ModelPricing("0.10", "0.50"),
 
-    # --- Mistral (per docs.mistral.ai/inference/pricing, 2026-10-16 — free
-    # tier is $0. Small and Medium re-confirmed unchanged; Large's alias target
-    # is unverifiable on this key, see the model_registry caveat.
-    # Large 3 really is priced below Medium 3.5 now: Medium 3.5 is Mistral's
-    # newer, stronger flagship) ---
+    # --- Mistral (per docs.mistral.ai/inference/pricing, 2026-11-11 — free
+    # tier is $0. Small 4 re-confirmed at $0.15/$0.60. Large 4 is listed at
+    # $0.70/$2.10. Medium 3.5 and Large 3 were deprecated 2026-10-31 and are
+    # NO LONGER on the pricing page at all, so their rates below are the last
+    # verified ones (2026-10-16) and cannot be re-confirmed) ---
     "mistral-small-latest": ModelPricing("0.15", "0.60"),
     "mistral-medium-latest": ModelPricing("1.50", "7.50"),
     "mistral-large-latest": ModelPricing("0.50", "1.50"),
+    "mistral-large-4": ModelPricing("0.70", "2.10"),
 }
 
 _MILLION = Decimal("1000000")

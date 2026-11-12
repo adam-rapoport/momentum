@@ -17,7 +17,7 @@ from app.core.llm_types import StreamChunk, StreamResult
 
 def _chunk(
     *,
-    content: str | None = None,
+    content: str | list | None = None,
     tool_calls: list | None = None,
     finish_reason: str | None = None,
     usage: SimpleNamespace | None = None,
@@ -85,6 +85,49 @@ async def test_text_deltas_stream_then_final_result():
     assert result.text == "Hello world"
     assert result.finish_reason == "stop"
     assert result.tool_calls == []
+
+
+async def test_typed_content_parts_keep_text_and_drop_reasoning():
+    """Mistral Large 4 streams `content` as a LIST of typed parts — reasoning
+    as {"type": "thinking"} and the answer as {"type": "text"} — instead of a
+    plain string. This is the exact shape captured from a live turn
+    (2026-11-11); before the fix it crashed the turn with "expected str
+    instance, list found"."""
+    thinking = lambda t, closed=True: {  # noqa: E731
+        "type": "thinking",
+        "thinking": [{"type": "text", "text": t}],
+        "closed": closed,
+    }
+    client = _FakeClient(
+        [
+            _chunk(content=""),
+            _chunk(content=[thinking("We", closed=False)]),
+            _chunk(content=[thinking(" need answer exactly")]),
+            # The final reasoning part and the first answer part share a delta.
+            _chunk(content=[thinking("."), {"type": "text", "text": "OK"}]),
+            _chunk(content=[{"type": "text", "text": " then"}], finish_reason="stop"),
+        ]
+    )
+    events = await _drain(client, "mistral-large-4")
+    # Reasoning-only deltas emit nothing; only real answer text streams out.
+    assert [e.text for e in events if isinstance(e, StreamChunk)] == ["OK", " then"]
+    assert all(isinstance(e.text, str) for e in events)
+    assert events[-1].text == "OK then"
+    assert events[-1].finish_reason == "stop"
+
+
+async def test_unrecognised_content_shapes_degrade_to_no_text():
+    """A part type we don't know (or junk) must never kill the turn."""
+    client = _FakeClient(
+        [
+            _chunk(content=[{"type": "audio", "data": "…"}, 42, None]),
+            _chunk(content=[SimpleNamespace(type="text", text="hi")]),
+            _chunk(finish_reason="stop"),
+        ]
+    )
+    events = await _drain(client, "mistral-large-4")
+    assert [e.text for e in events if isinstance(e, StreamChunk)] == ["hi"]
+    assert events[-1].text == "hi"
 
 
 async def test_tool_call_deltas_accumulate_across_chunks():

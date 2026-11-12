@@ -67,16 +67,19 @@ class Settings(BaseSettings):
     # Name kept as `groq_heavy_model` for compatibility; the value can now
     # be ANY provider's model ID (Groq, Google, ...). Provider is inferred
     # from the model-name prefix by app.core.llm.
-    # Default heavy model: gemini-3.7-flash via the native Gen AI SDK path
-    # (app.core.google_genai_client). Replaced gemini-3.5-flash 2026-08:
-    # 3.7 Flash is Google's strongest Flash and (at least through 2026-12-31)
-    # half 3.5 Flash's price, still with a free tier. 3.5 Flash itself had
-    # replaced the earlier gemma-4-31b-it default, which the OpenAI-compat
-    # endpoint couldn't drive reliably for structured output (2026-06 testing).
+    # Default heavy model: gemini-3.8-flash via the native Gen AI SDK path
+    # (app.core.google_genai_client). Replaced gemini-3.7-flash 2026-11
+    # (Adam's call): Google deprecated 3.7 Flash on 2026-10-08 and was already
+    # silently serving 3.8 Flash under the old id, so this just names the
+    # model users were really getting — same price (intro $0.75/$3.75 through
+    # 2026-12-31), still with a free tier. Earlier history: 3.7 Flash replaced
+    # 3.5 Flash in 2026-08, which had replaced the gemma-4-31b-it default that
+    # the OpenAI-compat endpoint couldn't drive reliably for structured output
+    # (2026-06 testing).
     # Env var alias stays GROQ_HEAVY_MODEL to avoid breaking existing .env
     # files; rename on next sprint if we keep accumulating providers.
     groq_heavy_model: str = Field(
-        "gemini-3.7-flash", alias="GROQ_HEAVY_MODEL"
+        "gemini-3.8-flash", alias="GROQ_HEAVY_MODEL"
     )
     groq_base_url: str = Field("https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
 

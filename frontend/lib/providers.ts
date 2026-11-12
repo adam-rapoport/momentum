@@ -58,7 +58,9 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "AIza... on older keys — newer formats vary",
     keyPrefix: "AIza",
     keyLength: [35, 90],
-    defaultModel: { light: "gemini-3.5-flash-lite", heavy: "gemini-3.7-flash" },
+    // Heavy moved 3.7 → 3.8 Flash 2026-11: Google retired 3.7 Flash and was
+    // already serving 3.8 under that id (same price, same free tier).
+    defaultModel: { light: "gemini-3.5-flash-lite", heavy: "gemini-3.8-flash" },
   },
   openai: {
     id: "openai",
@@ -66,27 +68,31 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     name: "OpenAI",
     tiers: ["light", "heavy"],
     pricing: "Paid · billing required on your OpenAI account",
-    description: "The GPT-5.4 and 5.6 families. Paid; works as a light or heavy model.",
+    description: "The GPT-6 and GPT-5 families. Paid; works as a light or heavy model.",
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: 'In OpenAI → API keys → "Create new secret key".',
     keyHint: "Starts with sk-",
     keyPrefix: "sk-",
     keyLength: [20, 200],
-    defaultModel: { light: "gpt-5.6-luna", heavy: "gpt-5.6-sol" },
+    // Moved to the GPT-6 generation 2026-11: each is half the price of the
+    // 5.6 model it replaces (and 5.6 Sol's promo rate ends 2026-11-30).
+    defaultModel: { light: "gpt-6-luna", heavy: "gpt-6.1-sol" },
   },
   anthropic: {
     id: "anthropic",
     credProvider: "llm:anthropic",
     name: "Anthropic Claude",
     tiers: ["light", "heavy"],
-    pricing: "Paid · $1–$25 per million tokens by model",
-    description: "Claude Haiku, Sonnet, and Opus — strong drafting and reasoning. Paid.",
+    pricing: "Paid · $0.10–$50 per million tokens by model",
+    description: "Claude Haiku, Sonnet, Opus, and Fable — strong drafting and reasoning. Paid.",
     helpUrl: "https://console.anthropic.com/settings/keys",
     helpText: 'In the Anthropic Console → API keys → "Create key".',
     keyHint: "Starts with sk-ant-",
     keyPrefix: "sk-ant-",
     keyLength: [40, 200],
-    defaultModel: { light: "claude-haiku-4-5", heavy: "claude-sonnet-5" },
+    // Moved to the 5.5 generation 2026-11: Haiku 5.5 is a tenth of Haiku
+    // 4.5's price with a 1M context; Sonnet 5.5 is Sonnet 5's price exactly.
+    defaultModel: { light: "claude-haiku-5-5", heavy: "claude-sonnet-5-5" },
   },
   openrouter: {
     id: "openrouter",
@@ -100,7 +106,8 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "Starts with sk-or-",
     keyPrefix: "sk-or-",
     keyLength: [30, 200],
-    defaultModel: { light: "google/gemini-3.7-flash", heavy: "anthropic/claude-sonnet-5" },
+    // Moved 2026-11 for the same reasons as the native Google/Anthropic picks.
+    defaultModel: { light: "google/gemini-3.8-flash", heavy: "anthropic/claude-sonnet-5.5" },
   },
   mistral: {
     id: "mistral",
@@ -114,7 +121,10 @@ export const PROVIDERS: Record<string, ProviderMeta> = {
     keyHint: "~32 characters",
     keyPrefix: "",
     keyLength: [20, 80],
-    defaultModel: { light: "mistral-small-latest", heavy: "mistral-large-latest" },
+    // Heavy moved to Large 4 2026-11: mistral-large-latest 403s on a free
+    // Mistral key ("tier_not_allowed"); Large 4 answers on one and is the
+    // named successor to the Large 3 / Medium 3.5 generation.
+    defaultModel: { light: "mistral-small-latest", heavy: "mistral-large-4" },
   },
   ollama: {
     id: "ollama",
