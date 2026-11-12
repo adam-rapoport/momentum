@@ -44,7 +44,7 @@ class ModelEntry:
 
 # Model IDs below were verified against each provider's live model-list API
 # (Groq /v1/models, Google /v1beta/models, OpenAI /v1/models, Anthropic
-# /v1/models, Mistral /v1/models — all re-checked 2026-10-16). When
+# /v1/models, Mistral /v1/models — all re-checked 2026-11-11). When
 # refreshing, re-check those endpoints rather than trusting docs — providers
 # retire IDs on their own schedule; Groq proved the point again in Sep 2026
 # (see qwen3.6-27b below). CAVEAT learned 2026-09-04: Mistral's
@@ -57,6 +57,13 @@ class ModelEntry:
 # lists a "Mistral Large 4" on sale at $0.68/$2.09, but which build the
 # -latest alias resolves to CANNOT be verified on this key, so the entry
 # keeps its unchanged, verified $0.50/$1.50).
+# Update 2026-11-11: Mistral Large 4 is now its own id (`mistral-large-4`,
+# live on /v1/models and answering on this same free key), and Mistral's docs
+# deprecated Large 3 and Medium 3.5 on 2026-10-31 (retirement 2027-04-30,
+# replacement Large 4 for both). So Large 4 is added below and is now the
+# Mistral heavy default in providers.ts — the first Mistral heavy pick that
+# works on a free key. mistral-large-latest still 403s "tier_not_allowed" here
+# and stays listed for paid-plan users, with a note saying so.
 # Learned 2026-10-16: a provider can retire an id WITHOUT removing it from
 # /v1/models — Google deprecated gemini-3.5-flash and gemini-3.7-flash on
 # 2026-10-08 and now silently serves their successors under the old ids. The
@@ -159,18 +166,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 3.6 Flash (Google, native SDK)",
         role="either",
-        notes="Strong Flash with a free tier (3.7 Flash has since superseded it). Runs on Google's native SDK.",
+        notes="Strong Flash with a free tier (3.8 Flash has since superseded it). Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     # DEPRECATED UPSTREAM 2026-10-08, same as 3.5 Flash above: Google now
     # routes this id to gemini-3.8-flash (confirmed live 2026-10-16 — request
     # gemini-3.7-flash -> response modelVersion "gemini-3.8-flash"). No
-    # shutdown date announced, so the entry stays for now. ***THIS ID IS THE
-    # APP'S DEFAULT HEAVY MODEL*** (app.config.groq_heavy_model, and
-    # providers.ts google.heavy / openrouter.light) — changing a default is
-    # Adam's call, so it is deliberately left alone here and flagged in the PR
-    # instead. The recorded price already matches 3.8 Flash's rate, so cost
-    # math stays correct whichever one actually serves the turn.
+    # shutdown date announced, so the entry stays for now. It WAS the app's
+    # default heavy model until 2026-11-11, when Adam approved moving the
+    # defaults (app.config.groq_heavy_model, providers.ts google.heavy /
+    # openrouter.light) to gemini-3.8-flash — the model Google was already
+    # serving under this id. The recorded price matches 3.8 Flash's rate, so
+    # cost math stays correct whichever one actually serves the turn.
     ModelEntry(
         id="gemini-3.7-flash",
         context_window=1_048_576,
@@ -210,7 +217,22 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="google",
         display_name="Gemini 4 Argon (Google, native SDK)",
         role="heavy",
-        notes="Google's newest and strongest model — built for complex coding, maths/science and long multi-step agent work. Half price through Nov 2026. No free tier: this one always bills. Runs on Google's native SDK.",
+        notes="Google's Gemini 4 all-rounder — built for complex coding, maths/science and long multi-step agent work. Half price through Nov 2026. No free tier: this one always bills. Runs on Google's native SDK.",
+        client="genai_sdk",
+    ),
+    # Gemini 4 Carbon — GA 2026-11-10 (Google's changelog: "our most capable
+    # reasoning model built for sustained agentic coding"). Live on
+    # /v1beta/models (1,048,576 in / 32,768 out, same shape as Argon). Google
+    # calls BOTH Gemini 4 models "most capable" and does not rank them, so the
+    # notes describe what each is for rather than claiming one is stronger.
+    # Same dated launch price as Argon and, like Argon, NO FREE TIER.
+    ModelEntry(
+        id="gemini-4-carbon",
+        context_window=1_048_576,
+        provider="google",
+        display_name="Gemini 4 Carbon (Google, native SDK)",
+        role="heavy",
+        notes="Google's newest model — its reasoning-focused Gemini 4, built for long, sustained agentic coding, scientific reasoning and document-heavy knowledge work. Half price through Nov 2026. No free tier: this one always bills. Runs on Google's native SDK.",
         client="genai_sdk",
     ),
     # --- OpenAI (paid) ---
@@ -325,6 +347,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="OpenAI's newest high-end model — better than GPT-6 Sol at agentic coding and document-heavy work, for the same price. 1M context. Paid.",
     ),
+    # GPT-6.1 Terra — the 6.1 generation's mid tier, live on /v1/models
+    # (created 2026-10-13) and on OpenAI's pricing page at $1/$5 standard,
+    # exactly half of 6.1 Sol. Its -pro twin is the same model served in
+    # reasoning "pro" mode — a serving tier, skipped like the other -pro ids.
+    ModelEntry(
+        id="gpt-6.1-terra",
+        context_window=1_000_000,
+        provider="openai",
+        display_name="GPT-6.1 Terra (OpenAI)",
+        role="either",
+        notes="GPT-6.1's mid tier at half the price of GPT-6.1 Sol — a strong everyday pick for writing, coding and agent work, and good at reading screenshots. 1M context. Paid.",
+    ),
     # --- Anthropic (paid) — official anthropic SDK ---
     # IDs/pricing per platform.claude.com (2026-06). Claude models go through
     # the native SDK (app.core.anthropic_client), not an OpenAI-compat shim.
@@ -422,7 +456,21 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="anthropic",
         display_name="Claude Fable 5.1 (Anthropic)",
         role="heavy",
-        notes="Anthropic's newest top-tier model — better than Fable 5 at agentic coding, long refactors and long-running work. Same price as Fable 5. Paid, premium pricing.",
+        notes="Anthropic's previous top-tier model — better than Fable 5 at agentic coding and long-running work. Fable 5.2 is newer and 20% cheaper, so prefer it. Paid, premium pricing.",
+        client="anthropic_sdk",
+    ),
+    # Fable 5.2 (2026-11-09) — live on Anthropic's /v1/models and Active on
+    # the deprecations page (not sooner than 2027-11-09). First Fable to come
+    # in UNDER its predecessor: $8/$40 standard vs 5.1's $10/$50
+    # (platform.claude.com pricing, 2026-11-11). Same always-on thinking and
+    # same client path as Fable 5/5.1 — no `thinking` config may be sent.
+    ModelEntry(
+        id="claude-fable-5-2",
+        context_window=1_000_000,
+        provider="anthropic",
+        display_name="Claude Fable 5.2 (Anthropic)",
+        role="heavy",
+        notes="Anthropic's newest and most capable model — gains over Fable 5.1 in coding and reasoning for the hardest, longest-running work, and 20% cheaper ($8/$40). Paid, premium pricing.",
         client="anthropic_sdk",
     ),
     # --- OpenRouter (pay-as-you-go aggregator) ---
@@ -461,7 +509,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Gemini 3.6 Flash (OpenRouter)",
         role="either",
-        notes="Strong Google Flash via OpenRouter (3.7 Flash has since superseded it).",
+        notes="Strong Google Flash via OpenRouter (3.8 Flash has since superseded it).",
     ),
     ModelEntry(
         id="google/gemini-3.7-flash",
@@ -489,7 +537,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Gemini 4 Argon (OpenRouter)",
         role="heavy",
-        notes="Google's newest and strongest model via OpenRouter — for complex coding, maths/science and long agent runs. Half price through Nov 2026.",
+        notes="Google's Gemini 4 all-rounder via OpenRouter — for complex coding, maths/science and long agent runs. Half price through Nov 2026.",
+    ),
+    # Gemini 4 Carbon's OpenRouter twin (catalog 2026-11-10) at Google's
+    # official $2/$10 launch rate; its ":batch" slug is the half-price one.
+    ModelEntry(
+        id="google/gemini-4-carbon",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Gemini 4 Carbon (OpenRouter)",
+        role="heavy",
+        notes="Google's newest model via OpenRouter — its reasoning-focused Gemini 4, for long agentic coding and document-heavy knowledge work. Half price through Nov 2026.",
     ),
     ModelEntry(
         id="anthropic/claude-opus-5",
@@ -521,7 +579,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="openrouter",
         display_name="Claude Fable 5.1 (OpenRouter)",
         role="heavy",
-        notes="Anthropic's newest top-tier model via OpenRouter — better than Fable 5 at agentic coding and long-running work. Premium pricing.",
+        notes="Anthropic's previous top-tier model via OpenRouter — Fable 5.2 is newer and 20% cheaper, so prefer it. Premium pricing.",
+    ),
+    # Fable 5.2 twin at Anthropic's official $8/$40 (OpenRouter's catalog
+    # agrees; the ":batch" slug is the half-price $4/$20 one).
+    ModelEntry(
+        id="anthropic/claude-fable-5.2",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="Claude Fable 5.2 (OpenRouter)",
+        role="heavy",
+        notes="Anthropic's newest and most capable model via OpenRouter — gains over Fable 5.1 in coding and reasoning, and 20% cheaper. Premium pricing.",
     ),
     # First OpenAI twin on OpenRouter since the gpt-5 family was retired in
     # Aug 2026 — restores OpenAI access for OpenRouter-only users. Context
@@ -561,13 +629,35 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="OpenAI's newest high-end model via OpenRouter — better than GPT-6 Sol at agentic coding and document-heavy work, for the same price.",
     ),
+    # GPT-6.1 Terra twin at OpenAI's official $1/$5 standard rate (the catalog
+    # agrees for the plain slug; ":batch" is the half-price one).
+    ModelEntry(
+        id="openai/gpt-6.1-terra",
+        context_window=1_000_000,
+        provider="openrouter",
+        display_name="GPT-6.1 Terra (OpenRouter)",
+        role="either",
+        notes="GPT-6.1's mid tier via OpenRouter at half the price of GPT-6.1 Sol — a strong everyday pick for writing, coding and agent work.",
+    ),
     ModelEntry(
         id="moonshotai/kimi-k3",
         context_window=1_048_576,
         provider="openrouter",
         display_name="Kimi K3 (OpenRouter)",
         role="either",
-        notes="Moonshot's flagship — 1M context, strong reasoning and agentic tool use.",
+        notes="Moonshot's previous flagship — 1M context, strong reasoning and agentic tool use. Kimi K3.1 Pro has since superseded it.",
+    ),
+    # Kimi K3.1 Pro (catalog 2026-10-23) — Moonshot's post-trained successor
+    # to K3, same 1M window. Like K3 its OpenRouter headline rate is lopsided
+    # (cheap to read with, dear for long answers) and moves with the default
+    # endpoint; recorded at the catalog rate on 2026-11-11.
+    ModelEntry(
+        id="moonshotai/kimi-k3.1-pro",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Kimi K3.1 Pro (OpenRouter)",
+        role="either",
+        notes="Moonshot's newest flagship — the successor to Kimi K3, built for long-horizon coding and agent work. 1M context; cheap to send to, pricier for long answers.",
     ),
     ModelEntry(
         id="anthropic/claude-sonnet-5",
@@ -663,6 +753,16 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="either",
         notes="1M context, strong coding/agentic tool use — mid-priced all-rounder.",
     ),
+    # MiniMax M3.1 Flash (catalog 2026-10-19) — MiniMax bills it as a clear
+    # step up from M3 on agentic and coding work at half M3's current rate.
+    ModelEntry(
+        id="minimax/minimax-m3.1-flash",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="MiniMax M3.1 Flash (OpenRouter)",
+        role="either",
+        notes="MiniMax's newer, cheaper model — better than M3 at coding and multi-step agent work for half the price. 1M context.",
+    ),
     # Replaced the un-dated qwen/qwen3.8-max slug on 2026-09-11: OpenRouter
     # dropped that slug from its catalog (it still routes here, silently
     # resolving to -0902, but a de-listed alias can stop working without
@@ -728,6 +828,18 @@ REGISTRY: tuple[ModelEntry, ...] = (
         role="heavy",
         notes="Meta's new top-tier model — its strongest for hard coding and long agent runs, well above Muse Spark. Always thinks before answering, so even short turns cost a few cents. Premium pricing.",
     ),
+    # Muse Ember (catalog 2026-11-09) — Meta's smallest, cheapest Muse, aimed
+    # at the short repeated jobs agents do all day (tool calls, routing,
+    # subtasks). Added only because its live smoke passed (see the PR); the
+    # Muse Spark 1.3 gate below is why that is not taken for granted.
+    ModelEntry(
+        id="meta/muse-ember",
+        context_window=1_048_576,
+        provider="openrouter",
+        display_name="Muse Ember (OpenRouter)",
+        role="either",
+        notes="Meta's smallest, cheapest model — fast and built for quick everyday turns and tool use. 1M context. A good low-cost light pick.",
+    ),
     # Muse Spark 1.3 (released 2026-09-02, same $1.25/$4.25) was evaluated for
     # the Sep 2026 refresh and NOT added: its live smoke 403s with
     # "missing_attestation_types: age_18plus" even though the 1.2 gate is
@@ -750,7 +862,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="mistral",
         display_name="Mistral Medium (Mistral)",
         role="either",
-        notes="Mid-tier Mistral — balanced speed and quality.",
+        notes="Mid-tier Mistral — Mistral retires this generation in April 2027; Mistral Large 4 is its named successor and costs less.",
     ),
     ModelEntry(
         id="mistral-large-latest",
@@ -758,7 +870,22 @@ REGISTRY: tuple[ModelEntry, ...] = (
         provider="mistral",
         display_name="Mistral Large (Mistral)",
         role="heavy",
-        notes="Strongest Mistral for drafting and reasoning.",
+        notes="Older Mistral Large — only works on a paid Mistral plan (a free key gets an error). Mistral Large 4 is its successor and works on a free key too.",
+    ),
+    # Mistral Large 4 (docs "26.10") — Mistral's new flagship and the named
+    # replacement for BOTH Large 3 and Medium 3.5 (deprecated 2026-10-31,
+    # retiring 2027-04-30). Its own fixed id, not a -latest alias. Live on
+    # /v1/models with a 1,048,576 window and — unlike mistral-large-latest —
+    # it answers on a free key (verified 2026-11-11). It reasons before
+    # answering and returns that reasoning as typed content parts; see
+    # app.core.openai_compat for how those are handled.
+    ModelEntry(
+        id="mistral-large-4",
+        context_window=1_048_576,
+        provider="mistral",
+        display_name="Mistral Large 4 (Mistral)",
+        role="heavy",
+        notes="Mistral's newest flagship — 1M context, strong reasoning and coding, and cheaper than the Medium it replaces. Works on a free Mistral key. The best Mistral heavy pick.",
     ),
 )
 
